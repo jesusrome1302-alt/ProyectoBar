@@ -251,3 +251,18 @@ npm install -D <pkg> # Instalar devDependency
      - Tarjetas en cabecera con: Total de unidades físicas en bodega, Valorización de existencias a costo (`$ COP`), Valorización proyectada a precio de venta y contador de alertas por stock crítico/bajo.
   6. **Calidad y Reglas:**
      - 0 errores y 0 warnings en ESLint (`npm run lint`). Compilación estática exitosa (`npm run build`) en todas las rutas sin rutas dinámicas ni server actions.
+- **13/10/2026:** Preparación del Sistema para Prueba Operativa en Vivo (Esta Noche):
+  1. **Edición Completa de Productos en `/productos`:**
+     - Botón de edición con icono de lápiz en cada tarjeta del catálogo.
+     - Modal completo para actualizar: Nombre, Categoría, Precio de venta, Costo de compra, Stock físico actual, Stock mínimo de alerta y SKU/código de barras.
+     - Botón rápido y switch de activar/pausar productos temporalmente (si se agotan o no se venden en la jornada).
+     - Validación sincronizada con `/ventas`: productos inactivos o agotados muestran badges de aviso y bloquean adición no intencional.
+  2. **Facturación y Comprobantes Térmicos de Venta en `/cobro`:**
+     - Botón de **"Pre-Cuenta / Ticket"** en la cabecera de la mesa seleccionada para llevar la cuenta impresa al cliente antes de cobrar.
+     - Selector interactivo de propina sugerida voluntaria (5%, 10%, 15% o sin propina).
+     - Al presionar **"Cerrar Cuenta y Emitir Factura"**, se archiva la venta con número de recibo consecutivo (`FAC-XXXXXX`), mesa liberada y apertura automática del comprobante térmico con botón de impresión directa (`window.print()`).
+     - Sección de **"Historial de Cuentas Cerradas del Turno"** con listado de facturas emitidas y botón para reimprimir cualquier recibo si el cliente lo solicita.
+  3. **Configuración Operativa & Preparador de Turno Limpio en `/configuracion`:**
+     - Formulario reactivo para configurar el nombre comercial del bar, NIT, dirección, teléfono, pie de ticket y operador en turno.
+     - Botón **"Preparar Bar para Turno de Hoy (Limpiar Pruebas)"**: restablece mesas a $0 y disponibles, reinicia movimientos de caja del día para el arqueo limpio, pero **conserva 100% intactos los productos, inventario en bodega y proveedores**.
+  4. **Calidad:** 0 errores y 0 warnings en ESLint (`npm run lint`), compilación estática exitosa (`npm run build`).

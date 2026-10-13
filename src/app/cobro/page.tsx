@@ -1,24 +1,92 @@
 'use client'
 
 import { useState } from 'react'
-import { ReceiptText, CreditCard, DollarSign, Smartphone, Landmark, CheckCircle, AlertCircle, Printer, Check } from 'lucide-react'
+import {
+  ReceiptText,
+  CreditCard,
+  DollarSign,
+  Smartphone,
+  Landmark,
+  CheckCircle,
+  AlertCircle,
+  Printer,
+  Check,
+  X,
+  FileText,
+  History,
+} from 'lucide-react'
 import Link from 'next/link'
-import { useBarStore, loadBarData, saveBarData, TableState, PaymentRecord } from '@/lib/barState'
+import {
+  useBarStore,
+  loadBarData,
+  saveBarData,
+  closeTableAndSaveReceipt,
+  TableState,
+  PaymentRecord,
+  SaleReceiptRecord,
+} from '@/lib/barState'
 
 export default function CobroPage() {
   const barData = useBarStore()
   const tables = barData.tables
+  const closedSales = barData.closedSales || []
+  const settings = barData.settings || {
+    barName: 'ROCK BAR',
+    nit: '900.123.456-7',
+    address: 'Calle 10 # 40-20',
+    phone: '+57 (4) 444-1234',
+    footerText: '¡Gracias por tu visita a Rock Bar! El rock nunca muere.',
+  }
+
   const [selectedTableId, setSelectedTableId] = useState<number>(3)
   const [paymentMethod, setPaymentMethod] = useState<string>('Efectivo')
   const [customAmount, setCustomAmount] = useState<number | null>(null)
   const [cashReceived, setCashReceived] = useState<number>(50000)
   const [notification, setNotification] = useState<string>('')
 
+  // Estado para visualización / impresión de Ticket Térmico
+  const [showTicketModal, setShowTicketModal] = useState<boolean>(false)
+  const [activeReceipt, setActiveReceipt] = useState<SaleReceiptRecord | null>(null)
+  const [isPreBill, setIsPreBill] = useState<boolean>(false)
+  const [addTip, setAddTip] = useState<boolean>(false)
+  const [tipPercent, setTipPercent] = useState<number>(10)
+
   const currentAccount = tables.find((t: TableState) => t.id === selectedTableId) || tables[0]
 
   const formatCOP = (val: number) => '$ ' + val.toLocaleString('es-CO')
 
   const effectiveAmount = customAmount !== null ? customAmount : (currentAccount?.pending ?? 0)
+
+  // Ver e imprimir pre-cuenta antes de cobrar
+  const handleViewPreBill = () => {
+    if (!currentAccount || !currentAccount.items || currentAccount.items.length === 0) {
+      setNotification('Esta mesa no tiene productos en la comanda para generar pre-cuenta.')
+      setTimeout(() => setNotification(''), 3500)
+      return
+    }
+
+    const now = new Date()
+    const timeStr = now.toLocaleDateString('es-CO') + ' ' + now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+    const subtotal = currentAccount.items.reduce((acc, it) => acc + it.subtotal, 0)
+    const tipAmount = addTip ? Math.round(subtotal * (tipPercent / 100)) : 0
+
+    const preReceipt: SaleReceiptRecord = {
+      id: 'PRE-CUENTA',
+      tableId: currentAccount.id,
+      tableName: currentAccount.name,
+      closedAt: timeStr,
+      operator: barData.operatorName || 'Cajero Principal',
+      items: currentAccount.items,
+      payments: currentAccount.payments || [],
+      subtotal,
+      tip: tipAmount,
+      total: subtotal + tipAmount,
+    }
+
+    setActiveReceipt(preReceipt)
+    setIsPreBill(true)
+    setShowTicketModal(true)
+  }
 
   // Registrar pago o abono
   const handleRegisterPayment = () => {
@@ -59,6 +127,7 @@ export default function CobroPage() {
       data.movements.unshift({
         id: 'mov-' + Date.now(),
         type: 'sale',
+        category: 'Venta',
         description: `Pago en efectivo ${currentAccount.name}`,
         amount: effectiveAmount,
         time: timeStr,
@@ -69,6 +138,7 @@ export default function CobroPage() {
       data.movements.unshift({
         id: 'mov-' + Date.now(),
         type: 'sale',
+        category: 'Venta Electrónica',
         description: `Pago ${paymentMethod} ${currentAccount.name}`,
         amount: effectiveAmount,
         time: timeStr,
@@ -83,32 +153,29 @@ export default function CobroPage() {
     setTimeout(() => setNotification(''), 4500)
   }
 
-  // Cerrar cuenta y liberar mesa (cuando saldo = $0)
+  // Cerrar cuenta y liberar mesa (cuando saldo = $0) y generar factura definitiva
   const handleCloseAndFreeTable = () => {
     if (!currentAccount || currentAccount.pending > 0) return
 
-    const data = loadBarData()
-    const updatedTables = data.tables.map((t) => {
-      if (t.id === selectedTableId) {
-        return {
-          ...t,
-          status: 'available' as const,
-          items: [],
-          payments: [],
-          total: 0,
-          paid: 0,
-          pending: 0,
-          openedAt: undefined,
-        }
-      }
-      return t
-    })
+    const subtotal = currentAccount.items?.reduce((acc, it) => acc + it.subtotal, 0) || 0
+    const tipAmount = addTip ? Math.round(subtotal * (tipPercent / 100)) : 0
 
-    data.tables = updatedTables
-    saveBarData(data)
-    setCustomAmount(null)
-    setNotification(`¡Cuenta cerrada y ${currentAccount.name} liberada exitosamente! Ahora está Disponible.`)
-    setTimeout(() => setNotification(''), 5000)
+    const savedReceipt = closeTableAndSaveReceipt(selectedTableId, tipAmount)
+    if (savedReceipt) {
+      setActiveReceipt(savedReceipt)
+      setIsPreBill(false)
+      setShowTicketModal(true)
+      setCustomAmount(null)
+      setNotification(`¡Cuenta de ${currentAccount.name} cerrada y mesa liberada! Recibo ${savedReceipt.id} archivado.`)
+      setTimeout(() => setNotification(''), 5000)
+    }
+  }
+
+  // Reimprimir recibo del historial
+  const handleReprintReceipt = (receipt: SaleReceiptRecord) => {
+    setActiveReceipt(receipt)
+    setIsPreBill(false)
+    setShowTicketModal(true)
   }
 
   const changeDue = Math.max(0, cashReceived - effectiveAmount)
@@ -264,19 +331,31 @@ export default function CobroPage() {
                   </p>
                 </div>
 
-                {/* Indicadores Financieros de la Cuenta */}
-                <div className="flex items-center space-x-4 bg-zinc-950/80 p-3 rounded-xl border border-zinc-800">
-                  <div>
-                    <p className="text-[10px] text-zinc-500 uppercase font-bold">Total Cuenta</p>
-                    <p className="text-sm font-black text-white">{formatCOP(currentAccount.total)}</p>
-                  </div>
-                  <div className="border-l border-zinc-800 pl-4">
-                    <p className="text-[10px] text-emerald-400 uppercase font-bold">Abonado</p>
-                    <p className="text-sm font-black text-emerald-400">{formatCOP(currentAccount.paid)}</p>
-                  </div>
-                  <div className="border-l border-zinc-800 pl-4">
-                    <p className="text-[10px] text-amber-500 uppercase font-bold">Saldo Pendiente</p>
-                    <p className="text-base font-black text-amber-400">{formatCOP(currentAccount.pending)}</p>
+                <div className="flex items-center space-x-3">
+                  <button
+                    type="button"
+                    onClick={handleViewPreBill}
+                    title="Ver o imprimir pre-cuenta para llevar a la mesa"
+                    className="flex items-center space-x-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 hover:text-white px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Pre-Cuenta / Ticket</span>
+                  </button>
+
+                  {/* Indicadores Financieros de la Cuenta */}
+                  <div className="flex items-center space-x-4 bg-zinc-950/80 p-2.5 rounded-xl border border-zinc-800">
+                    <div>
+                      <p className="text-[10px] text-zinc-500 uppercase font-bold">Total Cuenta</p>
+                      <p className="text-sm font-black text-white">{formatCOP(currentAccount.total)}</p>
+                    </div>
+                    <div className="border-l border-zinc-800 pl-3">
+                      <p className="text-[10px] text-emerald-400 uppercase font-bold">Abonado</p>
+                      <p className="text-sm font-black text-emerald-400">{formatCOP(currentAccount.paid)}</p>
+                    </div>
+                    <div className="border-l border-zinc-800 pl-3">
+                      <p className="text-[10px] text-amber-500 uppercase font-bold">Saldo</p>
+                      <p className="text-sm font-black text-amber-400">{formatCOP(currentAccount.pending)}</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -439,6 +518,51 @@ export default function CobroPage() {
                   )}
                 </div>
 
+                {/* Opción de Propina Voluntaria Sugerida */}
+                <div className="bg-zinc-950/70 p-3.5 rounded-xl border border-zinc-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-bold text-white block">Propina Voluntaria Sugerida</span>
+                      <div className="flex items-center space-x-1">
+                        {[5, 10, 15].map((pct) => (
+                          <button
+                            key={pct}
+                            type="button"
+                            onClick={() => {
+                              setTipPercent(pct)
+                              setAddTip(true)
+                            }}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                              tipPercent === pct && addTip
+                                ? 'bg-amber-500 text-black'
+                                : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                            }`}
+                          >
+                            {pct}%
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <span className="text-[11px] text-zinc-400 mt-0.5 block">
+                      Monto ({tipPercent}%):{' '}
+                      <strong className="text-amber-400 font-bold">
+                        {formatCOP(Math.round(((currentAccount.total || 0) * tipPercent) / 100))}
+                      </strong>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAddTip(!addTip)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      addTip
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                        : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                    }`}
+                  >
+                    {addTip ? `✓ Incluida (${tipPercent}%)` : '+ Añadir Propina'}
+                  </button>
+                </div>
+
                 {/* Botones de Acción */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-zinc-800">
                   <button
@@ -468,7 +592,7 @@ export default function CobroPage() {
                     <Printer className="w-4 h-4" />
                     <span>
                       {currentAccount.pending === 0
-                        ? 'Cerrar Cuenta y Liberar Mesa'
+                        ? 'Cerrar Cuenta y Emitir Factura'
                         : 'Pendiente saldo para cerrar'}
                     </span>
                   </button>
@@ -482,6 +606,183 @@ export default function CobroPage() {
           )}
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* SECCIÓN: HISTORIAL DE CUENTAS CERRADAS DEL TURNO */}
+      {/* ========================================================================= */}
+      <div className="rock-card p-5 rounded-2xl space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+          <div className="flex items-center space-x-2">
+            <History className="w-4 h-4 text-amber-500" />
+            <h3 className="font-bold text-white text-base">Cuentas Cerradas del Turno ({closedSales.length})</h3>
+          </div>
+          <span className="text-[11px] text-zinc-400">Facturas archivadas listas para reimpresión</span>
+        </div>
+
+        {closedSales.length === 0 ? (
+          <p className="text-xs text-zinc-500 text-center py-4">
+            Aún no se han cerrado cuentas en este turno. Al cerrar una mesa saldada, se archivará aquí automáticamente.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-zinc-950/80 text-zinc-400 font-bold uppercase tracking-wider text-[10px] border-b border-zinc-800">
+                <tr>
+                  <th className="py-2.5 px-3">Nº Factura</th>
+                  <th className="py-2.5 px-3">Mesa</th>
+                  <th className="py-2.5 px-3">Hora Cierre</th>
+                  <th className="py-2.5 px-3">Ítems</th>
+                  <th className="py-2.5 px-3 text-right">Total Facturado</th>
+                  <th className="py-2.5 px-3 text-center">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800/60 font-medium">
+                {closedSales.map((sale) => (
+                  <tr key={sale.id} className="hover:bg-zinc-900/40 transition-colors">
+                    <td className="py-2.5 px-3 font-mono font-bold text-amber-400">{sale.id}</td>
+                    <td className="py-2.5 px-3 text-white font-bold">{sale.tableName}</td>
+                    <td className="py-2.5 px-3 text-zinc-400">{sale.closedAt}</td>
+                    <td className="py-2.5 px-3 text-zinc-300">
+                      {sale.items.length} productos ({sale.items.reduce((acc, it) => acc + it.quantity, 0)} uds)
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-black text-emerald-400">
+                      {formatCOP(sale.total)}
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleReprintReceipt(sale)}
+                        className="inline-flex items-center space-x-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
+                      >
+                        <Printer className="w-3 h-3 text-amber-400" />
+                        <span>Reimprimir</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* MODAL: TICKET TÉRMICO / FACTURA DE VENTA ROCK BAR */}
+      {/* ========================================================================= */}
+      {showTicketModal && activeReceipt && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="rock-card w-full max-w-md p-6 rounded-3xl border border-zinc-700 shadow-2xl relative space-y-4 animate-scaleUp">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center space-x-2">
+                <FileText className="w-5 h-5 text-amber-400" />
+                <h3 className="font-bold text-white text-base">
+                  {isPreBill ? 'Pre-Cuenta de Consumo' : 'Comprobante de Venta'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTicketModal(false)}
+                className="text-zinc-500 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Recibo Formato Térmico */}
+            <div className="bg-white text-black p-5 rounded-xl font-mono text-xs shadow-inner space-y-3">
+              <div className="text-center space-y-0.5 border-b border-dashed border-zinc-400 pb-2">
+                <p className="font-black text-base tracking-wider">{settings.barName}</p>
+                <p className="text-[10px] text-zinc-600">NIT: {settings.nit}</p>
+                <p className="text-[10px] text-zinc-600">{settings.address}</p>
+                <p className="text-[10px] text-zinc-600">{settings.phone}</p>
+                <div className="pt-1 font-bold text-[11px]">
+                  {isPreBill ? '*** PRE-CUENTA DE COBRO ***' : `FACTURA DE VENTA: ${activeReceipt.id}`}
+                </div>
+              </div>
+
+              <div className="text-[10px] space-y-0.5 border-b border-dashed border-zinc-400 pb-2">
+                <div className="flex justify-between">
+                  <span>Mesa: <strong>{activeReceipt.tableName}</strong></span>
+                  <span>Hora: {activeReceipt.closedAt}</span>
+                </div>
+                <div>Atendido por: {activeReceipt.operator}</div>
+              </div>
+
+              {/* Detalle de Productos */}
+              <div className="space-y-1.5 border-b border-dashed border-zinc-400 pb-2 text-[11px]">
+                <div className="grid grid-cols-12 font-bold text-zinc-700 text-[10px] pb-1">
+                  <span className="col-span-2">CANT</span>
+                  <span className="col-span-6">DESCRIPCIÓN</span>
+                  <span className="col-span-4 text-right">TOTAL</span>
+                </div>
+                {activeReceipt.items.map((it, idx) => (
+                  <div key={idx} className="grid grid-cols-12 text-[10px]">
+                    <span className="col-span-2">{it.quantity}x</span>
+                    <span className="col-span-6 truncate font-sans">{it.name}</span>
+                    <span className="col-span-4 text-right">{formatCOP(it.subtotal)}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Totales */}
+              <div className="space-y-1 text-right text-[11px] pt-1">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>{formatCOP(activeReceipt.subtotal)}</span>
+                </div>
+                {activeReceipt.tip > 0 && (
+                  <div className="flex justify-between text-zinc-700">
+                    <span>Propina Voluntaria:</span>
+                    <span>{formatCOP(activeReceipt.tip)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm font-black border-t border-black pt-1">
+                  <span>TOTAL A PAGAR:</span>
+                  <span>{formatCOP(activeReceipt.total)}</span>
+                </div>
+              </div>
+
+              {/* Métodos de Pago */}
+              {activeReceipt.payments && activeReceipt.payments.length > 0 && (
+                <div className="border-t border-dashed border-zinc-400 pt-2 text-[10px] space-y-0.5">
+                  <p className="font-bold">Pagos Registrados:</p>
+                  {activeReceipt.payments.map((pay, idx) => (
+                    <div key={idx} className="flex justify-between text-zinc-700">
+                      <span>• {pay.method}:</span>
+                      <span>{formatCOP(pay.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Pie de Ticket */}
+              <div className="text-center text-[10px] pt-2 border-t border-dashed border-zinc-400 text-zinc-600">
+                <p>{settings.footerText}</p>
+                <p className="text-[9px] text-zinc-500 mt-1">Software POS Rock Bar • Operación Local</p>
+              </div>
+            </div>
+
+            {/* Botones del Modal */}
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={() => setShowTicketModal(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 shadow-lg shadow-red-900/30 transition-all cursor-pointer"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Imprimir Ticket</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

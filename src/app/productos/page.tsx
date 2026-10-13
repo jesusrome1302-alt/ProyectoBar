@@ -21,10 +21,14 @@ import {
   ArrowUpRight,
   Boxes,
   AlertCircle,
+  Edit2,
+  Power,
 } from 'lucide-react'
 import {
   useBarStore,
   addProductItem,
+  updateProductItem,
+  toggleProductActive,
   deleteProductItem,
   adjustProductStock,
   addSupplier,
@@ -56,6 +60,7 @@ export default function ProductosPage() {
 
   // Modales
   const [showProductModal, setShowProductModal] = useState<boolean>(false)
+  const [showEditProductModal, setShowEditProductModal] = useState<boolean>(false)
   const [showSupplierModal, setShowSupplierModal] = useState<boolean>(false)
   const [showPurchaseModal, setShowPurchaseModal] = useState<boolean>(false)
   const [showAdjustmentModal, setShowAdjustmentModal] = useState<boolean>(false)
@@ -68,6 +73,17 @@ export default function ProductosPage() {
   const [formStock, setFormStock] = useState<number>(24)
   const [formMinStock, setFormMinStock] = useState<number>(10)
   const [formBarcode, setFormBarcode] = useState<string>('')
+
+  // Formulario Editar Producto
+  const [editingProductId, setEditingProductId] = useState<string>('')
+  const [editName, setEditName] = useState<string>('')
+  const [editCategory, setEditCategory] = useState<string>('Cervezas')
+  const [editPrice, setEditPrice] = useState<number>(12000)
+  const [editCost, setEditCost] = useState<number>(6000)
+  const [editStock, setEditStock] = useState<number>(24)
+  const [editMinStock, setEditMinStock] = useState<number>(10)
+  const [editBarcode, setEditBarcode] = useState<string>('')
+  const [editActive, setEditActive] = useState<boolean>(true)
 
   // Formulario Nuevo Proveedor
   const [supName, setSupName] = useState<string>('')
@@ -130,6 +146,49 @@ export default function ProductosPage() {
 
     setNotification(`¡Producto "${newProd.name}" creado con éxito y disponible en catálogo!`)
     setTimeout(() => setNotification(''), 4500)
+  }
+
+  // Abrir modal de edición con datos del producto
+  const openEditProduct = (p: ProductState) => {
+    setEditingProductId(p.id)
+    setEditName(p.name)
+    setEditCategory(p.category)
+    setEditPrice(p.price)
+    setEditCost(p.cost)
+    setEditStock(p.stock)
+    setEditMinStock(p.min_stock)
+    setEditBarcode(p.barcode || '')
+    setEditActive(p.active !== false)
+    setShowEditProductModal(true)
+  }
+
+  // Guardar cambios del producto editado
+  const handleSaveEditProduct = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingProductId || !editName.trim() || editPrice <= 0) return
+
+    updateProductItem(editingProductId, {
+      name: editName.trim(),
+      category: editCategory,
+      price: editPrice,
+      cost: editCost,
+      stock: editStock,
+      min_stock: editMinStock,
+      barcode: editBarcode.trim(),
+      active: editActive,
+    })
+
+    setShowEditProductModal(false)
+    setNotification(`¡Producto "${editName.trim()}" actualizado correctamente!`)
+    setTimeout(() => setNotification(''), 4000)
+  }
+
+  // Alternar estado activo / pausado
+  const handleToggleActive = (p: ProductState) => {
+    toggleProductActive(p.id)
+    const nextStateMsg = p.active === false ? 'activado para venta en POS' : 'pausado temporalmente'
+    setNotification(`Producto "${p.name}" ${nextStateMsg}.`)
+    setTimeout(() => setNotification(''), 3500)
   }
 
   // Manejar eliminación de producto
@@ -469,19 +528,33 @@ export default function ProductosPage() {
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-3">
-                    <span className="text-[11px] font-bold text-zinc-400 bg-zinc-800/80 px-2.5 py-1 rounded-md border border-zinc-700/60">
-                      {p.category}
-                    </span>
+                    <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                      <span className="text-[11px] font-bold text-zinc-400 bg-zinc-800/80 px-2.5 py-1 rounded-md border border-zinc-700/60">
+                        {p.category}
+                      </span>
+                      {p.active === false && (
+                        <span className="text-[10px] font-bold bg-zinc-800 text-zinc-400 border border-zinc-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Pausado
+                        </span>
+                      )}
+                    </div>
 
-                    <div className="flex items-center space-x-1.5">
+                    <div className="flex items-center space-x-1">
                       <span
                         className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center space-x-1 ${
-                          isLowStock
+                          p.stock <= 0
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                            : isLowStock
                             ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                             : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         }`}
                       >
-                        {isLowStock ? (
+                        {p.stock <= 0 ? (
+                          <>
+                            <AlertCircle className="w-3 h-3 mr-1 inline" />
+                            <span>Agotado</span>
+                          </>
+                        ) : isLowStock ? (
                           <>
                             <AlertTriangle className="w-3 h-3 mr-1 inline" />
                             <span>Stock Bajo</span>
@@ -494,6 +567,31 @@ export default function ProductosPage() {
                         )}
                       </span>
 
+                      {/* Botón Editar Producto */}
+                      <button
+                        type="button"
+                        onClick={() => openEditProduct(p)}
+                        title="Editar precios, costos, stock o datos del producto"
+                        className="p-1 rounded-lg text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 transition-colors cursor-pointer"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Botón Pausar/Activar */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleActive(p)}
+                        title={p.active === false ? 'Habilitar para venta en POS' : 'Pausar temporalmente (no vender hoy)'}
+                        className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                          p.active === false
+                            ? 'text-zinc-600 hover:text-emerald-400 hover:bg-zinc-800'
+                            : 'text-emerald-500 hover:text-zinc-400 hover:bg-zinc-800'
+                        }`}
+                      >
+                        <Power className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Botón Eliminar */}
                       <button
                         type="button"
                         onClick={() => handleDeleteProduct(p)}
@@ -936,6 +1034,163 @@ export default function ProductosPage() {
                   className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 shadow-lg shadow-red-900/30 transition-all cursor-pointer"
                 >
                   Guardar Producto
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: EDITAR PRODUCTO */}
+      {/* ========================================================================= */}
+      {showEditProductModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="rock-card w-full max-w-lg p-6 rounded-3xl border border-zinc-700 shadow-2xl relative space-y-4 animate-scaleUp">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-600/20 text-amber-500 flex items-center justify-center font-bold">
+                  <Edit2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-lg">Editar Producto</h3>
+                  <p className="text-xs text-zinc-400">Modifica precios, costos, categoría o stock físico</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEditProductModal(false)}
+                className="text-zinc-500 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditProduct} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-zinc-300 block mb-1">Nombre del Producto *</label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Ej. Cerveza Corona Extra 355ml"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Categoría *</label>
+                  <select
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 cursor-pointer"
+                  >
+                    <option value="Cervezas">Cervezas</option>
+                    <option value="Licores">Licores & Botellas</option>
+                    <option value="Cócteles">Cócteles</option>
+                    <option value="Snacks">Snacks & Comida</option>
+                    <option value="Sin Alcohol">Sin Alcohol</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Código / SKU</label>
+                  <input
+                    type="text"
+                    value={editBarcode}
+                    onChange={(e) => setEditBarcode(e.target.value)}
+                    placeholder="Ej. 7701230001"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Precio Venta (COP) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={100}
+                    step={100}
+                    value={editPrice}
+                    onChange={(e) => setEditPrice(Number(e.target.value))}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-amber-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Costo Compra (COP) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    step={100}
+                    value={editCost}
+                    onChange={(e) => setEditCost(Number(e.target.value))}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-amber-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Stock Actual (unidades)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editStock}
+                    onChange={(e) => setEditStock(Number(e.target.value))}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Stock Mínimo (Alerta)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editMinStock}
+                    onChange={(e) => setEditMinStock(Number(e.target.value))}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              {/* Estado de Venta Activo / Pausado */}
+              <div className="bg-zinc-950/70 p-3.5 rounded-xl border border-zinc-800 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-white">Disponibilidad en el POS</p>
+                  <p className="text-[11px] text-zinc-400">Si está inactivo, no se podrá agregar a las comandas</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditActive(!editActive)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    editActive
+                      ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/40'
+                      : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                  }`}
+                >
+                  {editActive ? 'Activo (En Venta)' : 'Pausado (Oculto)'}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShowEditProductModal(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 shadow-lg shadow-amber-900/30 transition-all cursor-pointer"
+                >
+                  Guardar Cambios
                 </button>
               </div>
             </form>

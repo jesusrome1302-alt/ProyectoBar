@@ -113,6 +113,29 @@ export interface InventoryMovementRecord {
   resultingStock: number
 }
 
+export interface SaleReceiptRecord {
+  id: string
+  tableId: number
+  tableName: string
+  closedAt: string
+  operator: string
+  items: OrderItemState[]
+  payments: PaymentRecord[]
+  subtotal: number
+  tip: number
+  total: number
+}
+
+export interface BarSettings {
+  barName: string
+  nit: string
+  address: string
+  phone: string
+  footerText: string
+  tipPercentage: number
+  taxPercentage: number
+}
+
 export interface ProductState {
   id: string
   name: string
@@ -122,6 +145,8 @@ export interface ProductState {
   stock: number
   min_stock: number
   barcode?: string
+  active?: boolean
+  description?: string
 }
 
 export interface BarData {
@@ -135,6 +160,18 @@ export interface BarData {
   suppliers: SupplierState[]
   purchases: PurchaseRecord[]
   inventoryMovements: InventoryMovementRecord[]
+  closedSales?: SaleReceiptRecord[]
+  settings?: BarSettings
+}
+
+export const DEFAULT_SETTINGS: BarSettings = {
+  barName: 'ROCK BAR',
+  nit: '900.123.456-7',
+  address: 'Calle 10 # 40-20, Medellín',
+  phone: '+57 (4) 444-1234',
+  footerText: '¡Gracias por tu visita a Rock Bar! El rock nunca muere.',
+  tipPercentage: 10,
+  taxPercentage: 8,
 }
 
 const STORAGE_KEY = 'ROCK_BAR_APP_STATE_V1'
@@ -464,6 +501,8 @@ export const DEFAULT_BAR_DATA: BarData = {
   suppliers: INITIAL_SUPPLIERS,
   purchases: DEFAULT_PURCHASES,
   inventoryMovements: DEFAULT_INVENTORY_MOVEMENTS,
+  closedSales: [],
+  settings: DEFAULT_SETTINGS,
 }
 
 let cachedData: BarData = DEFAULT_BAR_DATA
@@ -499,6 +538,12 @@ export function loadBarData(): BarData {
     }
     if (!parsed.inventoryMovements) {
       parsed.inventoryMovements = DEFAULT_BAR_DATA.inventoryMovements
+    }
+    if (!parsed.closedSales) {
+      parsed.closedSales = []
+    }
+    if (!parsed.settings) {
+      parsed.settings = DEFAULT_SETTINGS
     }
     cachedData = parsed
     return cachedData
@@ -536,10 +581,34 @@ export function addProductItem(item: Omit<ProductState, 'id'>): ProductState {
   const newProduct: ProductState = {
     ...item,
     id: 'prod-' + Date.now(),
+    active: item.active !== undefined ? item.active : true,
   }
   data.products = [newProduct, ...(data.products || INITIAL_PRODUCTS)]
   saveBarData(data)
   return newProduct
+}
+
+export function updateProductItem(id: string, updates: Partial<ProductState>): void {
+  const data = loadBarData()
+  data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
+    if (p.id === id) {
+      return { ...p, ...updates }
+    }
+    return p
+  })
+  saveBarData(data)
+}
+
+export function toggleProductActive(id: string): void {
+  const data = loadBarData()
+  data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
+    if (p.id === id) {
+      const nextActive = p.active === false ? true : false
+      return { ...p, active: nextActive }
+    }
+    return p
+  })
+  saveBarData(data)
 }
 
 export function deleteProductItem(id: string): void {
@@ -556,6 +625,88 @@ export function adjustProductStock(id: string, delta: number): void {
     }
     return p
   })
+  saveBarData(data)
+}
+
+// Cierre de cuenta con archivado de recibo de venta
+export function closeTableAndSaveReceipt(
+  tableId: number,
+  tip: number = 0
+): SaleReceiptRecord | null {
+  const data = loadBarData()
+  const table = data.tables.find((t) => t.id === tableId)
+  if (!table) return null
+
+  const now = new Date()
+  const timeStr = now.toLocaleDateString('es-CO') + ' ' + now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  const subtotal = table.items.reduce((acc, it) => acc + it.subtotal, 0)
+  const total = subtotal + tip
+
+  const receipt: SaleReceiptRecord = {
+    id: 'FAC-' + Date.now().toString().slice(-6),
+    tableId: table.id,
+    tableName: table.name,
+    closedAt: timeStr,
+    operator: data.operatorName || 'Cajero Principal',
+    items: [...table.items],
+    payments: [...(table.payments || [])],
+    subtotal,
+    tip,
+    total,
+  }
+
+  data.closedSales = [receipt, ...(data.closedSales || [])]
+
+  // Resetear la mesa
+  data.tables = data.tables.map((t) => {
+    if (t.id === tableId) {
+      return {
+        ...t,
+        status: 'available' as const,
+        items: [],
+        payments: [],
+        total: 0,
+        paid: 0,
+        pending: 0,
+        openedAt: undefined,
+      }
+    }
+    return t
+  })
+
+  saveBarData(data)
+  return receipt
+}
+
+// Actualizar configuración del establecimiento
+export function updateBarSettings(newSettings: Partial<BarSettings>): void {
+  const data = loadBarData()
+  data.settings = { ...(data.settings || DEFAULT_SETTINGS), ...newSettings }
+  saveBarData(data)
+}
+
+// Limpiar datos de operaciones para empezar en blanco la prueba de la noche
+export function clearOperationalDataOnly(): void {
+  const data = loadBarData()
+  data.tables = DEFAULT_BAR_DATA.tables.map((t) => ({
+    ...t,
+    status: 'available' as const,
+    items: [],
+    payments: [],
+    total: 0,
+    paid: 0,
+    pending: 0,
+    openedAt: undefined,
+  }))
+  data.cash = {
+    ...DEFAULT_BAR_DATA.cash,
+    cashSales: 0,
+    electronicSales: 0,
+    expenses: 0,
+    expectedCash: data.cash.initialCash || 0,
+  }
+  data.movements = []
+  data.closedSales = []
   saveBarData(data)
 }
 

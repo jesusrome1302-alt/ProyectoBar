@@ -37,6 +37,11 @@ export default function VentasPage() {
 
   // Agregar producto a la mesa activa
   const handleAddProduct = (prod: ProductState) => {
+    if (prod.active === false) {
+      setNotification(`⚠️ "${prod.name}" está pausado temporalmente para la venta.`)
+      setTimeout(() => setNotification(''), 3500)
+      return
+    }
     if (prod.stock <= 0) {
       setNotification(`⚠️ "${prod.name}" no tiene existencias en stock.`)
       setTimeout(() => setNotification(''), 3500)
@@ -192,12 +197,14 @@ export default function VentasPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {filteredProducts.map((p) => {
               const isOutOfStock = p.stock <= 0
+              const isInactive = p.active === false
+              const isDisabled = isOutOfStock || isInactive
 
               return (
                 <div
                   key={p.id}
                   className={`rock-card p-3.5 rounded-xl flex flex-col justify-between h-36 relative transition-all group ${
-                    isOutOfStock
+                    isDisabled
                       ? 'opacity-60 border-zinc-800/50'
                       : 'hover:border-red-600 hover:bg-zinc-900/90'
                   }`}
@@ -205,8 +212,16 @@ export default function VentasPage() {
                   <div>
                     <div className="flex items-center justify-between gap-1 mb-1">
                       <span className="text-[10px] font-bold text-zinc-500 uppercase">{p.category}</span>
-                      <span className={`text-[10px] font-semibold ${isOutOfStock ? 'text-red-400' : 'text-zinc-400'}`}>
-                        {p.stock} uds
+                      <span
+                        className={`text-[10px] font-semibold ${
+                          isInactive
+                            ? 'text-zinc-500'
+                            : isOutOfStock
+                            ? 'text-red-400'
+                            : 'text-zinc-400'
+                        }`}
+                      >
+                        {isInactive ? 'Pausado' : `${p.stock} uds`}
                       </span>
                     </div>
                     <p className="font-bold text-white text-xs sm:text-sm line-clamp-2 leading-tight group-hover:text-amber-400 transition-colors">
@@ -221,16 +236,22 @@ export default function VentasPage() {
 
                     <button
                       type="button"
-                      disabled={isOutOfStock}
+                      disabled={isDisabled}
                       onClick={() => handleAddProduct(p)}
                       className={`w-full flex items-center justify-center space-x-1.5 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer active:scale-95 ${
-                        isOutOfStock
+                        isDisabled
                           ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
                           : 'bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white shadow-md shadow-red-900/30'
                       }`}
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>{isOutOfStock ? 'Agotado' : `+ Agregar a M${selectedTableId}`}</span>
+                      <span>
+                        {isInactive
+                          ? 'Pausado'
+                          : isOutOfStock
+                          ? 'Agotado'
+                          : `+ Agregar a M${selectedTableId}`}
+                      </span>
                     </button>
                   </div>
                 </div>
