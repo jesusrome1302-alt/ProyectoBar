@@ -1,11 +1,12 @@
 import Link from 'next/link'
-import { LayoutDashboard, UtensilsCrossed, ShoppingBag, Package, DollarSign, BarChart3, Settings } from 'lucide-react'
+import { LayoutDashboard, UtensilsCrossed, ShoppingBag, Package, ReceiptText, DollarSign, BarChart3, Settings } from 'lucide-react'
 
 export default function Sidebar() {
   const navItems = [
     { name: 'Panel Principal', href: '/', icon: LayoutDashboard },
     { name: 'Mesas', href: '/mesas', icon: UtensilsCrossed },
     { name: 'Ventas / Barra', href: '/ventas', icon: ShoppingBag },
+    { name: 'Cobro / Cuentas', href: '/cobro', icon: ReceiptText },
     { name: 'Productos', href: '/productos', icon: Package },
     { name: 'Caja', href: '/caja', icon: DollarSign },
     { name: 'Reportes', href: '/reportes', icon: BarChart3 },

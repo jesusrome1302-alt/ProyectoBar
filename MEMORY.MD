@@ -130,8 +130,8 @@ proyecto-bar/
 | ETAPA 2 | Modelo de datos, migraciones SQL, auth, RLS | ✅ Completa |
 | ETAPA 3 | Interfaz visual, navegación, panel, mapa de mesas | ✅ Completa |
 | ETAPA 4 | Catálogo productos, categorías, creación de pedidos | ✅ Completa |
-| ETAPA 5 | Venta directa, cuentas por mesa, pagos parciales | ⏳ Próxima |
-| ETAPA 6 | Caja, apertura/cierre turnos, gastos, retiros | ⏳ Por iniciar |
+| ETAPA 5 | Venta directa, cuentas por mesa, pagos parciales | ✅ Completa |
+| ETAPA 6 | Caja, apertura/cierre turnos, gastos, retiros | ⏳ Próxima |
 | ETAPA 7 | Inventario, compras, proveedores, ajustes | ⏳ Por iniciar |
 | ETAPA 8 | Reportes, filtros, exportaciones, permisos | ⏳ Por iniciar |
 | ETAPA 9 | Pruebas, seguridad, documentación, despliegue | ⏳ Por iniciar |
@@ -208,3 +208,4 @@ npm install -D <pkg> # Instalar devDependency
 - **13/10/2026:** Servidor de desarrollo Next.js iniciado con éxito en http://localhost:3000 con Turbopack.
 - **13/10/2026:** Corregida importación de `globals.css` en `src/app/layout.tsx` para habilitar estilos completos de Tailwind y diseño Rock Bar.
 - **13/10/2026:** ETAPA 4 completada - Implementado Catálogo de productos y categorías en `/productos`, Punto de Venta y creación de pedidos en `/ventas`, mapa de mesas en `/mesas`, caja en `/caja`, reportes en `/reportes` y configuración en `/configuracion`. Modelos en `src/types/database.ts` completados. Build limpio con 0 warnings.
+- **13/10/2026:** ETAPA 5 completada - Implementado módulo de Cuentas, Cobros, Pagos Parciales (Abonos) y Cierre en `/cobro`. Métodos de pago (Efectivo, Nequi/Daviplata, Datáfono, Transferencia), calculadora de vueltos, restricción de liberación de mesa hasta saldo $0. Integración fluida desde `/mesas` y `/ventas`. Build y linter limpios.

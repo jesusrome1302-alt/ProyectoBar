@@ -1,4 +1,5 @@
 import { ShoppingBag, Plus, Minus, Trash2, CheckCircle, Search, CreditCard } from 'lucide-react'
+import Link from 'next/link'
 
 export default function VentasPage() {
   const categories = [
@@ -196,10 +197,13 @@ export default function VentasPage() {
               <span>Guardar / Enviar a Mesa 3</span>
             </button>
 
-            <button className="w-full flex items-center justify-center space-x-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 font-bold py-2.5 rounded-xl transition-all text-xs">
+            <Link
+              href="/cobro"
+              className="w-full flex items-center justify-center space-x-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 font-bold py-2.5 rounded-xl transition-all text-xs"
+            >
               <CreditCard className="w-4 h-4 text-emerald-400" />
               <span>Proceder a Cobro Directo</span>
-            </button>
+            </Link>
           </div>
         </div>
       </div>

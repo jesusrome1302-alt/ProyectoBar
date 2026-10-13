@@ -121,10 +121,10 @@ export default function MesasPage() {
 
               <div className="pt-2 border-t border-zinc-800/80">
                 <Link
-                  href="/ventas"
+                  href={isOccupied ? "/cobro" : "/ventas"}
                   className="w-full flex items-center justify-center space-x-1.5 py-2 rounded-xl text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-800 transition-colors"
                 >
-                  <span>{isOccupied ? 'Ver Comanda' : 'Abrir Mesa'}</span>
+                  <span>{isOccupied ? 'Ver Comanda / Cobrar' : 'Abrir Mesa'}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
