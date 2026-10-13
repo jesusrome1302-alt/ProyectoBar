@@ -1,23 +1,51 @@
-import { UtensilsCrossed, DollarSign, ShoppingBag, AlertTriangle, TrendingUp } from 'lucide-react'
+'use client'
+
+import { UtensilsCrossed, DollarSign, ShoppingBag, AlertTriangle, TrendingUp, ArrowRight } from 'lucide-react'
+import Link from 'next/link'
+import { useBarStore } from '@/lib/barState'
 
 export default function DashboardPage() {
-  const stats = [
-    { name: 'Ventas del Día', value: '$ 480.000', change: '+12%', icon: DollarSign, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-    { name: 'Mesas Ocupadas', value: '4 / 9', change: '44% Cap.', icon: UtensilsCrossed, color: 'text-red-500', bg: 'bg-red-500/10' },
-    { name: 'Pedidos Activos', value: '7', change: 'En barra y mesas', icon: ShoppingBag, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-    { name: 'Alertas Stock', value: '2', change: 'Bajo inventario', icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-  ]
+  const barData = useBarStore()
+  const tables = barData.tables
+  const totalSales = barData.cash.cashSales + barData.cash.electronicSales
+  const occupiedTables = tables.filter((t) => t.status === 'occupied')
+  const occupiedCount = occupiedTables.length
 
-  const mockTables = [
-    { id: 1, name: 'Mesa 1', status: 'occupied', total: '$ 125.000', items: 4 },
-    { id: 2, name: 'Mesa 2', status: 'available', total: '$ 0', items: 0 },
-    { id: 3, name: 'Mesa 3', status: 'occupied', total: '$ 89.000', items: 3 },
-    { id: 4, name: 'Mesa 4', status: 'available', total: '$ 0', items: 0 },
-    { id: 5, name: 'Mesa 5', status: 'occupied', total: '$ 210.000', items: 8 },
-    { id: 6, name: 'Mesa 6', status: 'available', total: '$ 0', items: 0 },
-    { id: 7, name: 'Mesa 7', status: 'reserved', total: '$ 0', items: 0 },
-    { id: 8, name: 'Mesa 8', status: 'available', total: '$ 0', items: 0 },
-    { id: 9, name: 'Mesa 9', status: 'occupied', total: '$ 56.000', items: 2 },
+  const formatCOP = (val: number) => '$ ' + val.toLocaleString('es-CO')
+
+  const stats = [
+    {
+      name: 'Ventas en Turno',
+      value: formatCOP(totalSales),
+      change: '+14% hoy',
+      icon: DollarSign,
+      color: 'text-amber-400',
+      bg: 'bg-amber-500/10',
+    },
+    {
+      name: 'Mesas Ocupadas',
+      value: `${occupiedCount} / ${tables.length || 9}`,
+      change: `${Math.round((occupiedCount / (tables.length || 9)) * 100)}% Capacidad`,
+      icon: UtensilsCrossed,
+      color: 'text-red-500',
+      bg: 'bg-red-500/10',
+    },
+    {
+      name: 'Comandas Activas',
+      value: String(occupiedCount),
+      change: 'En salón y barra',
+      icon: ShoppingBag,
+      color: 'text-blue-400',
+      bg: 'bg-blue-500/10',
+    },
+    {
+      name: 'Alertas Inventario',
+      value: '2',
+      change: 'Bajo inventario',
+      icon: AlertTriangle,
+      color: 'text-amber-500',
+      bg: 'bg-amber-500/10',
+    },
   ]
 
   return (
@@ -26,20 +54,20 @@ export default function DashboardPage() {
       <div className="relative overflow-hidden rounded-3xl rock-gradient p-6 sm:p-8 border border-red-900/40 shadow-2xl">
         <div className="relative z-10">
           <div className="inline-flex items-center space-x-2 bg-red-600/30 border border-red-500/40 px-3 py-1 rounded-full text-amber-400 text-xs font-semibold mb-4">
-            <span>🔥 Live Session</span>
+            <span>🔥 Operación en Vivo</span>
             <span>•</span>
-            <span>Rock & Metal Bar</span>
+            <span>Rock & Metal Bar POS</span>
           </div>
           <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight mb-2">
             Panel de Operaciones
           </h2>
           <p className="text-zinc-300 text-sm sm:text-base max-w-xl">
-            Control en tiempo real de mesas, pedidos, caja e inventario. ¡Que suene el rock! 🎸
+            Control en tiempo real de mesas, pedidos, cobros e inventario. ¡Que suene el rock! 🎸
           </p>
         </div>
       </div>
 
-      {/* Tarjetas de Estadísticas */}
+      {/* Tarjetas de Estadísticas en Vivo */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon
@@ -59,7 +87,7 @@ export default function DashboardPage() {
                   <TrendingUp className="w-3.5 h-3.5 mr-0.5" />
                   {stat.change}
                 </span>
-                <span>respecto a ayer</span>
+                <span>actualizado en vivo</span>
               </div>
             </div>
           )
@@ -87,13 +115,13 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 gap-4">
-          {mockTables.map((table) => {
+          {tables.map((table) => {
             const isOccupied = table.status === 'occupied'
             const isReserved = table.status === 'reserved'
             return (
               <div
                 key={table.id}
-                className={`rock-card p-5 rounded-2xl transition-all border-l-4 ${
+                className={`rock-card p-5 rounded-2xl transition-all border-l-4 flex flex-col justify-between ${
                   isOccupied
                     ? 'border-l-red-600 bg-zinc-900/90'
                     : isReserved
@@ -101,29 +129,41 @@ export default function DashboardPage() {
                     : 'border-l-emerald-500 bg-zinc-900/50'
                 }`}
               >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="font-bold text-white text-lg">{table.name}</span>
-                  <span
-                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                      isOccupied
-                        ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                        : isReserved
-                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    }`}
-                  >
-                    {isOccupied ? 'Ocupada' : isReserved ? 'Reservada' : 'Disponible'}
-                  </span>
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-bold text-white text-lg">{table.name}</span>
+                    <span
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                        isOccupied
+                          ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                          : isReserved
+                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      }`}
+                    >
+                      {isOccupied ? 'Ocupada' : isReserved ? 'Reservada' : 'Disponible'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-4 text-sm bg-zinc-950/60 p-3 rounded-xl border border-zinc-800/60">
+                    <div>
+                      <p className="text-zinc-500 text-xs">Total Consumo</p>
+                      <p className="font-bold text-white text-base">{formatCOP(table.total)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-zinc-500 text-xs">Artículos</p>
+                      <p className="font-semibold text-zinc-300">{table.items.length} ítems</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between mt-4 text-sm">
-                  <div>
-                    <p className="text-zinc-500 text-xs">Total Consumo</p>
-                    <p className="font-bold text-white text-base">{table.total}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-zinc-500 text-xs">Artículos</p>
-                    <p className="font-semibold text-zinc-300">{table.items} ítems</p>
-                  </div>
+
+                <div className="pt-3 mt-3 border-t border-zinc-800 flex items-center justify-between">
+                  <Link
+                    href={isOccupied ? '/cobro' : '/ventas'}
+                    className="w-full flex items-center justify-center space-x-1 py-1.5 rounded-lg text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                  >
+                    <span>{isOccupied ? 'Cobrar / Ver Comanda' : 'Abrir Pedido'}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
               </div>
             )
