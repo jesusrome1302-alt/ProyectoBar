@@ -3,8 +3,8 @@
 ## 1. CONTEXTO DEL PROYECTO
 Aplicación web responsive de punto de venta y administración para un bar, con enfoque en ambiente Rock. Permite gestionar mesas, pedidos, ventas directas, inventario, caja, gastos, reportes y permisos de usuarios.
 
-**Estado Actual:** ETAPA 3 completada (Interfaz visual básica implementada)
-**Versión Actual:** 0.2 (después de estructura y UI)
+**Estado Actual:** ETAPA 5 completada (Cuentas, cobros, abonos parciales, interactividad total y gestión de catálogo/pedidos reactiva)
+**Versión Actual:** 0.5 (Punto de Venta reactivo, Catálogo de productos y Cuentas de mesas en tiempo real)
 **Fecha de inicio:** 13 de octubre de 2026
 
 ---
