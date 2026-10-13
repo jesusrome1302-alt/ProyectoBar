@@ -129,8 +129,8 @@ proyecto-bar/
 | ETAPA 1 | Preparación, dependencias, estructura, documentación | ✅ Completa |
 | ETAPA 2 | Modelo de datos, migraciones SQL, auth, RLS | ✅ Completa |
 | ETAPA 3 | Interfaz visual, navegación, panel, mapa de mesas | ✅ Completa |
-| ETAPA 4 | Catálogo productos, categorías, creación de pedidos | ⏳ Próxima |
-| ETAPA 5 | Venta directa, cuentas por mesa, pagos parciales | ⏳ Por iniciar |
+| ETAPA 4 | Catálogo productos, categorías, creación de pedidos | ✅ Completa |
+| ETAPA 5 | Venta directa, cuentas por mesa, pagos parciales | ⏳ Próxima |
 | ETAPA 6 | Caja, apertura/cierre turnos, gastos, retiros | ⏳ Por iniciar |
 | ETAPA 7 | Inventario, compras, proveedores, ajustes | ⏳ Por iniciar |
 | ETAPA 8 | Reportes, filtros, exportaciones, permisos | ⏳ Por iniciar |
@@ -207,3 +207,4 @@ npm install -D <pkg> # Instalar devDependency
 - **13/10/2026:** Modernización de `globals.css` a directiva nativa `@import "tailwindcss";` de Tailwind v4.
 - **13/10/2026:** Servidor de desarrollo Next.js iniciado con éxito en http://localhost:3000 con Turbopack.
 - **13/10/2026:** Corregida importación de `globals.css` en `src/app/layout.tsx` para habilitar estilos completos de Tailwind y diseño Rock Bar.
+- **13/10/2026:** ETAPA 4 completada - Implementado Catálogo de productos y categorías en `/productos`, Punto de Venta y creación de pedidos en `/ventas`, mapa de mesas en `/mesas`, caja en `/caja`, reportes en `/reportes` y configuración en `/configuracion`. Modelos en `src/types/database.ts` completados. Build limpio con 0 warnings.

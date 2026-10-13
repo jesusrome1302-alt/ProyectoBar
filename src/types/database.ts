@@ -75,3 +75,60 @@ export interface Payment {
   payment_method: string
   created_at: string
 }
+
+export interface CashSession {
+  id: string
+  business_id: string
+  opened_by: string
+  closed_by?: string
+  initial_cash: number
+  expected_cash: number
+  final_cash?: number
+  status: 'open' | 'closed'
+  opened_at: string
+  closed_at?: string
+}
+
+export interface CashMovement {
+  id: string
+  cash_session_id: string
+  profile_id: string
+  type: 'in' | 'out' | 'expense' | 'withdrawal'
+  amount: number
+  reason: string
+  created_at: string
+}
+
+export interface Supplier {
+  id: string
+  business_id: string
+  name: string
+  contact_info?: string
+}
+
+export interface InventoryMovement {
+  id: string
+  business_id: string
+  product_id: string
+  profile_id: string
+  type: 'purchase' | 'sale' | 'loss' | 'adjustment'
+  quantity: number
+  notes?: string
+  created_at: string
+}
+
+export interface AuditLog {
+  id: string
+  business_id: string
+  profile_id?: string
+  action: string
+  details?: string
+  created_at: string
+}
+
+export interface Settings {
+  business_id: string
+  receipt_footer?: string
+  tax_rate: number
+}
+

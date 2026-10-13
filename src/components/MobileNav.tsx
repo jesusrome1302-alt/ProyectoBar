@@ -1,11 +1,12 @@
 import Link from 'next/link'
-import { LayoutDashboard, UtensilsCrossed, ShoppingBag, DollarSign, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, UtensilsCrossed, ShoppingBag, Package, DollarSign, BarChart3 } from 'lucide-react'
 
 export default function MobileNav() {
   const navItems = [
     { name: 'Panel', href: '/', icon: LayoutDashboard },
     { name: 'Mesas', href: '/mesas', icon: UtensilsCrossed },
     { name: 'Ventas', href: '/ventas', icon: ShoppingBag },
+    { name: 'Productos', href: '/productos', icon: Package },
     { name: 'Caja', href: '/caja', icon: DollarSign },
     { name: 'Reportes', href: '/reportes', icon: BarChart3 },
   ]
