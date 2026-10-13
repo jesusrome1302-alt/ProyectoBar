@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ShoppingBag, Plus, Minus, Trash2, CheckCircle, Search, CreditCard, Check } from 'lucide-react'
 import Link from 'next/link'
-import { useBarStore, loadBarData, saveBarData, INITIAL_PRODUCTS, TableState, OrderItemState } from '@/lib/barState'
+import { useBarStore, loadBarData, saveBarData, INITIAL_PRODUCTS, TableState, OrderItemState, ProductState } from '@/lib/barState'
 
 export default function VentasPage() {
   const barData = useBarStore()
@@ -52,7 +52,7 @@ export default function VentasPage() {
   }
 
   // Agregar producto a la orden
-  const handleAddProduct = (prod: typeof INITIAL_PRODUCTS[0]) => {
+  const handleAddProduct = (prod: ProductState) => {
     const existing = currentOrder.find((it) => it.productId === prod.id)
     let newItems: OrderItemState[]
     if (existing) {
@@ -112,9 +112,10 @@ export default function VentasPage() {
 
   const totalAmount = currentOrder.reduce((acc, it) => acc + it.subtotal, 0)
 
-  // Filtrado de productos
-  const filteredProducts = INITIAL_PRODUCTS.filter((p) => {
-    const matchesCategory = activeCategory === 'all' || p.category === activeCategory
+  // Filtrado de productos en vivo
+  const productList = barData.products || INITIAL_PRODUCTS
+  const filteredProducts = productList.filter((p) => {
+    const matchesCategory = activeCategory === 'all' || p.category.toLowerCase().includes(activeCategory.toLowerCase())
     const matchesQuery = p.name.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesCategory && matchesQuery
   })

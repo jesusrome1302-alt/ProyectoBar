@@ -1,230 +1,88 @@
-import { Package, Plus, Search, AlertTriangle, CheckCircle, Filter } from 'lucide-react'
+'use client'
+
+import { useState } from 'react'
+import { Package, Plus, Search, AlertTriangle, CheckCircle, Trash2, X, PlusCircle, MinusCircle, Check } from 'lucide-react'
+import { useBarStore, addProductItem, deleteProductItem, adjustProductStock, ProductState } from '@/lib/barState'
 
 export default function ProductosPage() {
+  const barData = useBarStore()
+  const products = barData.products || []
+
+  const [activeCategory, setActiveCategory] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState<string>('')
+  const [showModal, setShowModal] = useState<boolean>(false)
+  const [notification, setNotification] = useState<string>('')
+
+  // Formulario nuevo producto
+  const [formName, setFormName] = useState<string>('')
+  const [formCategory, setFormCategory] = useState<string>('Cervezas')
+  const [formPrice, setFormPrice] = useState<number>(12000)
+  const [formCost, setFormCost] = useState<number>(6000)
+  const [formStock, setFormStock] = useState<number>(24)
+  const [formMinStock, setFormMinStock] = useState<number>(10)
+  const [formBarcode, setFormBarcode] = useState<string>('')
+
   const categories = [
-    { id: 'all', name: 'Todos', count: 18 },
-    { id: 'cervezas', name: 'Cervezas', count: 6 },
-    { id: 'licores', name: 'Licores & Botellas', count: 5 },
-    { id: 'cocteles', name: 'Cócteles de Autor', count: 4 },
-    { id: 'bebidas', name: 'Bebidas sin Alcohol', count: 4 },
-    { id: 'snacks', name: 'Snacks & Comida', count: 4 },
+    { id: 'all', name: 'Todos' },
+    { id: 'Cervezas', name: 'Cervezas' },
+    { id: 'Licores', name: 'Licores' },
+    { id: 'Cócteles', name: 'Cócteles' },
+    { id: 'Snacks', name: 'Snacks' },
+    { id: 'Sin Alcohol', name: 'Sin Alcohol' },
   ]
 
-  const products = [
-    // Cervezas
-    {
-      id: '1',
-      name: 'Cerveza Corona Extra 355ml',
-      category: 'Cervezas',
-      barcode: '7701234001',
-      price: 14000,
-      cost: 7500,
-      stock: 36,
-      min_stock: 12,
-      active: true,
-    },
-    {
-      id: '2',
-      name: 'Cerveza Club Colombia Dorada 330ml',
-      category: 'Cervezas',
-      barcode: '7701234002',
-      price: 10000,
-      cost: 5200,
-      stock: 48,
-      min_stock: 15,
-      active: true,
-    },
-    {
-      id: '3',
-      name: 'Cerveza Heineken Long Neck',
-      category: 'Cervezas',
-      barcode: '7701234003',
-      price: 15000,
-      cost: 8000,
-      stock: 24,
-      min_stock: 10,
-      active: true,
-    },
-    {
-      id: '4',
-      name: 'Cerveza Artesanal BBC Cajicá Miel',
-      category: 'Cervezas',
-      barcode: '7701234004',
-      price: 16000,
-      cost: 8800,
-      stock: 6,
-      min_stock: 12,
-      active: true,
-    },
-    {
-      id: '5',
-      name: 'Cerveza Águila Original 330ml',
-      category: 'Cervezas',
-      barcode: '7701234005',
-      price: 8000,
-      cost: 4100,
-      stock: 60,
-      min_stock: 20,
-      active: true,
-    },
-    {
-      id: '6',
-      name: 'Cerveza Poker Lata 330ml',
-      category: 'Cervezas',
-      barcode: '7701234006',
-      price: 8000,
-      cost: 4000,
-      stock: 5,
-      min_stock: 15,
-      active: true,
-    },
+  const formatCOP = (val: number) => '$ ' + val.toLocaleString('es-CO')
 
-    // Licores
-    {
-      id: '7',
-      name: 'Whisky Johnnie Walker Black Label 750ml',
-      category: 'Licores & Botellas',
-      barcode: '7701234007',
-      price: 240000,
-      cost: 150000,
-      stock: 8,
-      min_stock: 3,
-      active: true,
-    },
-    {
-      id: '8',
-      name: 'Ron Medellín Añejo 8 Años 750ml',
-      category: 'Licores & Botellas',
-      barcode: '7701234008',
-      price: 120000,
-      cost: 72000,
-      stock: 12,
-      min_stock: 4,
-      active: true,
-    },
-    {
-      id: '9',
-      name: 'Aguardiente Antioqueño Azul 750ml',
-      category: 'Licores & Botellas',
-      barcode: '7701234009',
-      price: 85000,
-      cost: 51000,
-      stock: 14,
-      min_stock: 5,
-      active: true,
-    },
-    {
-      id: '10',
-      name: 'Tequila José Cuervo Especial 750ml',
-      category: 'Licores & Botellas',
-      barcode: '7701234010',
-      price: 160000,
-      cost: 98000,
-      stock: 5,
-      min_stock: 2,
-      active: true,
-    },
-    {
-      id: '11',
-      name: 'Ginebra Tanqueray London Dry 750ml',
-      category: 'Licores & Botellas',
-      barcode: '7701234011',
-      price: 195000,
-      cost: 120000,
-      stock: 4,
-      min_stock: 2,
-      active: true,
-    },
+  // Crear nuevo producto
+  const handleCreateProduct = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formName.trim() || formPrice <= 0) return
 
-    // Cócteles
-    {
-      id: '12',
-      name: 'Cóctel Rock Margarita',
-      category: 'Cócteles de Autor',
-      barcode: '7701234012',
-      price: 32000,
-      cost: 11000,
-      stock: 50,
-      min_stock: 10,
-      active: true,
-    },
-    {
-      id: '13',
-      name: 'Mojito Cubano Clásico',
-      category: 'Cócteles de Autor',
-      barcode: '7701234013',
-      price: 28000,
-      cost: 9500,
-      stock: 50,
-      min_stock: 10,
-      active: true,
-    },
-    {
-      id: '14',
-      name: 'Gin Tonic Cítrico Botanicals',
-      category: 'Cócteles de Autor',
-      barcode: '7701234014',
-      price: 35000,
-      cost: 13000,
-      stock: 40,
-      min_stock: 10,
-      active: true,
-    },
+    const newProd = addProductItem({
+      name: formName.trim(),
+      category: formCategory,
+      price: formPrice,
+      cost: formCost,
+      stock: formStock,
+      min_stock: formMinStock,
+      barcode: formBarcode.trim() || 'SKU-' + Math.floor(100000 + Math.random() * 900000),
+    })
 
-    // Snacks
-    {
-      id: '15',
-      name: 'Nachos Rock con Queso Cheddar & Jalapeños',
-      category: 'Snacks & Comida',
-      barcode: '7701234015',
-      price: 26000,
-      cost: 11500,
-      stock: 18,
-      min_stock: 5,
-      active: true,
-    },
-    {
-      id: '16',
-      name: 'Alitas BBQ Rocker x8 uds',
-      category: 'Snacks & Comida',
-      barcode: '7701234016',
-      price: 34000,
-      cost: 16000,
-      stock: 15,
-      min_stock: 6,
-      active: true,
-    },
-    {
-      id: '17',
-      name: 'Papas Rústicas con Tocineta',
-      category: 'Snacks & Comida',
-      barcode: '7701234017',
-      price: 22000,
-      cost: 9000,
-      stock: 22,
-      min_stock: 8,
-      active: true,
-    },
+    setShowModal(false)
+    setFormName('')
+    setFormPrice(12000)
+    setFormCost(6000)
+    setFormStock(24)
+    setFormMinStock(10)
+    setFormBarcode('')
 
-    // Bebidas sin alcohol
-    {
-      id: '18',
-      name: 'Bebida Energizante Red Bull 250ml',
-      category: 'Bebidas sin Alcohol',
-      barcode: '7701234018',
-      price: 15000,
-      cost: 8500,
-      stock: 20,
-      min_stock: 8,
-      active: true,
-    },
-  ]
-
-  const formatCOP = (val: number) => {
-    return '$ ' + val.toLocaleString('es-CO')
+    setNotification(`¡Producto "${newProd.name}" creado con éxito y disponible para ventas!`)
+    setTimeout(() => setNotification(''), 4500)
   }
 
-  const totalStockItems = products.reduce((acc, p) => acc + p.stock, 0)
+  // Eliminar producto
+  const handleDeleteProduct = (p: ProductState) => {
+    if (confirm(`¿Estás seguro de que deseas eliminar "${p.name}" del catálogo?`)) {
+      deleteProductItem(p.id)
+      setNotification(`Producto "${p.name}" eliminado del catálogo.`)
+      setTimeout(() => setNotification(''), 4000)
+    }
+  }
+
+  // Ajustar stock
+  const handleStockChange = (id: string, name: string, delta: number) => {
+    adjustProductStock(id, delta)
+    setNotification(`Stock de "${name}" ${delta > 0 ? 'incrementado' : 'reducido'} (${delta > 0 ? '+' : ''}${delta}).`)
+    setTimeout(() => setNotification(''), 3000)
+  }
+
+  const filteredProducts = products.filter((p) => {
+    const matchesCat = activeCategory === 'all' || p.category.toLowerCase().includes(activeCategory.toLowerCase())
+    const matchesQuery = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || (p.barcode && p.barcode.includes(searchQuery))
+    return matchesCat && matchesQuery
+  })
+
+  const totalStockItems = products.reduce((acc, p) => acc + (p.stock || 0), 0)
   const lowStockCount = products.filter((p) => p.stock <= p.min_stock).length
 
   return (
@@ -234,35 +92,46 @@ export default function ProductosPage() {
         <div>
           <div className="flex items-center space-x-2 text-xs font-bold text-red-500 uppercase tracking-widest mb-1">
             <Package className="w-4 h-4" />
-            <span>Inventario & Menú</span>
+            <span>Inventario & Catálogo Activo</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
             Catálogo de Productos
           </h2>
           <p className="text-zinc-400 text-xs sm:text-sm mt-0.5">
-            Administración de bebidas, licores, cócteles, snacks, precios y existencias.
+            Crea nuevos productos, elimina artículos descontinuados y gestiona existencias en tiempo real.
           </p>
         </div>
 
         <div className="flex items-center space-x-3">
-          <button className="flex items-center space-x-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-red-900/30 transition-all text-sm">
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center space-x-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-red-900/30 transition-all text-sm cursor-pointer active:scale-95"
+          >
             <Plus className="w-4 h-4" />
-            <span>Nuevo Producto</span>
+            <span>+ Nuevo Producto</span>
           </button>
         </div>
       </div>
+
+      {/* Notificación si existe */}
+      {notification && (
+        <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center space-x-2 animate-fadeIn">
+          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{notification}</span>
+        </div>
+      )}
 
       {/* Métricas Rápidas del Catálogo */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <div className="rock-card p-4 rounded-xl">
           <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Total Productos</p>
           <p className="text-xl sm:text-2xl font-black text-white mt-1">{products.length}</p>
-          <span className="text-[11px] text-zinc-500">En 5 categorías</span>
+          <span className="text-[11px] text-zinc-500">En catálogo activo</span>
         </div>
         <div className="rock-card p-4 rounded-xl">
-          <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Unidades en Stock</p>
+          <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Unidades Físicas</p>
           <p className="text-xl sm:text-2xl font-black text-amber-400 mt-1">{totalStockItems}</p>
-          <span className="text-[11px] text-zinc-500">Existencias físicas</span>
+          <span className="text-[11px] text-zinc-500">Stock total</span>
         </div>
         <div className="rock-card p-4 rounded-xl">
           <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Alertas de Stock</p>
@@ -272,9 +141,9 @@ export default function ProductosPage() {
           <span className="text-[11px] text-zinc-500">Por debajo del mínimo</span>
         </div>
         <div className="rock-card p-4 rounded-xl">
-          <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Margen Promedio</p>
-          <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-1">48.5%</p>
-          <span className="text-[11px] text-zinc-500">Estimado sobre costo</span>
+          <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Categorías</p>
+          <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-1">5</p>
+          <span className="text-[11px] text-zinc-500">Licores, birras, snacks...</span>
         </div>
       </div>
 
@@ -285,30 +154,27 @@ export default function ProductosPage() {
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
             <input
               type="text"
-              placeholder="Buscar por nombre de producto o código de barras..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar por nombre de producto o SKU..."
               className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-red-500 transition-colors"
             />
-          </div>
-          <div className="flex items-center space-x-2">
-            <button className="flex items-center space-x-2 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors">
-              <Filter className="w-4 h-4 text-zinc-400" />
-              <span>Filtrar</span>
-            </button>
           </div>
         </div>
 
         {/* Píldoras de Categorías */}
         <div className="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-thin">
-          {categories.map((cat, idx) => (
+          {categories.map((cat) => (
             <button
               key={cat.id}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                idx === 0
+              onClick={() => setActiveCategory(cat.id)}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                activeCategory === cat.id
                   ? 'bg-red-600 text-white shadow-md shadow-red-900/30'
                   : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800 hover:border-zinc-700'
               }`}
             >
-              {cat.name} ({cat.count})
+              {cat.name}
             </button>
           ))}
         </div>
@@ -316,9 +182,9 @@ export default function ProductosPage() {
 
       {/* Grid de Productos */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {products.map((p) => {
+        {filteredProducts.map((p) => {
           const isLowStock = p.stock <= p.min_stock
-          const margin = Math.round(((p.price - p.cost) / p.price) * 100)
+          const margin = p.price > 0 ? Math.round(((p.price - p.cost) / p.price) * 100) : 0
 
           return (
             <div
@@ -327,38 +193,48 @@ export default function ProductosPage() {
                 isLowStock ? 'border-amber-500/50' : ''
               }`}
             >
-              {/* Badge superior */}
+              {/* Badge superior y botón eliminar */}
               <div className="flex items-start justify-between gap-2 mb-3">
                 <span className="text-[11px] font-bold text-zinc-400 bg-zinc-800/80 px-2.5 py-1 rounded-md border border-zinc-700/60">
                   {p.category}
                 </span>
 
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center space-x-1 ${
-                    isLowStock
-                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                      : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  }`}
-                >
-                  {isLowStock ? (
-                    <>
-                      <AlertTriangle className="w-3 h-3 mr-1 inline" />
-                      <span>Stock Bajo</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-3 h-3 mr-1 inline" />
-                      <span>Disponible</span>
-                    </>
-                  )}
-                </span>
+                <div className="flex items-center space-x-1.5">
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center space-x-1 ${
+                      isLowStock
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    }`}
+                  >
+                    {isLowStock ? (
+                      <>
+                        <AlertTriangle className="w-3 h-3 mr-1 inline" />
+                        <span>Stock Bajo</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-3 h-3 mr-1 inline" />
+                        <span>Disponible</span>
+                      </>
+                    )}
+                  </span>
+
+                  <button
+                    onClick={() => handleDeleteProduct(p)}
+                    title="Eliminar este producto del catálogo"
+                    className="p-1 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               {/* Título */}
               <h3 className="font-bold text-white text-base leading-snug group-hover:text-amber-400 transition-colors mb-1">
                 {p.name}
               </h3>
-              <p className="text-[11px] text-zinc-500 font-mono mb-4">SKU: {p.barcode}</p>
+              <p className="text-[11px] text-zinc-500 font-mono mb-4">SKU: {p.barcode || 'N/A'}</p>
 
               {/* Métricas de Precio & Costo */}
               <div className="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800/60 mb-4 grid grid-cols-2 gap-2">
@@ -373,20 +249,179 @@ export default function ProductosPage() {
                 </div>
               </div>
 
-              {/* Barra de Stock */}
-              <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-800/80">
-                <span className="text-zinc-400">
-                  Stock:{' '}
+              {/* Ajustador de Stock en Vivo */}
+              <div className="flex items-center justify-between text-xs pt-2 border-t border-zinc-800/80">
+                <div>
+                  <span className="text-zinc-400">Stock: </span>
                   <strong className={isLowStock ? 'text-amber-400 font-black' : 'text-zinc-200'}>
                     {p.stock} uds
                   </strong>
-                </span>
-                <span className="text-[11px] text-zinc-500">Mín: {p.min_stock} uds</span>
+                  <span className="text-[10px] text-zinc-500 ml-1">(mín: {p.min_stock})</span>
+                </div>
+
+                <div className="flex items-center space-x-1">
+                  <button
+                    onClick={() => handleStockChange(p.id, p.name, -1)}
+                    title="Restar 1 unidad"
+                    className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white cursor-pointer"
+                  >
+                    <MinusCircle className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleStockChange(p.id, p.name, 1)}
+                    title="Sumar 1 unidad"
+                    className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white cursor-pointer"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleStockChange(p.id, p.name, 10)}
+                    title="Sumar paquete (+10 uds)"
+                    className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] font-bold text-amber-400 cursor-pointer"
+                  >
+                    +10
+                  </button>
+                </div>
               </div>
             </div>
           )
         })}
       </div>
+
+      {/* Modal / Formulario para Crear Nuevo Producto */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="rock-card w-full max-w-lg p-6 rounded-3xl border border-zinc-700 shadow-2xl relative space-y-4 animate-scaleUp">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-xl bg-red-600/20 text-red-500 flex items-center justify-center font-bold">
+                  <Package className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-lg">Registrar Nuevo Producto</h3>
+                  <p className="text-xs text-zinc-400">Se agregará al catálogo y al punto de venta</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-zinc-500 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateProduct} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-zinc-300 block mb-1">Nombre del Producto *</label>
+                <input
+                  type="text"
+                  required
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  placeholder="Ej. Cerveza Artesanal IPA 330ml, Tequila Don Julio..."
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Categoría *</label>
+                  <select
+                    value={formCategory}
+                    onChange={(e) => setFormCategory(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-red-500 cursor-pointer"
+                  >
+                    <option value="Cervezas">Cervezas</option>
+                    <option value="Licores">Licores & Botellas</option>
+                    <option value="Cócteles">Cócteles</option>
+                    <option value="Snacks">Snacks & Comida</option>
+                    <option value="Sin Alcohol">Sin Alcohol</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Código / SKU</label>
+                  <input
+                    type="text"
+                    value={formBarcode}
+                    onChange={(e) => setFormBarcode(e.target.value)}
+                    placeholder="Ej. 7701239999"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Precio Venta (COP) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={100}
+                    step={100}
+                    value={formPrice}
+                    onChange={(e) => setFormPrice(Number(e.target.value))}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-red-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Costo Compra (COP) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    step={100}
+                    value={formCost}
+                    onChange={(e) => setFormCost(Number(e.target.value))}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-red-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Stock Inicial (unidades)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={formStock}
+                    onChange={(e) => setFormStock(Number(e.target.value))}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Stock Mínimo (Alerta)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={formMinStock}
+                    onChange={(e) => setFormMinStock(Number(e.target.value))}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 shadow-lg shadow-red-900/30 transition-all cursor-pointer"
+                >
+                  Guardar Producto
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

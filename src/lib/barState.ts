@@ -50,44 +50,57 @@ export interface CashMovementRecord {
   user: string
 }
 
+export interface ProductState {
+  id: string
+  name: string
+  category: string
+  price: number
+  cost: number
+  stock: number
+  min_stock: number
+  barcode?: string
+}
+
 export interface BarData {
   operatorName: string
   tables: TableState[]
   cash: CashState
   movements: CashMovementRecord[]
+  products: ProductState[]
 }
 
 const STORAGE_KEY = 'ROCK_BAR_APP_STATE_V1'
 
-export const INITIAL_PRODUCTS = [
+export const INITIAL_PRODUCTS: ProductState[] = [
   // Cervezas
-  { id: 'prod-1', name: 'Corona Extra 355ml', category: 'Cervezas', price: 14000, cost: 7500, stock: 36 },
-  { id: 'prod-2', name: 'Club Colombia Dorada 330ml', category: 'Cervezas', price: 10000, cost: 5200, stock: 48 },
-  { id: 'prod-3', name: 'Heineken Long Neck', category: 'Cervezas', price: 15000, cost: 8000, stock: 24 },
-  { id: 'prod-4', name: 'BBC Cajicá Miel', category: 'Cervezas', price: 16000, cost: 8800, stock: 12 },
-  { id: 'prod-5', name: 'Poker Lata 330ml', category: 'Cervezas', price: 8000, cost: 4000, stock: 50 },
-  { id: 'prod-6', name: 'Águila Original 330ml', category: 'Cervezas', price: 8000, cost: 4100, stock: 60 },
+  { id: 'prod-1', name: 'Corona Extra 355ml', category: 'Cervezas', price: 14000, cost: 7500, stock: 36, min_stock: 12, barcode: '7701234001' },
+  { id: 'prod-2', name: 'Club Colombia Dorada 330ml', category: 'Cervezas', price: 10000, cost: 5200, stock: 48, min_stock: 15, barcode: '7701234002' },
+  { id: 'prod-3', name: 'Heineken Long Neck', category: 'Cervezas', price: 15000, cost: 8000, stock: 24, min_stock: 10, barcode: '7701234003' },
+  { id: 'prod-4', name: 'BBC Cajicá Miel', category: 'Cervezas', price: 16000, cost: 8800, stock: 12, min_stock: 10, barcode: '7701234004' },
+  { id: 'prod-5', name: 'Poker Lata 330ml', category: 'Cervezas', price: 8000, cost: 4000, stock: 50, min_stock: 15, barcode: '7701234005' },
+  { id: 'prod-6', name: 'Águila Original 330ml', category: 'Cervezas', price: 8000, cost: 4100, stock: 60, min_stock: 20, barcode: '7701234006' },
 
   // Licores
-  { id: 'prod-7', name: 'Trago Whisky Johnnie Walker Black', category: 'Licores', price: 28000, cost: 16000, stock: 25 },
-  { id: 'prod-8', name: 'Trago Ron Medellín 8 Años', category: 'Licores', price: 18000, cost: 9500, stock: 30 },
-  { id: 'prod-9', name: 'Trago Aguardiente Antioqueño Azul', category: 'Licores', price: 12000, cost: 6500, stock: 40 },
-  { id: 'prod-10', name: 'Trago Tequila José Cuervo', category: 'Licores', price: 24000, cost: 13000, stock: 20 },
+  { id: 'prod-7', name: 'Trago Whisky Johnnie Walker Black', category: 'Licores', price: 28000, cost: 16000, stock: 25, min_stock: 5, barcode: '7701234007' },
+  { id: 'prod-8', name: 'Trago Ron Medellín 8 Años', category: 'Licores', price: 18000, cost: 9500, stock: 30, min_stock: 6, barcode: '7701234008' },
+  { id: 'prod-9', name: 'Trago Aguardiente Antioqueño Azul', category: 'Licores', price: 12000, cost: 6500, stock: 40, min_stock: 10, barcode: '7701234009' },
+  { id: 'prod-10', name: 'Trago Tequila José Cuervo', category: 'Licores', price: 24000, cost: 13000, stock: 20, min_stock: 4, barcode: '7701234010' },
 
   // Cócteles
-  { id: 'prod-11', name: 'Cóctel Rock Margarita', category: 'Cócteles', price: 32000, cost: 11000, stock: 50 },
-  { id: 'prod-12', name: 'Mojito Cubano Clásico', category: 'Cócteles', price: 28000, cost: 9500, stock: 50 },
-  { id: 'prod-13', name: 'Gin Tonic Botanicals', category: 'Cócteles', price: 35000, cost: 13000, stock: 40 },
+  { id: 'prod-11', name: 'Cóctel Rock Margarita', category: 'Cócteles', price: 32000, cost: 11000, stock: 50, min_stock: 10, barcode: '7701234011' },
+  { id: 'prod-12', name: 'Mojito Cubano Clásico', category: 'Cócteles', price: 28000, cost: 9500, stock: 50, min_stock: 10, barcode: '7701234012' },
+  { id: 'prod-13', name: 'Gin Tonic Botanicals', category: 'Cócteles', price: 35000, cost: 13000, stock: 40, min_stock: 10, barcode: '7701234013' },
 
   // Snacks
-  { id: 'prod-14', name: 'Nachos Cheddar & Jalapeños', category: 'Snacks', price: 26000, cost: 11500, stock: 18 },
-  { id: 'prod-15', name: 'Alitas BBQ Rocker x8', category: 'Snacks', price: 34000, cost: 16000, stock: 15 },
-  { id: 'prod-16', name: 'Papas Rústicas con Tocineta', category: 'Snacks', price: 22000, cost: 9000, stock: 22 },
+  { id: 'prod-14', name: 'Nachos Cheddar & Jalapeños', category: 'Snacks', price: 26000, cost: 11500, stock: 18, min_stock: 5, barcode: '7701234014' },
+  { id: 'prod-15', name: 'Alitas BBQ Rocker x8', category: 'Snacks', price: 34000, cost: 16000, stock: 15, min_stock: 6, barcode: '7701234015' },
+  { id: 'prod-16', name: 'Papas Rústicas con Tocineta', category: 'Snacks', price: 22000, cost: 9000, stock: 22, min_stock: 8, barcode: '7701234016' },
 
   // Sin Alcohol
-  { id: 'prod-17', name: 'Red Bull 250ml', category: 'Sin Alcohol', price: 15000, cost: 8500, stock: 20 },
-  { id: 'prod-18', name: 'Agua Manantial con Gas', category: 'Sin Alcohol', price: 6000, cost: 2500, stock: 30 },
+  { id: 'prod-17', name: 'Red Bull 250ml', category: 'Sin Alcohol', price: 15000, cost: 8500, stock: 20, min_stock: 8, barcode: '7701234017' },
+  { id: 'prod-18', name: 'Agua Manantial con Gas', category: 'Sin Alcohol', price: 6000, cost: 2500, stock: 30, min_stock: 10, barcode: '7701234018' },
 ]
+
 
 export const DEFAULT_BAR_DATA: BarData = {
   operatorName: 'Cajero Principal',
@@ -238,6 +251,7 @@ export const DEFAULT_BAR_DATA: BarData = {
     { id: 'm-2', type: 'out', description: 'Compra de hielo de emergencia', amount: -25000, time: '04:45 PM', user: 'Cajero Principal' },
     { id: 'm-3', type: 'sale', description: 'Abono efectivo Mesa 5', amount: 58000, time: '05:30 PM', user: 'Cajero Principal' },
   ],
+  products: INITIAL_PRODUCTS,
 }
 
 let cachedData: BarData = DEFAULT_BAR_DATA
@@ -257,11 +271,43 @@ export function loadBarData(): BarData {
       return cachedData
     }
     cachedRaw = raw
-    cachedData = JSON.parse(raw) as BarData
+    const parsed = JSON.parse(raw) as BarData
+    if (!parsed.products || parsed.products.length === 0) {
+      parsed.products = INITIAL_PRODUCTS
+    }
+    cachedData = parsed
     return cachedData
   } catch {
     return DEFAULT_BAR_DATA
   }
+}
+
+export function addProductItem(item: Omit<ProductState, 'id'>): ProductState {
+  const data = loadBarData()
+  const newProduct: ProductState = {
+    ...item,
+    id: 'prod-' + Date.now(),
+  }
+  data.products = [newProduct, ...(data.products || INITIAL_PRODUCTS)]
+  saveBarData(data)
+  return newProduct
+}
+
+export function deleteProductItem(id: string): void {
+  const data = loadBarData()
+  data.products = (data.products || INITIAL_PRODUCTS).filter((p) => p.id !== id)
+  saveBarData(data)
+}
+
+export function adjustProductStock(id: string, delta: number): void {
+  const data = loadBarData()
+  data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
+    if (p.id === id) {
+      return { ...p, stock: Math.max(0, p.stock + delta) }
+    }
+    return p
+  })
+  saveBarData(data)
 }
 
 export function saveBarData(data: BarData): void {
