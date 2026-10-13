@@ -31,6 +31,22 @@ export interface TableState {
   pending: number
 }
 
+export interface CashSessionRecord {
+  id: string
+  openedAt: string
+  closedAt?: string
+  operator: string
+  initialCash: number
+  cashSales: number
+  electronicSales: number
+  expenses: number
+  expectedCash: number
+  actualCash?: number
+  difference?: number
+  notes?: string
+  status: 'open' | 'closed'
+}
+
 export interface CashState {
   initialCash: number
   cashSales: number
@@ -39,11 +55,13 @@ export interface CashState {
   expectedCash: number
   status: 'open' | 'closed'
   openedAt: string
+  currentSessionId?: string
 }
 
 export interface CashMovementRecord {
   id: string
   type: 'in' | 'out' | 'sale'
+  category?: string
   description: string
   amount: number
   time: string
@@ -68,6 +86,7 @@ export interface BarData {
   cash: CashState
   movements: CashMovementRecord[]
   products: ProductState[]
+  sessions: CashSessionRecord[]
 }
 
 const STORAGE_KEY = 'ROCK_BAR_APP_STATE_V1'
@@ -246,13 +265,31 @@ export const DEFAULT_BAR_DATA: BarData = {
     expectedCash: 183000,
     status: 'open',
     openedAt: '04:00 PM',
+    currentSessionId: 'ses-actual',
   },
   movements: [
-    { id: 'm-1', type: 'in', description: 'Base inicial de turno', amount: 150000, time: '04:00 PM', user: 'Cajero Principal' },
-    { id: 'm-2', type: 'out', description: 'Compra de hielo de emergencia', amount: -25000, time: '04:45 PM', user: 'Cajero Principal' },
-    { id: 'm-3', type: 'sale', description: 'Abono efectivo Mesa 5', amount: 58000, time: '05:30 PM', user: 'Cajero Principal' },
+    { id: 'm-1', type: 'in', category: 'Base Inicial', description: 'Base inicial de turno', amount: 150000, time: '04:00 PM', user: 'Cajero Principal' },
+    { id: 'm-2', type: 'out', category: 'Insumos', description: 'Compra de hielo de emergencia', amount: -25000, time: '04:45 PM', user: 'Cajero Principal' },
+    { id: 'm-3', type: 'sale', category: 'Venta', description: 'Abono efectivo Mesa 5', amount: 58000, time: '05:30 PM', user: 'Cajero Principal' },
   ],
   products: INITIAL_PRODUCTS,
+  sessions: [
+    {
+      id: 'ses-prev-1',
+      openedAt: 'Ayer, 03:30 PM',
+      closedAt: 'Ayer, 11:45 PM',
+      operator: 'Cajero Principal',
+      initialCash: 150000,
+      cashSales: 520000,
+      electronicSales: 780000,
+      expenses: 35000,
+      expectedCash: 635000,
+      actualCash: 635000,
+      difference: 0,
+      notes: 'Turno cerrado con cuadre exacto. Se deja base de 150.000 para el día siguiente.',
+      status: 'closed',
+    },
+  ],
 }
 
 let cachedData: BarData = DEFAULT_BAR_DATA
@@ -276,6 +313,9 @@ export function loadBarData(): BarData {
     const parsed = JSON.parse(raw) as BarData
     if (!parsed.products || parsed.products.length === 0) {
       parsed.products = INITIAL_PRODUCTS
+    }
+    if (!parsed.sessions) {
+      parsed.sessions = DEFAULT_BAR_DATA.sessions
     }
     cachedData = parsed
     return cachedData
@@ -530,6 +570,120 @@ export function clearTableOrder(tableId: number): void {
   })
 
   data.activeTableId = tableId
+  saveBarData(data)
+}
+
+// Apertura de turno de caja
+export function openCashShift(initialBase: number, operatorName?: string): CashSessionRecord {
+  const data = loadBarData()
+  const timeNow = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  const sessionId = 'ses-' + Date.now()
+  const operator = operatorName || data.operatorName || 'Cajero Principal'
+
+  data.cash = {
+    initialCash: initialBase,
+    cashSales: 0,
+    electronicSales: 0,
+    expenses: 0,
+    expectedCash: initialBase,
+    status: 'open',
+    openedAt: timeNow,
+    currentSessionId: sessionId,
+  }
+
+  const openMovement: CashMovementRecord = {
+    id: 'mov-' + Date.now(),
+    type: 'in',
+    category: 'Base Inicial',
+    description: `Apertura de turno (Base: $ ${initialBase.toLocaleString('es-CO')})`,
+    amount: initialBase,
+    time: timeNow,
+    user: operator,
+  }
+
+  data.movements = [openMovement, ...(data.movements || [])]
+
+  const newSession: CashSessionRecord = {
+    id: sessionId,
+    openedAt: `Hoy, ${timeNow}`,
+    operator,
+    initialCash: initialBase,
+    cashSales: 0,
+    electronicSales: 0,
+    expenses: 0,
+    expectedCash: initialBase,
+    status: 'open',
+  }
+
+  saveBarData(data)
+  return newSession
+}
+
+// Cierre de turno de caja y arqueo
+export function closeCashShift(actualCash: number, notes?: string): CashSessionRecord {
+  const data = loadBarData()
+  const timeNow = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  const expected = data.cash.expectedCash
+  const difference = actualCash - expected
+
+  const closedSession: CashSessionRecord = {
+    id: data.cash.currentSessionId || ('ses-' + Date.now()),
+    openedAt: data.cash.openedAt.startsWith('Hoy') ? data.cash.openedAt : `Hoy, ${data.cash.openedAt}`,
+    closedAt: `Hoy, ${timeNow}`,
+    operator: data.operatorName || 'Cajero Principal',
+    initialCash: data.cash.initialCash,
+    cashSales: data.cash.cashSales,
+    electronicSales: data.cash.electronicSales,
+    expenses: data.cash.expenses,
+    expectedCash: expected,
+    actualCash,
+    difference,
+    notes: notes || (difference === 0 ? 'Cuadre exacto sin novedades.' : difference > 0 ? `Sobrante de $ ${difference.toLocaleString('es-CO')}` : `Faltante de $ ${Math.abs(difference).toLocaleString('es-CO')}`),
+    status: 'closed',
+  }
+
+  data.sessions = [closedSession, ...(data.sessions || [])]
+  data.cash.status = 'closed'
+
+  const closeMovement: CashMovementRecord = {
+    id: 'mov-' + Date.now(),
+    type: 'out',
+    category: 'Arqueo de Cierre',
+    description: `Cierre de turno: Contado $ ${actualCash.toLocaleString('es-CO')} (${difference === 0 ? 'Cuadre exacto' : difference > 0 ? 'Sobrante' : 'Faltante'})`,
+    amount: 0,
+    time: timeNow,
+    user: data.operatorName,
+  }
+
+  data.movements = [closeMovement, ...(data.movements || [])]
+
+  saveBarData(data)
+  return closedSession
+}
+
+// Registro de gastos o ingresos menores de caja
+export function addCashMovement(type: 'in' | 'out', category: string, amount: number, description: string): void {
+  const data = loadBarData()
+  const timeNow = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+
+  if (type === 'out') {
+    data.cash.expenses += amount
+    data.cash.expectedCash = Math.max(0, data.cash.expectedCash - amount)
+  } else {
+    data.cash.expectedCash += amount
+  }
+
+  const movement: CashMovementRecord = {
+    id: 'mov-' + Date.now(),
+    type,
+    category,
+    description,
+    amount: type === 'out' ? -amount : amount,
+    time: timeNow,
+    user: data.operatorName,
+  }
+
+  data.movements = [movement, ...(data.movements || [])]
   saveBarData(data)
 }
 

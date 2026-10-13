@@ -157,6 +157,24 @@ export default function CobroPage() {
         </div>
       )}
 
+      {/* Banner si el turno de caja está cerrado */}
+      {barData.cash?.status === 'closed' && (
+        <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Aviso de Caja:</strong> El turno de caja está cerrado. Puedes abrir un nuevo turno para realizar el arqueo.
+            </span>
+          </div>
+          <Link
+            href="/caja"
+            className="text-amber-400 hover:text-white font-bold underline text-xs whitespace-nowrap ml-3"
+          >
+            Ir a Caja →
+          </Link>
+        </div>
+      )}
+
       {/* Grid Principal: Lista de Cuentas Abiertas (izq) y Panel de Cobro Detallado (der) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Selector de Cuentas Abiertas (4 cols) */}

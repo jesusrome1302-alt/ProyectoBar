@@ -3,8 +3,8 @@
 ## 1. CONTEXTO DEL PROYECTO
 Aplicación web responsive de punto de venta y administración para un bar, con enfoque en ambiente Rock. Permite gestionar mesas, pedidos, ventas directas, inventario, caja, gastos, reportes y permisos de usuarios.
 
-**Estado Actual:** ETAPA 5 completada (Cuentas, cobros, abonos parciales, interactividad total y gestión de catálogo/pedidos reactiva)
-**Versión Actual:** 0.5 (Punto de Venta reactivo, Catálogo de productos y Cuentas de mesas en tiempo real)
+**Estado Actual:** ETAPA 6 completada (Caja, turnos, arqueos, balance y gastos menores)
+**Versión Actual:** 0.6 (Gestión Integral de Caja, Turnos y Arqueos en tiempo real)
 **Fecha de inicio:** 13 de octubre de 2026
 
 ---
@@ -131,8 +131,8 @@ proyecto-bar/
 | ETAPA 3 | Interfaz visual, navegación, panel, mapa de mesas | ✅ Completa |
 | ETAPA 4 | Catálogo productos, categorías, creación de pedidos | ✅ Completa |
 | ETAPA 5 | Venta directa, cuentas por mesa, pagos parciales | ✅ Completa |
-| ETAPA 6 | Caja, apertura/cierre turnos, gastos, retiros | ⏳ Próxima |
-| ETAPA 7 | Inventario, compras, proveedores, ajustes | ⏳ Por iniciar |
+| ETAPA 6 | Caja, apertura/cierre turnos, gastos, retiros, arqueos | ✅ Completa |
+| ETAPA 7 | Inventario, compras, proveedores, ajustes | ⏳ Siguiente |
 | ETAPA 8 | Reportes, filtros, exportaciones, permisos | ⏳ Por iniciar |
 | ETAPA 9 | Pruebas, seguridad, documentación, despliegue | ⏳ Por iniciar |
 
@@ -225,3 +225,10 @@ npm install -D <pkg> # Instalar devDependency
     4. Botón visible y destacado `+ Agregar a M{X}` en cada tarjeta de producto y feedback toast instantáneo.
     5. Botón de **"Vaciar Comanda"** visible tanto en la cabecera como en la parte inferior de las acciones en `/ventas`, devolviendo el stock físico de los productos a bodega automáticamente y reseteando el estado de la mesa a disponible si no hay pagos pendientes.
     6. Sincronización de mesa activa entre `/mesas` (`+ Pedido`) y `/ventas`. Compilación y build limpios con 0 errores.
+- **13/10/2026:** ETAPA 6 completada - Implementado Módulo Integral de Caja, Turnos y Arqueos en `/caja`:
+  1. **Apertura de turno:** Modal interactivo con configuración de base inicial en efectivo ($ COP) y botones de selección rápida ($50k, $100k, $150k, $200k).
+  2. **Arqueo y Cierre de turno:** Cálculo en vivo del efectivo esperado en cajón (`Base + Ventas Efectivo - Gastos`). Entrada de conteo real con comparador visual de Cuadre Exacto, Sobrante o Faltante.
+  3. **Comprobante de Arqueo:** Generación de ticket térmico Rock Bar con desglose financiero e impresión directa (`window.print()`).
+  4. **Entradas y Salidas Menores:** Formulario para registrar salidas (insumos, proveedores, retiros a caja fuerte) y entradas (inyección de sencillo), afectando el balance físico en tiempo real.
+  5. **Historial de Sesiones:** Registro histórico de turnos anteriores con sus horas de inicio/fin, montos, operador y cuadres.
+  6. **Integración con Cobros:** Banner en `/cobro` que avisa al operador si la caja se encuentra cerrada y permite ir al módulo de caja con un clic. Linter y build limpios (0 errores, 0 warnings).
