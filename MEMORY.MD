@@ -3,8 +3,8 @@
 ## 1. CONTEXTO DEL PROYECTO
 Aplicación web responsive de punto de venta y administración para un bar, con enfoque en ambiente Rock. Permite gestionar mesas, pedidos, ventas directas, inventario, caja, gastos, reportes y permisos de usuarios.
 
-**Estado Actual:** ETAPA 6 completada (Caja, turnos, arqueos, balance y gastos menores)
-**Versión Actual:** 0.6 (Gestión Integral de Caja, Turnos y Arqueos en tiempo real)
+**Estado Actual:** ETAPA 7 completada (Inventario, compras, proveedores y kardex)
+**Versión Actual:** 0.7 (Cadena de Suministro, Compras, Proveedores y Kardex en tiempo real)
 **Fecha de inicio:** 13 de octubre de 2026
 
 ---
@@ -64,7 +64,7 @@ proyecto-bar/
 │   │   ├── page.tsx     # Página principal (Dashboard)
 │   │   ├── mesas/         # Rutas de mesas
 │   │   ├── ventas/        # Rutas de ventas
-│   │   ├── productos/     # Rutas de catálogo
+│   │   ├── productos/     # Rutas de catálogo, inventario, compras y proveedores
 │   │   ├── caja/          # Rutas de caja
 │   │   ├── reportes/      # Rutas de reportes
 │   │   └── configuracion/ # Configuración
@@ -132,8 +132,8 @@ proyecto-bar/
 | ETAPA 4 | Catálogo productos, categorías, creación de pedidos | ✅ Completa |
 | ETAPA 5 | Venta directa, cuentas por mesa, pagos parciales | ✅ Completa |
 | ETAPA 6 | Caja, apertura/cierre turnos, gastos, retiros, arqueos | ✅ Completa |
-| ETAPA 7 | Inventario, compras, proveedores, ajustes | ⏳ Siguiente |
-| ETAPA 8 | Reportes, filtros, exportaciones, permisos | ⏳ Por iniciar |
+| ETAPA 7 | Inventario, compras, proveedores, ajustes, kardex | ✅ Completa |
+| ETAPA 8 | Reportes, filtros, exportaciones, permisos | ⏳ Siguiente |
 | ETAPA 9 | Pruebas, seguridad, documentación, despliegue | ⏳ Por iniciar |
 
 ---
@@ -232,3 +232,22 @@ npm install -D <pkg> # Instalar devDependency
   4. **Entradas y Salidas Menores:** Formulario para registrar salidas (insumos, proveedores, retiros a caja fuerte) y entradas (inyección de sencillo), afectando el balance físico en tiempo real.
   5. **Historial de Sesiones:** Registro histórico de turnos anteriores con sus horas de inicio/fin, montos, operador y cuadres.
   6. **Integración con Cobros:** Banner en `/cobro` que avisa al operador si la caja se encuentra cerrada y permite ir al módulo de caja con un clic. Linter y build limpios (0 errores, 0 warnings).
+- **13/10/2026:** ETAPA 7 completada - Implementado Módulo Integral de Inventario, Compras, Proveedores, Mermas y Kardex en `/productos`:
+  1. **Directorio y Gestión de Proveedores:**
+     - Modelo `SupplierState` en `src/lib/barState.ts` con proveedores clave precargados: Bavaria S.A., Fábrica de Licores de Antioquia (FLA), Diageo Colombia, Postobón S.A., Snacks & Insumos Gourmet.
+     - Modal para registrar nuevos proveedores con categoría, contacto, teléfono, correo, tiempo de entrega (`leadTime`), términos de pago y dirección.
+     - Acciones de edición, filtrado y eliminación directa de proveedores.
+  2. **Registro de Compras y Reabastecimiento a Proveedores:**
+     - Modal dinámico de compra que permite seleccionar el proveedor, número de factura comercial, método de pago (Efectivo Caja, Transferencia Bancaria, Crédito / Cuenta por Cobrar) y agregar múltiples ítems de productos con cantidades y costos unitarios.
+     - Actualización automática de existencias en bodega y ajuste del costo unitario (`cost`) de cada producto.
+     - Sincronización automática con la Caja: si el método de pago seleccionado es "Efectivo Caja", se registra automáticamente la salida en el cajón de efectivo (`expenses` y egreso de movimiento).
+  3. **Control de Mermas, Roturas y Auditoría Física de Inventario:**
+     - Modal interactivo para registrar mermas (botellas rotas, insumos vencidos, latas abolladas) o ajustes por conteo físico / auditoría periódica.
+     - Ajuste inmediato del stock resultante en bodega.
+  4. **Kardex Integral y Trazabilidad:**
+     - Registro cronológico detallado de todos los movimientos de stock: Compras (`purchase`), Ventas en comanda (`sale`), Mermas/Roturas (`loss`) y Ajustes de Auditoría (`adjustment`).
+     - Trazabilidad completa con fecha/hora, usuario responsable ("Cajero Principal"), motivo del movimiento, unidades variadas y stock resultante en bodega.
+  5. **Métricas Financieras en Tiempo Real:**
+     - Tarjetas en cabecera con: Total de unidades físicas en bodega, Valorización de existencias a costo (`$ COP`), Valorización proyectada a precio de venta y contador de alertas por stock crítico/bajo.
+  6. **Calidad y Reglas:**
+     - 0 errores y 0 warnings en ESLint (`npm run lint`). Compilación estática exitosa (`npm run build`) en todas las rutas sin rutas dinámicas ni server actions.

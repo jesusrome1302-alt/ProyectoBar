@@ -68,6 +68,51 @@ export interface CashMovementRecord {
   user: string
 }
 
+export interface SupplierState {
+  id: string
+  name: string
+  category: string
+  contactName: string
+  phone: string
+  email?: string
+  leadTime: string
+  paymentTerms: string
+  address?: string
+}
+
+export interface PurchaseItem {
+  productId: string
+  productName: string
+  quantity: number
+  unitCost: number
+  subtotal: number
+}
+
+export interface PurchaseRecord {
+  id: string
+  supplierId: string
+  supplierName: string
+  invoiceNumber?: string
+  items: PurchaseItem[]
+  totalAmount: number
+  paymentMethod: 'Efectivo Caja' | 'Transferencia' | 'Crédito'
+  date: string
+  user: string
+  notes?: string
+}
+
+export interface InventoryMovementRecord {
+  id: string
+  productId: string
+  productName: string
+  type: 'purchase' | 'sale' | 'loss' | 'adjustment'
+  quantity: number
+  reason: string
+  time: string
+  user: string
+  resultingStock: number
+}
+
 export interface ProductState {
   id: string
   name: string
@@ -87,6 +132,9 @@ export interface BarData {
   movements: CashMovementRecord[]
   products: ProductState[]
   sessions: CashSessionRecord[]
+  suppliers: SupplierState[]
+  purchases: PurchaseRecord[]
+  inventoryMovements: InventoryMovementRecord[]
 }
 
 const STORAGE_KEY = 'ROCK_BAR_APP_STATE_V1'
@@ -119,6 +167,129 @@ export const INITIAL_PRODUCTS: ProductState[] = [
   // Sin Alcohol
   { id: 'prod-17', name: 'Red Bull 250ml', category: 'Sin Alcohol', price: 15000, cost: 8500, stock: 20, min_stock: 8, barcode: '7701234017' },
   { id: 'prod-18', name: 'Agua Manantial con Gas', category: 'Sin Alcohol', price: 6000, cost: 2500, stock: 30, min_stock: 10, barcode: '7701234018' },
+]
+
+export const INITIAL_SUPPLIERS: SupplierState[] = [
+  {
+    id: 'sup-1',
+    name: 'Bavaria S.A.',
+    category: 'Cervezas & Maltas',
+    contactName: 'Carlos Mendoza',
+    phone: '+57 310 456 7890',
+    email: 'pedidos@bavaria.com.co',
+    leadTime: '24 a 48 horas',
+    paymentTerms: 'Contado / Crédito 15 días',
+    address: 'Zona Industrial Calle 80, Medellín',
+  },
+  {
+    id: 'sup-2',
+    name: 'Fábrica de Licores de Antioquia (FLA)',
+    category: 'Licores & Aguardientes',
+    contactName: 'Marcela Gómez',
+    phone: '+57 300 987 6543',
+    email: 'ventas@fla.com.co',
+    leadTime: '48 horas',
+    paymentTerms: 'Contado inmediato',
+    address: 'Itagüí, Antioquia',
+  },
+  {
+    id: 'sup-3',
+    name: 'Diageo Colombia Distribuidores',
+    category: 'Licores Importados & Whisky',
+    contactName: 'Andrés Restrepo',
+    phone: '+57 315 234 5678',
+    email: 'contacto@diageocolombia.com',
+    leadTime: '3 días hábiles',
+    paymentTerms: 'Transferencia anticipada',
+    address: 'El Poblado, Medellín',
+  },
+  {
+    id: 'sup-4',
+    name: 'Postobón & Bebidas No Alcohólicas',
+    category: 'Gaseosas & Energizantes',
+    contactName: 'Liliana Patiño',
+    phone: '+57 312 678 1234',
+    email: 'pedidos.bar@postobon.com',
+    leadTime: '24 horas',
+    paymentTerms: 'Efectivo o Transferencia',
+    address: 'Carrera 48 # 32-102',
+  },
+  {
+    id: 'sup-5',
+    name: 'Snacks & Insumos Gourmet',
+    category: 'Comidas & Snacks de Bar',
+    contactName: 'Santiago Vélez',
+    phone: '+57 318 890 4321',
+    email: 'ventas@snacksrock.com',
+    leadTime: 'Mismo día (urgencias)',
+    paymentTerms: 'Contra entrega',
+    address: 'Envigado, Barrio Obrero',
+  },
+]
+
+export const DEFAULT_PURCHASES: PurchaseRecord[] = [
+  {
+    id: 'OC-101',
+    supplierId: 'sup-1',
+    supplierName: 'Bavaria S.A.',
+    invoiceNumber: 'FACT-89210',
+    date: 'Ayer, 10:00 AM',
+    user: 'Cajero Principal',
+    paymentMethod: 'Transferencia',
+    items: [
+      { productId: 'prod-1', productName: 'Corona Extra 355ml', quantity: 36, unitCost: 7500, subtotal: 270000 },
+      { productId: 'prod-2', productName: 'Club Colombia Dorada 330ml', quantity: 48, unitCost: 5200, subtotal: 249600 },
+    ],
+    totalAmount: 519600,
+    notes: 'Reabastecimiento regular de cervezas para fin de semana.',
+  },
+]
+
+export const DEFAULT_INVENTORY_MOVEMENTS: InventoryMovementRecord[] = [
+  {
+    id: 'inv-1',
+    productId: 'prod-1',
+    productName: 'Corona Extra 355ml',
+    type: 'purchase',
+    quantity: 36,
+    reason: 'Compra de inventario a Bavaria S.A. (FACT-89210)',
+    time: 'Ayer, 10:00 AM',
+    user: 'Cajero Principal',
+    resultingStock: 36,
+  },
+  {
+    id: 'inv-2',
+    productId: 'prod-2',
+    productName: 'Club Colombia Dorada 330ml',
+    type: 'purchase',
+    quantity: 48,
+    reason: 'Compra de inventario a Bavaria S.A. (FACT-89210)',
+    time: 'Ayer, 10:00 AM',
+    user: 'Cajero Principal',
+    resultingStock: 48,
+  },
+  {
+    id: 'inv-3',
+    productId: 'prod-5',
+    productName: 'Poker Lata 330ml',
+    type: 'loss',
+    quantity: -2,
+    reason: 'Merma por latas abolladas en bodega',
+    time: 'Ayer, 04:30 PM',
+    user: 'Cajero Principal',
+    resultingStock: 50,
+  },
+  {
+    id: 'inv-4',
+    productId: 'prod-8',
+    productName: 'Trago Ron Medellín 8 Años',
+    type: 'sale',
+    quantity: -4,
+    reason: 'Consumo registrado Mesa 1',
+    time: 'Hoy, 05:00 PM',
+    user: 'Cajero Principal',
+    resultingStock: 30,
+  },
 ]
 
 export const DEFAULT_BAR_DATA: BarData = {
@@ -290,6 +461,9 @@ export const DEFAULT_BAR_DATA: BarData = {
       status: 'closed',
     },
   ],
+  suppliers: INITIAL_SUPPLIERS,
+  purchases: DEFAULT_PURCHASES,
+  inventoryMovements: DEFAULT_INVENTORY_MOVEMENTS,
 }
 
 let cachedData: BarData = DEFAULT_BAR_DATA
@@ -316,6 +490,15 @@ export function loadBarData(): BarData {
     }
     if (!parsed.sessions) {
       parsed.sessions = DEFAULT_BAR_DATA.sessions
+    }
+    if (!parsed.suppliers) {
+      parsed.suppliers = DEFAULT_BAR_DATA.suppliers
+    }
+    if (!parsed.purchases) {
+      parsed.purchases = DEFAULT_BAR_DATA.purchases
+    }
+    if (!parsed.inventoryMovements) {
+      parsed.inventoryMovements = DEFAULT_BAR_DATA.inventoryMovements
     }
     cachedData = parsed
     return cachedData
@@ -684,6 +867,144 @@ export function addCashMovement(type: 'in' | 'out', category: string, amount: nu
   }
 
   data.movements = [movement, ...(data.movements || [])]
+  saveBarData(data)
+}
+
+// === FUNCIONES ETAPA 7: PROVEEDORES, COMPRAS E INVENTARIO ===
+
+// Agregar un nuevo proveedor
+export function addSupplier(supplier: Omit<SupplierState, 'id'>): SupplierState {
+  const data = loadBarData()
+  const newSupplier: SupplierState = {
+    ...supplier,
+    id: 'sup-' + Date.now(),
+  }
+  data.suppliers = [newSupplier, ...(data.suppliers || INITIAL_SUPPLIERS)]
+  saveBarData(data)
+  return newSupplier
+}
+
+// Actualizar un proveedor existente
+export function updateSupplier(id: string, updates: Partial<SupplierState>): void {
+  const data = loadBarData()
+  data.suppliers = (data.suppliers || INITIAL_SUPPLIERS).map((s) => {
+    if (s.id === id) {
+      return { ...s, ...updates }
+    }
+    return s
+  })
+  saveBarData(data)
+}
+
+// Eliminar un proveedor
+export function deleteSupplier(id: string): void {
+  const data = loadBarData()
+  data.suppliers = (data.suppliers || INITIAL_SUPPLIERS).filter((s) => s.id !== id)
+  saveBarData(data)
+}
+
+// Registrar una compra de reabastecimiento a proveedor
+export function registerPurchase(purchaseData: Omit<PurchaseRecord, 'id' | 'date' | 'user'>): PurchaseRecord {
+  const data = loadBarData()
+  const timeNow = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  const dateStr = `Hoy, ${timeNow}`
+  const user = data.operatorName || 'Cajero Principal'
+  const purchaseId = 'OC-' + (100 + (data.purchases?.length || 0) + 1)
+
+  const newPurchase: PurchaseRecord = {
+    ...purchaseData,
+    id: purchaseId,
+    date: dateStr,
+    user,
+  }
+
+  // Actualizar existencias y costo unitario de cada producto comprado
+  data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
+    const purchasedItem = purchaseData.items.find((it) => it.productId === p.id)
+    if (purchasedItem) {
+      const newStock = p.stock + purchasedItem.quantity
+      const newCost = purchasedItem.unitCost > 0 ? purchasedItem.unitCost : p.cost
+
+      // Registrar movimiento en el kardex
+      const invMov: InventoryMovementRecord = {
+        id: 'inv-' + Date.now() + '-' + p.id,
+        productId: p.id,
+        productName: p.name,
+        type: 'purchase',
+        quantity: purchasedItem.quantity,
+        reason: `Compra ${purchaseId} a ${purchaseData.supplierName}${purchaseData.invoiceNumber ? ` (Fact: ${purchaseData.invoiceNumber})` : ''}`,
+        time: dateStr,
+        user,
+        resultingStock: newStock,
+      }
+      data.inventoryMovements = [invMov, ...(data.inventoryMovements || [])]
+
+      return {
+        ...p,
+        stock: newStock,
+        cost: newCost,
+      }
+    }
+    return p
+  })
+
+  // Si se pagó con Efectivo de Caja, registrar el egreso en caja
+  if (purchaseData.paymentMethod === 'Efectivo Caja' && purchaseData.totalAmount > 0) {
+    data.cash.expenses += purchaseData.totalAmount
+    data.cash.expectedCash = Math.max(0, data.cash.expectedCash - purchaseData.totalAmount)
+    data.movements.unshift({
+      id: 'mov-' + Date.now(),
+      type: 'out',
+      category: 'Pago Proveedor',
+      description: `Compra ${purchaseId} a ${purchaseData.supplierName}`,
+      amount: -purchaseData.totalAmount,
+      time: timeNow,
+      user,
+    })
+  }
+
+  data.purchases = [newPurchase, ...(data.purchases || [])]
+  saveBarData(data)
+  return newPurchase
+}
+
+// Registrar ajuste manual de inventario (merma, rotura o conteo físico)
+export function registerInventoryAdjustment(
+  productId: string,
+  type: 'loss' | 'adjustment',
+  quantity: number,
+  reason: string
+): void {
+  const data = loadBarData()
+  const timeNow = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  const dateStr = `Hoy, ${timeNow}`
+  const user = data.operatorName || 'Cajero Principal'
+
+  data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
+    if (p.id === productId) {
+      const newStock = Math.max(0, p.stock + quantity)
+
+      const invMov: InventoryMovementRecord = {
+        id: 'inv-' + Date.now(),
+        productId: p.id,
+        productName: p.name,
+        type,
+        quantity,
+        reason,
+        time: dateStr,
+        user,
+        resultingStock: newStock,
+      }
+      data.inventoryMovements = [invMov, ...(data.inventoryMovements || [])]
+
+      return {
+        ...p,
+        stock: newStock,
+      }
+    }
+    return p
+  })
+
   saveBarData(data)
 }
 
