@@ -205,3 +205,4 @@ npm install -D <pkg> # Instalar devDependency
 - **13/10/2026:** Repositorio Git inicializado en rama `main` con `.env.local` protegido.
 - **13/10/2026:** Corrección de advertencias ESLint en `layout.tsx`, `Sidebar.tsx` y `MobileNav.tsx` (0 errores, 0 warnings).
 - **13/10/2026:** Modernización de `globals.css` a directiva nativa `@import "tailwindcss";` de Tailwind v4.
+- **13/10/2026:** Servidor de desarrollo Next.js iniciado con éxito en http://localhost:3000 con Turbopack.
