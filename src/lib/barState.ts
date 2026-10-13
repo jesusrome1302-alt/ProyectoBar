@@ -63,6 +63,7 @@ export interface ProductState {
 
 export interface BarData {
   operatorName: string
+  activeTableId?: number
   tables: TableState[]
   cash: CashState
   movements: CashMovementRecord[]
@@ -101,9 +102,9 @@ export const INITIAL_PRODUCTS: ProductState[] = [
   { id: 'prod-18', name: 'Agua Manantial con Gas', category: 'Sin Alcohol', price: 6000, cost: 2500, stock: 30, min_stock: 10, barcode: '7701234018' },
 ]
 
-
 export const DEFAULT_BAR_DATA: BarData = {
   operatorName: 'Cajero Principal',
+  activeTableId: 1,
   tables: [
     {
       id: 1,
@@ -256,6 +257,7 @@ export const DEFAULT_BAR_DATA: BarData = {
 
 let cachedData: BarData = DEFAULT_BAR_DATA
 let cachedRaw: string | null = null
+const listeners = new Set<() => void>()
 
 export function loadBarData(): BarData {
   if (typeof window === 'undefined') return DEFAULT_BAR_DATA
@@ -267,7 +269,7 @@ export function loadBarData(): BarData {
       cachedData = DEFAULT_BAR_DATA
       return cachedData
     }
-    if (raw === cachedRaw) {
+    if (raw === cachedRaw && cachedData) {
       return cachedData
     }
     cachedRaw = raw
@@ -279,6 +281,30 @@ export function loadBarData(): BarData {
     return cachedData
   } catch {
     return DEFAULT_BAR_DATA
+  }
+}
+
+export function saveBarData(data: BarData): void {
+  if (typeof window === 'undefined') return
+  try {
+    const str = JSON.stringify(data)
+    cachedRaw = str
+    // Clonación para garantizar nueva identidad de objeto y disparo inmediato en useSyncExternalStore
+    cachedData = JSON.parse(str)
+    localStorage.setItem(STORAGE_KEY, str)
+
+    // Notificación sincrónica a componentes React
+    listeners.forEach((listener) => {
+      try {
+        listener()
+      } catch {
+        // Ignorar listener fallido
+      }
+    })
+
+    window.dispatchEvent(new Event('rock_bar_state_updated'))
+  } catch {
+    // Ignorar cuota de localStorage
   }
 }
 
@@ -310,17 +336,201 @@ export function adjustProductStock(id: string, delta: number): void {
   saveBarData(data)
 }
 
-export function saveBarData(data: BarData): void {
-  if (typeof window === 'undefined') return
-  try {
-    const str = JSON.stringify(data)
-    cachedRaw = str
-    cachedData = data
-    localStorage.setItem(STORAGE_KEY, str)
-    window.dispatchEvent(new Event('rock_bar_state_updated'))
-  } catch {
-    // Ignorar cuota
+export function setActiveTableId(id: number): void {
+  const data = loadBarData()
+  data.activeTableId = id
+  saveBarData(data)
+}
+
+// Agregar producto a una mesa
+export function addItemToTable(tableId: number, product: ProductState, quantity: number = 1): void {
+  const data = loadBarData()
+  const timeNow = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+
+  data.tables = data.tables.map((t) => {
+    if (t.id === tableId) {
+      const currentItems = [...(t.items || [])]
+      const existingIdx = currentItems.findIndex((it) => it.productId === product.id)
+
+      if (existingIdx >= 0) {
+        const item = currentItems[existingIdx]
+        const newQty = item.quantity + quantity
+        currentItems[existingIdx] = {
+          ...item,
+          quantity: newQty,
+          subtotal: newQty * item.unitPrice,
+        }
+      } else {
+        currentItems.push({
+          productId: product.id,
+          name: product.name,
+          quantity,
+          unitPrice: product.price,
+          subtotal: quantity * product.price,
+        })
+      }
+
+      const totalAmount = currentItems.reduce((acc, it) => acc + it.subtotal, 0)
+      const paid = t.paid || 0
+      const pending = Math.max(0, totalAmount - paid)
+
+      return {
+        ...t,
+        status: 'occupied',
+        openedAt: t.openedAt || timeNow,
+        items: currentItems,
+        total: totalAmount,
+        paid,
+        pending,
+      }
+    }
+    return t
+  })
+
+  // Ajustar existencias
+  data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
+    if (p.id === product.id) {
+      return { ...p, stock: Math.max(0, p.stock - quantity) }
+    }
+    return p
+  })
+
+  data.activeTableId = tableId
+  saveBarData(data)
+}
+
+// Cambiar cantidad de un producto en la mesa
+export function updateTableItemQty(tableId: number, productId: string, delta: number): void {
+  const data = loadBarData()
+
+  data.tables = data.tables.map((t) => {
+    if (t.id === tableId) {
+      const updatedItems: OrderItemState[] = []
+      for (const it of t.items || []) {
+        if (it.productId === productId) {
+          const newQty = it.quantity + delta
+          if (newQty > 0) {
+            updatedItems.push({
+              ...it,
+              quantity: newQty,
+              subtotal: newQty * it.unitPrice,
+            })
+          }
+        } else {
+          updatedItems.push(it)
+        }
+      }
+
+      const totalAmount = updatedItems.reduce((acc, it) => acc + it.subtotal, 0)
+      const paid = t.paid || 0
+      const pending = Math.max(0, totalAmount - paid)
+      const isOccupied = updatedItems.length > 0 || paid > 0
+
+      return {
+        ...t,
+        status: isOccupied ? 'occupied' : 'available',
+        openedAt: isOccupied ? t.openedAt : undefined,
+        items: updatedItems,
+        total: totalAmount,
+        paid,
+        pending,
+      }
+    }
+    return t
+  })
+
+  // Ajustar stock
+  data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
+    if (p.id === productId) {
+      return { ...p, stock: Math.max(0, p.stock - delta) }
+    }
+    return p
+  })
+
+  data.activeTableId = tableId
+  saveBarData(data)
+}
+
+// Eliminar un producto específico de la mesa
+export function removeTableItem(tableId: number, productId: string): void {
+  const data = loadBarData()
+  let qtyToReturn = 0
+
+  data.tables = data.tables.map((t) => {
+    if (t.id === tableId) {
+      const found = (t.items || []).find((it) => it.productId === productId)
+      if (found) qtyToReturn = found.quantity
+
+      const filtered = (t.items || []).filter((it) => it.productId !== productId)
+      const totalAmount = filtered.reduce((acc, it) => acc + it.subtotal, 0)
+      const paid = t.paid || 0
+      const pending = Math.max(0, totalAmount - paid)
+      const isOccupied = filtered.length > 0 || paid > 0
+
+      return {
+        ...t,
+        status: isOccupied ? 'occupied' : 'available',
+        openedAt: isOccupied ? t.openedAt : undefined,
+        items: filtered,
+        total: totalAmount,
+        paid,
+        pending,
+      }
+    }
+    return t
+  })
+
+  if (qtyToReturn > 0) {
+    data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
+      if (p.id === productId) {
+        return { ...p, stock: p.stock + qtyToReturn }
+      }
+      return p
+    })
   }
+
+  data.activeTableId = tableId
+  saveBarData(data)
+}
+
+// Vaciar comanda completa de una mesa
+export function clearTableOrder(tableId: number): void {
+  const data = loadBarData()
+  const table = data.tables.find((t) => t.id === tableId)
+  const items = table?.items || []
+
+  // Devolver todo el stock
+  const returnMap = new Map<string, number>()
+  for (const it of items) {
+    returnMap.set(it.productId, (returnMap.get(it.productId) || 0) + it.quantity)
+  }
+
+  data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
+    const qty = returnMap.get(p.id)
+    if (qty) {
+      return { ...p, stock: p.stock + qty }
+    }
+    return p
+  })
+
+  data.tables = data.tables.map((t) => {
+    if (t.id === tableId) {
+      return {
+        ...t,
+        status: 'available',
+        openedAt: undefined,
+        items: [],
+        payments: [],
+        total: 0,
+        paid: 0,
+        pending: 0,
+      }
+    }
+    return t
+  })
+
+  data.activeTableId = tableId
+  saveBarData(data)
 }
 
 export function resetBarData(): BarData {
@@ -329,12 +539,18 @@ export function resetBarData(): BarData {
 }
 
 function subscribe(callback: () => void) {
-  if (typeof window === 'undefined') return () => {}
-  window.addEventListener('rock_bar_state_updated', callback)
-  window.addEventListener('storage', callback)
+  listeners.add(callback)
+  const handler = () => callback()
+  if (typeof window !== 'undefined') {
+    window.addEventListener('rock_bar_state_updated', handler)
+    window.addEventListener('storage', handler)
+  }
   return () => {
-    window.removeEventListener('rock_bar_state_updated', callback)
-    window.removeEventListener('storage', callback)
+    listeners.delete(callback)
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('rock_bar_state_updated', handler)
+      window.removeEventListener('storage', handler)
+    }
   }
 }
 

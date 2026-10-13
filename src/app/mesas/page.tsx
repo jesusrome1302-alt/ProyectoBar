@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { UtensilsCrossed, Plus, Users, Clock, ArrowRight, CheckCircle, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
-import { useBarStore, loadBarData, saveBarData, resetBarData, TableState } from '@/lib/barState'
+import { useBarStore, loadBarData, saveBarData, resetBarData, setActiveTableId, TableState } from '@/lib/barState'
 
 export default function MesasPage() {
   const barData = useBarStore()
@@ -212,6 +212,7 @@ export default function MesasPage() {
                   <div className="grid grid-cols-2 gap-2">
                     <Link
                       href="/ventas"
+                      onClick={() => setActiveTableId(t.id)}
                       className="flex items-center justify-center space-x-1 py-2 rounded-xl text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors"
                     >
                       <span>+ Pedido</span>

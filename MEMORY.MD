@@ -216,3 +216,12 @@ npm install -D <pkg> # Instalar devDependency
   3. **Ajuste rápido de inventario:** Botones de `-1`, `+1` y `+10` (paquetes) por producto para actualizar existencias físicas sin recargar la página.
   4. **Punto de Venta (`/ventas`):** Botón de adición con 1 clic por producto, controles de incremento `+` y decremento `-` por ítem, botón individual de eliminar ítem de la comanda, y botón de vaciado total.
   5. **Validación:** Linter de ESLint en 0 errores y 0 warnings. Rutas estáticas con respuesta HTTP 200 OK.
+- **13/10/2026:** Corrección crítica de reactividad en botones de Comanda y Pedidos:
+  - **Causa raíz:** `useSyncExternalStore` comparaba la referencia en memoria del snapshot `cachedData`. Al mutar el objeto in-place antes de guardarlo, `Object.is(prev, next)` evaluaba como idéntico y React no re-renderizaba el estado tras hacer clic.
+  - **Solución implementada:**
+    1. Clonación inmutable en `saveBarData` (`JSON.parse(JSON.stringify(data))`), garantizando una nueva referencia de objeto para que `useSyncExternalStore` dispare re-renderizados instantáneos.
+    2. Adición de suscriptores reactivos sincrónicos en memoria (`listeners: Set<() => void>`).
+    3. Creación de funciones dedicadas en `barState.ts`: `addItemToTable`, `updateTableItemQty`, `removeTableItem`, `clearTableOrder` y `setActiveTableId`.
+    4. Botón visible y destacado `+ Agregar a M{X}` en cada tarjeta de producto y feedback toast instantáneo.
+    5. Botón de **"Vaciar Comanda"** visible tanto en la cabecera como en la parte inferior de las acciones en `/ventas`, devolviendo el stock físico de los productos a bodega automáticamente y reseteando el estado de la mesa a disponible si no hay pagos pendientes.
+    6. Sincronización de mesa activa entre `/mesas` (`+ Pedido`) y `/ventas`. Compilación y build limpios con 0 errores.
