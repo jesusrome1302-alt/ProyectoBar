@@ -1,3 +1,4 @@
+import './globals.css'
 import Sidebar from '@/components/Sidebar'
 import MobileNav from '@/components/MobileNav'
 import { Bell } from 'lucide-react'

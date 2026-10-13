@@ -206,3 +206,4 @@ npm install -D <pkg> # Instalar devDependency
 - **13/10/2026:** Corrección de advertencias ESLint en `layout.tsx`, `Sidebar.tsx` y `MobileNav.tsx` (0 errores, 0 warnings).
 - **13/10/2026:** Modernización de `globals.css` a directiva nativa `@import "tailwindcss";` de Tailwind v4.
 - **13/10/2026:** Servidor de desarrollo Next.js iniciado con éxito en http://localhost:3000 con Turbopack.
+- **13/10/2026:** Corregida importación de `globals.css` en `src/app/layout.tsx` para habilitar estilos completos de Tailwind y diseño Rock Bar.
