@@ -266,3 +266,18 @@ npm install -D <pkg> # Instalar devDependency
      - Formulario reactivo para configurar el nombre comercial del bar, NIT, dirección, teléfono, pie de ticket y operador en turno.
      - Botón **"Preparar Bar para Turno de Hoy (Limpiar Pruebas)"**: restablece mesas a $0 y disponibles, reinicia movimientos de caja del día para el arqueo limpio, pero **conserva 100% intactos los productos, inventario en bodega y proveedores**.
   4. **Calidad:** 0 errores y 0 warnings en ESLint (`npm run lint`), compilación estática exitosa (`npm run build`).
+- **27/10/2026:** Módulo de Mesas Dinámicas, Nombres de Clientes y Cuentas Separadas:
+  1. **Nombres de Clientes en Mesas (`customerName`):**
+     - Soporte completo para asociar el nombre del cliente a cada mesa o cuenta abierta (`customerName` en `TableState` y `SaleReceiptRecord`).
+     - Al abrir una mesa en `/mesas`, se solicita el nombre del cliente y notas opcionales.
+  2. **Creación Dinámica de Mesas y Sub-Cuentas:**
+     - Botón **"+ Nueva Mesa / Cuenta"** en `/mesas` y `/ventas` para crear mesas personalizadas o cuentas especiales (e.g., "Barra 1", "VIP 2", "Terraza 3").
+     - Funcionalidad de **"Separar / Nueva Cuenta Aquí"** con un solo clic para mesas donde hay dos o más personas con cuentas independientes (e.g., "Mesa 2 - B (Pedro)").
+  3. **Edición en Tiempo Real:**
+     - Modales para renombrar mesa, actualizar nombre del cliente y notas desde el mapa de `/mesas` y con acceso directo desde el encabezado de comandas en `/ventas`.
+     - Opción de eliminar mesas que no tengan pedidos activos.
+  4. **Trazabilidad en Cobro e Impresión Térmica:**
+     - En `/cobro`, las cuentas abiertas y facturadas muestran el nombre del cliente en badges visuales.
+     - Los tickets térmicos (Pre-Cuenta y Factura de Venta) imprimen automáticamente el campo `Cliente: [Nombre del cliente]`.
+     - La tabla de historial de ventas del turno incluye la columna "Cliente".
+  5. **Calidad:** 0 errores en linter (`npm run lint`), 100% compila estáticamente (`npm run build`) en todas las 11 rutas.

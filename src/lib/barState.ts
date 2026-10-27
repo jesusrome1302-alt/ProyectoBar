@@ -20,6 +20,7 @@ export interface PaymentRecord {
 export interface TableState {
   id: number
   name: string
+  customerName?: string
   capacity: number
   status: 'available' | 'occupied' | 'reserved'
   openedAt?: string
@@ -29,6 +30,7 @@ export interface TableState {
   total: number
   paid: number
   pending: number
+  notes?: string
 }
 
 export interface CashSessionRecord {
@@ -117,6 +119,7 @@ export interface SaleReceiptRecord {
   id: string
   tableId: number
   tableName: string
+  customerName?: string
   closedAt: string
   operator: string
   items: OrderItemState[]
@@ -646,6 +649,7 @@ export function closeTableAndSaveReceipt(
     id: 'FAC-' + Date.now().toString().slice(-6),
     tableId: table.id,
     tableName: table.name,
+    customerName: table.customerName,
     closedAt: timeStr,
     operator: data.operatorName || 'Cajero Principal',
     items: [...table.items],
@@ -669,6 +673,8 @@ export function closeTableAndSaveReceipt(
         paid: 0,
         pending: 0,
         openedAt: undefined,
+        customerName: undefined,
+        notes: undefined,
       }
     }
     return t
@@ -676,6 +682,92 @@ export function closeTableAndSaveReceipt(
 
   saveBarData(data)
   return receipt
+}
+
+// === FUNCIONES DINÁMICAS DE GESTIÓN DE MESAS Y CUENTAS DE CLIENTES ===
+
+export function addTable(params: {
+  name: string
+  capacity?: number
+  customerName?: string
+  notes?: string
+  autoOpen?: boolean
+}): TableState {
+  const data = loadBarData()
+  const nextId = (data.tables.length > 0 ? Math.max(...data.tables.map((t) => t.id)) : 0) + 1
+  const timeNow = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+
+  const newTable: TableState = {
+    id: nextId,
+    name: params.name.trim() || `Mesa ${nextId}`,
+    customerName: params.customerName?.trim() || undefined,
+    capacity: params.capacity && params.capacity > 0 ? params.capacity : 4,
+    status: params.autoOpen ? 'occupied' : 'available',
+    openedAt: params.autoOpen ? timeNow : undefined,
+    operator: data.operatorName || 'Cajero Principal',
+    items: [],
+    payments: [],
+    total: 0,
+    paid: 0,
+    pending: 0,
+    notes: params.notes?.trim() || undefined,
+  }
+
+  data.tables = [...data.tables, newTable]
+  if (params.autoOpen || !data.activeTableId) {
+    data.activeTableId = nextId
+  }
+  saveBarData(data)
+  return newTable
+}
+
+export function updateTable(id: number, updates: Partial<TableState>): void {
+  const data = loadBarData()
+  data.tables = data.tables.map((t) => {
+    if (t.id === id) {
+      return { ...t, ...updates }
+    }
+    return t
+  })
+  saveBarData(data)
+}
+
+export function deleteTable(id: number): boolean {
+  const data = loadBarData()
+  const table = data.tables.find((t) => t.id === id)
+  if (!table) return false
+
+  data.tables = data.tables.filter((t) => t.id !== id)
+  if (data.activeTableId === id) {
+    data.activeTableId = data.tables[0]?.id || 1
+  }
+  saveBarData(data)
+  return true
+}
+
+export function openTableWithCustomer(id: number, customerName?: string, notes?: string): void {
+  const data = loadBarData()
+  const timeNow = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+
+  data.tables = data.tables.map((t) => {
+    if (t.id === id) {
+      return {
+        ...t,
+        status: 'occupied' as const,
+        openedAt: timeNow,
+        customerName: customerName?.trim() || t.customerName,
+        notes: notes?.trim() || t.notes,
+        items: t.items || [],
+        payments: t.payments || [],
+        total: t.total || 0,
+        paid: t.paid || 0,
+        pending: t.pending || 0,
+      }
+    }
+    return t
+  })
+  data.activeTableId = id
+  saveBarData(data)
 }
 
 // Actualizar configuración del establecimiento

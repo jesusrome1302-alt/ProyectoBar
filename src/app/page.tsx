@@ -97,7 +97,9 @@ export default function DashboardPage() {
       {/* Mapa de Mesas Rápido */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-white tracking-wide">Estado de Mesas (1 - 9)</h3>
+          <h3 className="text-lg font-bold text-white tracking-wide">
+            Estado del Salón & Clientes ({tables.length})
+          </h3>
           <div className="flex items-center space-x-4 text-xs font-semibold">
             <span className="flex items-center space-x-1.5 text-zinc-300">
               <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
@@ -130,10 +132,17 @@ export default function DashboardPage() {
                 }`}
               >
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="font-bold text-white text-lg">{table.name}</span>
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <span className="font-bold text-white text-lg block">{table.name}</span>
+                      {table.customerName && (
+                        <span className="text-[11px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 inline-block mt-0.5">
+                          👤 {table.customerName}
+                        </span>
+                      )}
+                    </div>
                     <span
-                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0 ${
                         isOccupied
                           ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                           : isReserved

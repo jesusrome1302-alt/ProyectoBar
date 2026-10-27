@@ -284,7 +284,14 @@ export default function CobroPage() {
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="font-bold text-white text-base">{acc.name}</span>
+                      <div>
+                        <span className="font-bold text-white text-base block">{acc.name}</span>
+                        {acc.customerName && (
+                          <span className="text-[11px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 inline-block mt-0.5">
+                            👤 {acc.customerName}
+                          </span>
+                        )}
+                      </div>
                       <span
                         className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
                           isSettled
@@ -322,6 +329,11 @@ export default function CobroPage() {
                 <div>
                   <div className="flex items-center space-x-2">
                     <h3 className="font-black text-xl text-white">{currentAccount.name}</h3>
+                    {currentAccount.customerName && (
+                      <span className="text-xs bg-amber-500/15 text-amber-400 px-2.5 py-0.5 rounded-full font-bold border border-amber-500/30">
+                        👤 {currentAccount.customerName}
+                      </span>
+                    )}
                     <span className="text-xs bg-red-600/20 text-red-400 px-2.5 py-0.5 rounded-full font-bold border border-red-600/30">
                       {currentAccount.status === 'occupied' ? 'Ocupada' : 'Disponible'}
                     </span>
@@ -630,6 +642,7 @@ export default function CobroPage() {
                 <tr>
                   <th className="py-2.5 px-3">Nº Factura</th>
                   <th className="py-2.5 px-3">Mesa</th>
+                  <th className="py-2.5 px-3">Cliente</th>
                   <th className="py-2.5 px-3">Hora Cierre</th>
                   <th className="py-2.5 px-3">Ítems</th>
                   <th className="py-2.5 px-3 text-right">Total Facturado</th>
@@ -641,6 +654,16 @@ export default function CobroPage() {
                   <tr key={sale.id} className="hover:bg-zinc-900/40 transition-colors">
                     <td className="py-2.5 px-3 font-mono font-bold text-amber-400">{sale.id}</td>
                     <td className="py-2.5 px-3 text-white font-bold">{sale.tableName}</td>
+                    <td className="py-2.5 px-3 font-semibold text-zinc-300">
+                      {sale.customerName ? (
+                        <span className="text-amber-400 font-bold flex items-center space-x-1">
+                          <span>👤</span>
+                          <span>{sale.customerName}</span>
+                        </span>
+                      ) : (
+                        <span className="text-zinc-500 italic">-</span>
+                      )}
+                    </td>
                     <td className="py-2.5 px-3 text-zinc-400">{sale.closedAt}</td>
                     <td className="py-2.5 px-3 text-zinc-300">
                       {sale.items.length} productos ({sale.items.reduce((acc, it) => acc + it.quantity, 0)} uds)
@@ -705,6 +728,11 @@ export default function CobroPage() {
                   <span>Mesa: <strong>{activeReceipt.tableName}</strong></span>
                   <span>Hora: {activeReceipt.closedAt}</span>
                 </div>
+                {activeReceipt.customerName && (
+                  <div className="text-zinc-800 font-bold">
+                    Cliente: <span>{activeReceipt.customerName}</span>
+                  </div>
+                )}
                 <div>Atendido por: {activeReceipt.operator}</div>
               </div>
 

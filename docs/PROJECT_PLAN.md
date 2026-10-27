@@ -19,7 +19,7 @@ Este documento detalla el plan de desarrollo incremental, los módulos del siste
 | :--- | :--- |
 | Nombre comercial del bar | Pendiente |
 | Nombre y estilo visual de la aplicación | Pendiente |
-| Número exacto de mesas y nombres | Pendiente (1 a 9 iniciales) |
+| Número exacto de mesas y nombres | Resuelto (Mesas y cuentas dinámicas personalizadas con nombre de cliente y sub-cuentas separadas) |
 | Catálogo inicial y precios reales | Pendiente |
 | Métodos de pago que utiliza el negocio | Pendiente |
 | Necesidades de facturación electrónica | Pendiente |
