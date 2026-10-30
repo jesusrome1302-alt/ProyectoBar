@@ -777,6 +777,27 @@ export function updateBarSettings(newSettings: Partial<BarSettings>): void {
   saveBarData(data)
 }
 
+// Inicializar un nuevo bar registrado en el sistema
+export function registerNewBusinessBar(params: {
+  barName: string
+  ownerName: string
+  phone?: string
+  address?: string
+  city?: string
+}): void {
+  const data = loadBarData()
+  const cleanName = params.barName.trim().toUpperCase()
+  data.operatorName = params.ownerName
+  data.settings = {
+    ...(data.settings || DEFAULT_SETTINGS),
+    barName: cleanName,
+    address: params.address ? `${params.address}, ${params.city || ''}` : `${params.city || 'Colombia'}`,
+    phone: params.phone || '+57 (300) 000-0000',
+    footerText: `¡Gracias por visitar ${cleanName}! Vuelve pronto.`,
+  }
+  saveBarData(data)
+}
+
 // Limpiar datos de operaciones para empezar en blanco la prueba de la noche
 export function clearOperationalDataOnly(): void {
   const data = loadBarData()

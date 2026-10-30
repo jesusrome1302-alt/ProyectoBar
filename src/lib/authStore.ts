@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { registerNewBusinessBar } from '@/lib/barState'
 
 export type UserRole = 'owner' | 'admin' | 'staff'
 
@@ -10,8 +11,21 @@ export interface AuthUser {
   roleTitle: string
   avatar: string
   pin: string
+  barName?: string
+  phone?: string
+  city?: string
 }
 
+// Interfaz para crear nuevos usuarios (solo owner)
+export interface NewUserFormData {
+  name: string
+  email: string
+  role: UserRole
+  roleTitle: string
+  temporaryPin?: string
+}
+
+// Expandir PRESET_USERS con funcionalidad de creación
 export const PRESET_USERS: AuthUser[] = [
   {
     id: 'user-owner-1',
@@ -48,6 +62,30 @@ export interface AuthState {
 }
 
 const AUTH_STORAGE_KEY = 'ROCK_BAR_AUTH_SESSION_V1'
+
+// Nuevo usuario creado temporalmente (será persistido en localStorage)
+let tempUserIdCounter = 1000
+
+// Función para crear un nuevo usuario (solo puede ser llamada por el owner)
+export function createNewUser(formData: NewUserFormData, creatorRole: UserRole): AuthUser {
+  // Verificar que el creador sea owner
+  if (creatorRole !== 'owner') {
+    throw new Error('Solo el propietario puede crear nuevos usuarios')
+  }
+
+  const newId = `user-${formData.role}-${tempUserIdCounter++}`
+  const newUser: AuthUser = {
+    id: newId,
+    name: formData.name,
+    email: formData.email,
+    role: formData.role,
+    roleTitle: formData.roleTitle || `${formData.role.charAt(0).toUpperCase() + formData.role.slice(1)} / Personal`,
+    avatar: formData.name.slice(0, 2).toUpperCase(),
+    pin: formData.temporaryPin || Math.floor(1000 + Math.random() * 9000).toString(),
+  }
+
+  return newUser
+}
 
 export const DEFAULT_AUTH_STATE: AuthState = {
   user: PRESET_USERS[0],
@@ -114,8 +152,79 @@ export function loginWithPreset(role: UserRole): AuthUser {
   return targetUser
 }
 
+// Registrar un nuevo bar y su propietario (Onboarding SaaS para bares pequeños)
+export function registerBusinessOwner(params: {
+  firstName: string
+  lastName: string
+  barName: string
+  email: string
+  passwordOrPin: string
+  phone?: string
+  city?: string
+}): AuthUser {
+  const fullName = `${params.firstName.trim()} ${params.lastName.trim()}`
+  const initials = `${params.firstName.trim()[0] || 'B'}${params.lastName.trim()[0] || 'P'}`.toUpperCase()
+
+  const newUser: AuthUser = {
+    id: 'owner-' + Date.now(),
+    name: fullName,
+    email: params.email.trim().toLowerCase(),
+    role: 'owner',
+    roleTitle: `Propietario (${params.barName.trim()})`,
+    avatar: initials,
+    pin: params.passwordOrPin.trim(),
+    barName: params.barName.trim(),
+    phone: params.phone?.trim(),
+    city: params.city?.trim(),
+  }
+
+  // Agregar al inicio de perfiles activos
+  const existingIdx = PRESET_USERS.findIndex((u) => u.email === newUser.email)
+  if (existingIdx >= 0) {
+    PRESET_USERS[existingIdx] = newUser
+  } else {
+    PRESET_USERS.unshift(newUser)
+  }
+
+  // Sincronizar en barState el nuevo negocio y nombre del bar
+  registerNewBusinessBar({
+    barName: params.barName,
+    ownerName: fullName,
+    phone: params.phone,
+    city: params.city,
+  })
+
+  // Activar sesión inmediatamente
+  setAuthState({
+    user: newUser,
+    isAuthenticated: true,
+  })
+
+  return newUser
+}
+
+// Función para login con creación de usuario custom (por el owner en el panel)
+export function loginWithNewUser(name: string, role: UserRole): AuthUser {
+  const tempPin = Math.floor(1000 + Math.random() * 9000).toString()
+  const newUser: AuthUser = {
+    id: 'new-' + Date.now(),
+    name: name.trim(),
+    email: `${name.trim().toLowerCase().replace(/\s+/g, '')}@rockbar.com`,
+    role: role,
+    roleTitle: `${role.charAt(0).toUpperCase() + role.slice(1)} / Personal`,
+    avatar: name.trim().slice(0, 2).toUpperCase(),
+    pin: tempPin,
+  }
+  setAuthState({
+    user: newUser,
+    isAuthenticated: true,
+  })
+  return newUser
+}
+
+// Mejorado loginWithCredentials con mejor validación
 export function loginWithCredentials(identifier: string, pinOrPass: string): { success: boolean; message?: string; user?: AuthUser } {
-  // Buscar por email o PIN
+  // Buscar por email o PIN en users preset
   const found = PRESET_USERS.find(
     (u) =>
       u.email.toLowerCase() === identifier.trim().toLowerCase() ||
@@ -131,7 +240,7 @@ export function loginWithCredentials(identifier: string, pinOrPass: string): { s
     return { success: true, user: found }
   }
 
-  // Si no coincide pero escribió algo, permitir acceso staff
+  // Si no coincide, crear usuario custom staff (compatibilidad hacia atrás)
   if (identifier.trim().length > 0) {
     const customUser: AuthUser = {
       id: 'custom-' + Date.now(),

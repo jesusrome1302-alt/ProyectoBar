@@ -2,17 +2,109 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { PRESET_USERS, loginWithPreset, loginWithCredentials, UserRole } from '@/lib/authStore'
-import { Shield, KeyRound, Sparkles, CheckCircle2, Lock, ArrowRight, UserCheck } from 'lucide-react'
+import {
+  PRESET_USERS,
+  loginWithPreset,
+  loginWithCredentials,
+  registerBusinessOwner,
+  UserRole
+} from '@/lib/authStore'
+import {
+  Shield,
+  KeyRound,
+  Sparkles,
+  CheckCircle2,
+  Lock,
+  ArrowRight,
+  UserCheck,
+  Eye,
+  EyeOff,
+  Store,
+  Mail,
+  User,
+  Phone,
+  MapPin,
+  AlertCircle
+} from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
+  const [mode, setMode] = useState<'login' | 'register'>('register')
+
+  // Estado del formulario de Registro (Crea tu cuenta)
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [barName, setBarName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [city, setCity] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [acceptedTerms, setAcceptedTerms] = useState(true)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  // Estado del formulario de Login
   const [selectedRole, setSelectedRole] = useState<UserRole>('owner')
   const [identifier, setIdentifier] = useState('')
   const [pinOrPass, setPinOrPass] = useState('')
+
+  // Mensajes de alerta y feedback
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
 
+  // Manejar Registro de Nuevo Bar
+  const handleRegister = (e: React.FormEvent) => {
+    e.preventDefault()
+    setErrorMsg('')
+
+    if (!firstName.trim() || !lastName.trim()) {
+      setErrorMsg('Por favor ingresa tus nombres y apellidos completos.')
+      return
+    }
+    if (!barName.trim()) {
+      setErrorMsg('Por favor ingresa el nombre comercial de tu bar.')
+      return
+    }
+    if (!email.trim() || !email.includes('@')) {
+      setErrorMsg('Ingresa un correo electrónico de contacto válido.')
+      return
+    }
+    if (!password.trim() || password.length < 4) {
+      setErrorMsg('La contraseña o PIN debe tener al menos 4 caracteres.')
+      return
+    }
+    if (password !== confirmPassword) {
+      setErrorMsg('Las contraseñas no coinciden. Por favor verifícalas.')
+      return
+    }
+    if (!acceptedTerms) {
+      setErrorMsg('Debes aceptar la autorización de tratamiento de datos personales para continuar.')
+      return
+    }
+
+    try {
+      const newUser = registerBusinessOwner({
+        firstName,
+        lastName,
+        barName,
+        email,
+        passwordOrPin: password,
+        phone,
+        city,
+      })
+
+      setSuccessMsg(`¡Felicitaciones ${newUser.name}! Tu bar "${barName}" ha sido registrado con éxito. Accediendo al sistema...`)
+      setTimeout(() => {
+        router.push('/')
+      }, 700)
+    } catch (err) {
+      console.error('Error al registrar bar:', err)
+      setErrorMsg('Ocurrió un error al registrar el bar. Intenta de nuevo.')
+    }
+  }
+
+  // Manejar Login Rápido por Perfil Demostrativo
   const handleQuickLogin = (role: UserRole) => {
     setErrorMsg('')
     const loggedUser = loginWithPreset(role)
@@ -22,11 +114,12 @@ export default function LoginPage() {
     }, 400)
   }
 
+  // Manejar Login Tradicional con Credenciales
   const handleFormLogin = (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg('')
     if (!identifier && !pinOrPass) {
-      setErrorMsg('Ingresa tu usuario, correo o PIN para continuar')
+      setErrorMsg('Ingresa tu usuario, correo o PIN para continuar.')
       return
     }
 
@@ -37,7 +130,7 @@ export default function LoginPage() {
         router.push('/')
       }, 400)
     } else {
-      setErrorMsg(res.message || 'Credenciales no válidas')
+      setErrorMsg(res.message || 'Credenciales no válidas.')
     }
   }
 
@@ -63,149 +156,372 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-[85vh] flex flex-col justify-center items-center py-6 px-4">
-      <div className="w-full max-w-4xl space-y-8">
-        {/* Cabecera / Branding */}
-        <div className="text-center space-y-3">
-          <div className="inline-flex items-center space-x-2 bg-red-600/20 border border-red-500/30 px-4 py-1.5 rounded-full text-red-400 text-xs font-bold tracking-wider uppercase">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Control de Acceso y Turnos</span>
-          </div>
-          <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight flex items-center justify-center gap-3">
-            <span className="text-3xl sm:text-4xl">🎸</span>
-            <span>ROCK BAR POS</span>
-          </h1>
-          <p className="text-zinc-400 text-sm sm:text-base max-w-lg mx-auto">
-            Selecciona tu perfil de usuario para ingresar al sistema con los permisos asignados a tu rol de trabajo.
-          </p>
-        </div>
-
+    <div className="min-h-screen w-full flex items-center justify-center py-10 px-4 sm:px-6">
+      <div className="w-full max-w-xl space-y-6">
         {/* Notificaciones */}
         {errorMsg && (
-          <div className="bg-red-500/10 border border-red-500/40 text-red-300 px-4 py-3 rounded-2xl text-sm flex items-center justify-center space-x-2 animate-shake">
-            <Lock className="w-4 h-4 text-red-400" />
+          <div className="bg-red-500/10 border border-red-500/40 text-red-300 px-4 py-3 rounded-2xl text-xs sm:text-sm flex items-center space-x-2.5 animate-shake">
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
             <span>{errorMsg}</span>
           </div>
         )}
+
         {successMsg && (
-          <div className="bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 px-4 py-3 rounded-2xl text-sm flex items-center justify-center space-x-2 animate-pulse">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <div className="bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 px-4 py-3 rounded-2xl text-xs sm:text-sm flex items-center space-x-2.5 animate-pulse">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>{successMsg}</span>
           </div>
         )}
 
-        {/* Sección 1: Selección Rápida por Rol (1 Clic) */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-amber-500" />
-              Ingreso Rápido por Perfil (Demostración)
-            </h2>
-            <span className="text-xs text-zinc-500">Un clic para acceder</span>
-          </div>
+        {/* Tarjeta Principal de Registro / Login con Estilo DattaPro Dark */}
+        <div className="bg-[#0e131f]/90 border border-[#1e293b] rounded-3xl p-6 sm:p-10 backdrop-blur-xl shadow-2xl relative overflow-hidden">
+          {/* Logo y Encabezado */}
+          <div className="text-center space-y-3 mb-8">
+            <div className="inline-flex items-center justify-center space-x-2.5 mb-1">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-amber-500 flex items-center justify-center shadow-lg shadow-red-900/40 text-xl font-black text-white">
+                🎸
+              </div>
+              <span className="font-black text-xl tracking-wider text-white">
+                ROCK BAR <span className="text-amber-500">POS</span>
+              </span>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {PRESET_USERS.map((preset) => {
-              const colors = roleColors[preset.role]
-              const isSelected = selectedRole === preset.role
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              {mode === 'register' ? 'Crea tu cuenta' : 'Inicia sesión en tu Bar'}
+            </h1>
+            <p className="text-xs sm:text-sm text-zinc-400 max-w-md mx-auto leading-relaxed">
+              {mode === 'register'
+                ? 'Pasa de los cuadernos al control total: mesas, ventas, cobros e inventario adaptado a tu negocio.'
+                : 'Accede a las operaciones diarias de tu establecimiento según tu rol de trabajo.'}
+            </p>
 
-              return (
-                <div
-                  key={preset.id}
+            {/* Selector de Pestaña Modo */}
+            <div className="pt-2 flex justify-center">
+              <div className="inline-flex p-1 bg-zinc-950 rounded-2xl border border-zinc-800">
+                <button
+                  type="button"
                   onClick={() => {
-                    setSelectedRole(preset.role)
-                    handleQuickLogin(preset.role)
+                    setMode('register')
+                    setErrorMsg('')
                   }}
-                  className={`cursor-pointer rounded-2xl p-5 border transition-all duration-200 relative overflow-hidden group ${
-                    isSelected
-                      ? `${colors.border} ${colors.bg} ring-2 ring-amber-500/40 shadow-xl shadow-red-950/30`
-                      : 'border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 hover:bg-zinc-900'
+                  className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    mode === 'register'
+                      ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-md'
+                      : 'text-zinc-400 hover:text-white'
                   }`}
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-tr ${colors.accent} flex items-center justify-center font-black text-white text-lg shadow-md group-hover:scale-105 transition-transform`}>
-                      {preset.avatar}
-                    </div>
-                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${colors.badge}`}>
-                      {preset.role.toUpperCase()}
-                    </span>
-                  </div>
+                  Registrar Mi Bar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('login')
+                    setErrorMsg('')
+                  }}
+                  className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    mode === 'login'
+                      ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-md'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Iniciar Sesión
+                </button>
+              </div>
+            </div>
+          </div>
 
-                  <h3 className="font-bold text-white text-base group-hover:text-amber-400 transition-colors">
-                    {preset.name}
-                  </h3>
-                  <p className="text-xs text-zinc-400 mb-3">{preset.roleTitle}</p>
-
-                  <div className="pt-3 border-t border-zinc-800/80 flex items-center justify-between text-xs text-zinc-500">
-                    <span>PIN: <strong className="text-zinc-300 tracking-wider">{preset.pin}</strong></span>
-                    <span className="text-amber-500 group-hover:translate-x-1 transition-transform flex items-center gap-1 font-semibold">
-                      Ingresar <ArrowRight className="w-3.5 h-3.5" />
-                    </span>
+          {/* ============================================================ */}
+          {/* MODO 1: REGISTRO DE CUENTA Y BAR (ESTILO DATTAPRO)           */}
+          {/* ============================================================ */}
+          {mode === 'register' && (
+            <form onSubmit={handleRegister} className="space-y-4">
+              {/* Nombres y Apellidos */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Nombres</label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="Ej. Carlos"
+                      className="w-full bg-[#131926] border border-zinc-800 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors"
+                    />
                   </div>
                 </div>
-              )
-            })}
-          </div>
-        </div>
 
-        {/* Sección 2: Formulario de Login Clásico o Personalizado */}
-        <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-3xl p-6 sm:p-8 backdrop-blur-md shadow-2xl">
-          <div className="flex items-center space-x-3 mb-6 pb-4 border-b border-zinc-800">
-            <div className="p-2.5 rounded-xl bg-red-600/20 text-red-500 border border-red-500/30">
-              <KeyRound className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-white">Ingreso con Credenciales o PIN Personal</h2>
-              <p className="text-xs text-zinc-400">Si cuentas con tu propio PIN de mesero o correo de administrador</p>
-            </div>
-          </div>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Apellidos</label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Ej. Santana"
+                      className="w-full bg-[#131926] border border-zinc-800 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors"
+                    />
+                  </div>
+                </div>
+              </div>
 
-          <form onSubmit={handleFormLogin} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Nombre del Bar o Establecimiento */}
               <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
-                  Usuario o Correo
-                </label>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Nombre del Bar / Establecimiento</label>
                 <div className="relative">
+                  <Store className="w-4 h-4 text-amber-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="Ej. owner@rockbar.com o Carlos"
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors"
+                    required
+                    value={barName}
+                    onChange={(e) => setBarName(e.target.value)}
+                    placeholder="Ej. Cervecería El Barril, Bar La Esquina"
+                    className="w-full bg-[#131926] border border-zinc-800 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
                   />
                 </div>
               </div>
 
+              {/* Correo Electrónico */}
               <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
-                  PIN de Acceso o Contraseña
-                </label>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Correo Electrónico Comercial</label>
                 <div className="relative">
+                  <Mail className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
-                    type="password"
-                    value={pinOrPass}
-                    onChange={(e) => setPinOrPass(e.target.value)}
-                    placeholder="Ej. 1111 (o PIN de 4 dígitos)"
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="contacto@tubar.com"
+                    className="w-full bg-[#131926] border border-zinc-800 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors"
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <p className="text-[11px] text-zinc-500 text-center sm:text-left">
-                Acceso protegido por roles. Los empleados solo acceden a Mesas y Ventas. Los administradores y propietarios tienen acceso a Caja, Inventario y Reportes.
-              </p>
+              {/* Teléfono y Ciudad */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Teléfono / WhatsApp</label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+57 300 123 4567"
+                      className="w-full bg-[#131926] border border-zinc-800 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Ciudad</label>
+                  <div className="relative">
+                    <MapPin className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Ej. Cúcuta, Medellín, Cali..."
+                      className="w-full bg-[#131926] border border-zinc-800 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Contraseña */}
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Contraseña o PIN Maestro</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Crea una contraseña segura"
+                    className="w-full bg-[#131926] border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-zinc-500 mt-1">Al menos 4 caracteres o PIN de administración.</p>
+              </div>
+
+              {/* Confirmar Contraseña */}
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Confirmar Contraseña</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirma tu contraseña"
+                    className="w-full bg-[#131926] border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Tratamiento de Datos Personales (Estilo DattaPro) */}
+              <div className="p-3.5 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 text-[11px] text-zinc-400 space-y-2">
+                <label className="flex items-start space-x-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="mt-0.5 rounded border-zinc-700 bg-zinc-900 text-red-600 focus:ring-0"
+                  />
+                  <span className="leading-relaxed">
+                    Al realizar el registro, autorizo de manera previa, expresa e informada al sistema para el tratamiento de mis datos personales y de mi establecimiento comercial, conforme a la Política de Tratamiento de Datos Personales institucional y la Ley 1581 de 2012 de la República de Colombia.
+                  </span>
+                </label>
+              </div>
+
+              {/* Botón de Enviar */}
               <button
                 type="submit"
-                className="w-full sm:w-auto px-8 py-3 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 text-white font-bold text-sm hover:from-red-500 hover:to-amber-500 transition-all shadow-lg shadow-red-900/40 flex items-center justify-center space-x-2 shrink-0 cursor-pointer"
+                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-sm transition-all shadow-xl shadow-red-950/50 flex items-center justify-center space-x-2 cursor-pointer"
               >
-                <Shield className="w-4 h-4" />
-                <span>Iniciar Sesión</span>
+                <Sparkles className="w-4 h-4" />
+                <span>Crear Cuenta & Comenzar con mi Bar</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('login')
+                    setErrorMsg('')
+                  }}
+                  className="text-xs text-zinc-400 hover:text-amber-400 transition-colors"
+                >
+                  ¿Ya tienes cuenta registrada? <strong className="text-white underline">Inicia sesión aquí</strong>
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ============================================================ */}
+          {/* MODO 2: INICIO DE SESIÓN EXISTENTE (ROLES Y CREDENCIALES)    */}
+          {/* ============================================================ */}
+          {mode === 'login' && (
+            <div className="space-y-6">
+              {/* Sección A: Ingreso Rápido por Rol */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5 text-amber-500" />
+                    Acceso Demostrativo por Perfil
+                  </span>
+                  <span className="text-[10px] text-zinc-500">1 Clic para probar</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {PRESET_USERS.map((preset) => {
+                    const colors = roleColors[preset.role]
+                    const isSelected = selectedRole === preset.role
+
+                    return (
+                      <div
+                        key={preset.id}
+                        onClick={() => {
+                          setSelectedRole(preset.role)
+                          handleQuickLogin(preset.role)
+                        }}
+                        className={`cursor-pointer rounded-2xl p-3.5 border transition-all duration-200 group ${
+                          isSelected
+                            ? `${colors.border} ${colors.bg} ring-2 ring-amber-500/30`
+                            : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700 hover:bg-zinc-900'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className={`w-8 h-8 rounded-lg bg-gradient-to-tr ${colors.accent} flex items-center justify-center font-black text-white text-xs`}>
+                            {preset.avatar}
+                          </div>
+                          <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${colors.badge}`}>
+                            {preset.role.toUpperCase()}
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-xs text-white group-hover:text-amber-400 transition-colors truncate">
+                          {preset.name}
+                        </h4>
+                        <p className="text-[10px] text-zinc-500 truncate">{preset.roleTitle}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Sección B: Formulario PIN / Contraseña */}
+              <form onSubmit={handleFormLogin} className="space-y-3 pt-3 border-t border-zinc-800/80">
+                <div className="flex items-center space-x-2 text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                  <KeyRound className="w-3.5 h-3.5 text-red-500" />
+                  <span>O Ingresa con tu Correo o PIN Personal</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-zinc-400 mb-1">Usuario o Correo</label>
+                    <input
+                      type="text"
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
+                      placeholder="owner@rockbar.com"
+                      className="w-full bg-[#131926] border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-zinc-400 mb-1">PIN o Contraseña</label>
+                    <input
+                      type="password"
+                      value={pinOrPass}
+                      onChange={(e) => setPinOrPass(e.target.value)}
+                      placeholder="Ej. 1111"
+                      className="w-full bg-[#131926] border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-red-950/40 flex items-center justify-center space-x-2 cursor-pointer transition-all"
+                >
+                  <Shield className="w-4 h-4" />
+                  <span>Entrar al Sistema</span>
+                </button>
+
+                <div className="text-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('register')
+                      setErrorMsg('')
+                    }}
+                    className="text-xs text-zinc-400 hover:text-amber-400 transition-colors"
+                  >
+                    ¿Deseas registrar un nuevo bar? <strong className="text-white underline">Crea tu cuenta aquí</strong>
+                  </button>
+                </div>
+              </form>
             </div>
-          </form>
+          )}
         </div>
       </div>
     </div>

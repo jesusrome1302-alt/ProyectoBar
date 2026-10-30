@@ -5,8 +5,10 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import MobileNav from '@/components/MobileNav'
-import { Bell, UserCheck } from 'lucide-react'
-import { useAuthStore } from '@/lib/authStore'
+import { Bell, UserCheck, LogOut } from 'lucide-react'
+import { useAuthStore, logout } from '@/lib/authStore'
+import { useBarStore } from '@/lib/barState'
+import LoginPage from './login/page'
 
 export default function RootLayout({
   children,
@@ -14,8 +16,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const { user } = useAuthStore()
+  const { user, isAuthenticated } = useAuthStore()
+  const barData = useBarStore()
   const isLoginPage = pathname === '/login'
+  const isAuthorized = isAuthenticated && !isLoginPage
+  const barDisplayName = user?.barName || barData.settings?.barName || 'ROCK BAR'
 
   const roleKey = (user?.role && ['owner', 'admin', 'staff'].includes(user.role)) ? user.role : 'owner'
   const roleStyles = {
@@ -36,22 +41,35 @@ export default function RootLayout({
     },
   }[roleKey]
 
+  // Si no está autenticado, mostrar el portal de acceso / registro directamente
+  if (!isAuthenticated) {
+    return (
+      <html lang="es" className="dark">
+        <body className="bg-[#0a0f18] text-zinc-100 min-h-screen antialiased selection:bg-red-600 selection:text-white flex items-center justify-center">
+          <main className="w-full flex items-center justify-center">
+            <LoginPage />
+          </main>
+        </body>
+      </html>
+    )
+  }
+
   return (
     <html lang="es" className="dark">
       <body className="bg-[#121214] text-zinc-100 min-h-screen antialiased selection:bg-red-600 selection:text-white">
         <div className="flex min-h-screen">
           {/* Sidebar Escritorio (no se muestra en login) */}
-          {!isLoginPage && <Sidebar />}
+          {isAuthorized && <Sidebar />}
 
           {/* Contenido Principal */}
           <div className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
-            {/* Header Superior (no se muestra en login) */}
-            {!isLoginPage && (
+            {/* Header Superior */}
+            {isAuthorized && (
               <header className="h-16 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40">
                 <div className="flex items-center space-x-3">
                   <Link href="/" className="flex items-center space-x-2">
                     <span className="bg-gradient-to-r from-red-600 to-amber-500 bg-clip-text text-transparent font-black text-xl tracking-wider">
-                      ⚡ ROCK BAR POS
+                      ⚡ {barDisplayName} POS
                     </span>
                   </Link>
                   <span className="hidden sm:inline-block text-xs bg-zinc-800 text-zinc-300 px-2.5 py-1 rounded-full font-medium border border-zinc-700">
@@ -86,6 +104,15 @@ export default function RootLayout({
                       </span>
                     </div>
                   </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => logout()}
+                    title="Cerrar Sesión"
+                    className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-950/30 rounded-xl transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
                 </div>
               </header>
             )}

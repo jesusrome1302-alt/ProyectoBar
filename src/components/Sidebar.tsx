@@ -12,9 +12,11 @@ import {
   BarChart3,
   Settings,
   ShieldAlert,
-  UserCheck
+  UserCheck,
+  LogOut
 } from 'lucide-react'
-import { useAuthStore, UserRole } from '@/lib/authStore'
+import { useAuthStore, UserRole, logout } from '@/lib/authStore'
+import { useBarStore } from '@/lib/barState'
 
 type NavItem = {
   name: string
@@ -27,18 +29,20 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'Panel Principal', href: '/', icon: LayoutDashboard, roles: ['owner', 'admin', 'staff'] },
   { name: 'Mesas', href: '/mesas', icon: UtensilsCrossed, roles: ['owner', 'admin', 'staff'] },
   { name: 'Ventas / Barra', href: '/ventas', icon: ShoppingBag, roles: ['owner', 'admin', 'staff'] },
-  { name: 'Cobro / Cuentas', href: '/cobro', icon: ReceiptText, roles: ['owner', 'admin'] },
+  { name: 'Cobro / Cuentas', href: '/cobro', icon: ReceiptText, roles: ['owner', 'admin', 'staff'] },
   { name: 'Productos & Kardex', href: '/productos', icon: Package, roles: ['owner', 'admin'] },
   { name: 'Caja & Turnos', href: '/caja', icon: DollarSign, roles: ['owner', 'admin'] },
   { name: 'Reportes', href: '/reportes', icon: BarChart3, roles: ['owner', 'admin'] },
-  { name: 'Configuración', href: '/configuracion', icon: Settings, roles: ['owner'] },
-  { name: 'Usuarios y Roles', href: '/usuarios', icon: ShieldAlert, roles: ['owner'] },
+  { name: 'Configuración', href: '/configuracion', icon: Settings, roles: ['owner', 'admin'] },
+  { name: 'Usuarios y Roles', href: '/usuarios', icon: ShieldAlert, roles: ['owner', 'admin'] },
 ]
 
 export default function Sidebar() {
   const pathname = usePathname()
   const { user } = useAuthStore()
+  const barData = useBarStore()
   const currentRole: UserRole = user?.role || 'owner'
+  const barDisplayName = user?.barName || barData.settings?.barName || 'ROCK BAR'
 
   // Filtrar ítems autorizados para el rol actual
   const authorizedItems = NAV_ITEMS.filter((item) => item.roles.includes(currentRole))
@@ -52,14 +56,14 @@ export default function Sidebar() {
   return (
     <aside className="w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col justify-between hidden md:flex shrink-0">
       <div>
-        {/* Logo / Cabecera Rock Bar */}
+        {/* Logo / Cabecera Personalizada del Bar */}
         <Link href="/" className="p-6 border-b border-zinc-800 flex items-center space-x-3 block hover:bg-zinc-900/40 transition-colors">
-          <div className="bg-red-600 p-2.5 rounded-xl text-white font-black text-xl tracking-wider shadow-lg shadow-red-900/50 flex items-center justify-center">
+          <div className="bg-red-600 p-2.5 rounded-xl text-white font-black text-xl tracking-wider shadow-lg shadow-red-900/50 flex items-center justify-center shrink-0">
             🎸
           </div>
-          <div>
-            <h1 className="font-bold text-lg text-white tracking-wide">ROCK BAR</h1>
-            <p className="text-[11px] text-amber-500 font-semibold uppercase tracking-wider">Sistema de Gestión</p>
+          <div className="truncate">
+            <h1 className="font-bold text-base text-white tracking-wide truncate">{barDisplayName}</h1>
+            <p className="text-[10px] text-amber-500 font-semibold uppercase tracking-wider">Sistema POS & Bar</p>
           </div>
         </Link>
 
@@ -112,13 +116,23 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <Link
-          href="/login"
-          className="w-full flex items-center justify-center space-x-2 py-2 px-3 rounded-xl border border-zinc-800 bg-zinc-900/40 hover:bg-red-600/10 hover:border-red-500/40 text-zinc-400 hover:text-red-400 text-xs font-semibold transition-all"
-        >
-          <UserCheck className="w-3.5 h-3.5" />
-          <span>Cambiar Rol / Salir</span>
-        </Link>
+        <div className="grid grid-cols-2 gap-2">
+          <Link
+            href="/login"
+            className="flex items-center justify-center space-x-1.5 py-2 px-2.5 rounded-xl border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-800 text-zinc-400 hover:text-white text-xs font-semibold transition-all"
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+            <span>Roles</span>
+          </Link>
+          <button
+            type="button"
+            onClick={() => logout()}
+            className="flex items-center justify-center space-x-1.5 py-2 px-2.5 rounded-xl border border-red-950/40 bg-red-950/20 hover:bg-red-600/20 hover:border-red-500/40 text-red-400 text-xs font-semibold transition-all cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Salir</span>
+          </button>
+        </div>
       </div>
     </aside>
   )

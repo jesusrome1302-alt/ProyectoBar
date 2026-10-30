@@ -286,3 +286,8 @@ npm install -D <pkg> # Instalar devDependency
   5. **Módulo de Usuarios y Matriz de Permisos (`/usuarios`):** Panel interactivo para alternar roles y consultar la tabla detallada de privilegios de cada perfil.
   6. **Calidad:** 0 errores y 0 warnings en ESLint (`npm run lint`), compilación estática exitosa (`npm run build`).
   7. **Estabilidad y Caché de Sesión:** Corregido caché de referencia inmutable en `getAuthState` dentro de `useSyncExternalStore` para prevenir loops de render infinito en el cliente.
+  8. **Onboarding Multi-Bar "Crea tu cuenta" (Modelo SaaS para Bares Pequeños):**
+     - Formulario de registro completo inspirado en el diseño DattaPro: Nombres, Apellidos, Nombre del Bar, Correo comercial, Teléfono/WhatsApp, Ciudad, Contraseña/PIN seguro y autorización de tratamiento de datos personales (Ley 1581 de 2012).
+     - Activación automática: Al registrarse, el sistema inicializa el espacio de trabajo con el nombre del bar (`registerNewBusinessBar`), lo asigna como Propietario (`owner`) y desbloquea el acceso instantáneo al POS.
+     - Auth Guard en `layout.tsx`: Acceso bloqueado a la operativa interna si no hay sesión activa, mostrando el portal de Login / Registro.
+     - Identidad dinámica: Cabecera superior y barra lateral adoptan automáticamente el nombre del bar registrado.
