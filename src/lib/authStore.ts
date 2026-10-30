@@ -1,5 +1,12 @@
 import { useSyncExternalStore } from 'react'
 import { registerNewBusinessBar } from '@/lib/barState'
+import {
+  checkCloudEmailExists,
+  registerCloudAccount,
+  loginCloudAccount,
+  saveCloudTeamMember,
+  deleteCloudTeamMember,
+} from '@/lib/supabaseClient'
 
 export type UserRole = 'owner' | 'admin' | 'staff'
 
@@ -14,6 +21,7 @@ export interface AuthUser {
   barName?: string
   phone?: string
   city?: string
+  businessId?: string
 }
 
 // Interfaz para crear nuevos usuarios (solo owner)
@@ -128,6 +136,7 @@ export function saveBarUsers(users: AuthUser[]): void {
 // Agregar un empleado (mesero o admin) al bar actual
 export function addBarMember(data: { name: string; email?: string; role: UserRole; pin: string }): AuthUser {
   const currentUsers = getBarUsers()
+  const currentSession = getAuthState().user
   const roleTitle = data.role === 'admin' ? 'Administrador / Gerente' : 'Mesero / Staff'
   const newMember: AuthUser = {
     id: `user-${data.role}-${Date.now()}`,
@@ -137,9 +146,26 @@ export function addBarMember(data: { name: string; email?: string; role: UserRol
     roleTitle,
     avatar: data.name.trim().slice(0, 2).toUpperCase(),
     pin: data.pin.trim(),
+    barName: currentSession?.barName,
+    businessId: currentSession?.businessId,
   }
   const updated = [...currentUsers, newMember]
   saveBarUsers(updated)
+
+  // Sincronizar en la nube en segundo plano si hay businessId
+  if (currentSession?.businessId) {
+    saveCloudTeamMember({
+      id: newMember.id,
+      business_id: currentSession.businessId,
+      name: newMember.name,
+      email: newMember.email,
+      role: newMember.role,
+      role_title: newMember.roleTitle,
+      pin: newMember.pin,
+      avatar: newMember.avatar,
+    }).catch((err) => console.warn('Error sincronizando miembro en la nube:', err))
+  }
+
   return newMember
 }
 
@@ -148,6 +174,7 @@ export function deleteBarMember(userId: string): void {
   const currentUsers = getBarUsers()
   const filtered = currentUsers.filter((u) => u.id !== userId)
   saveBarUsers(filtered)
+  deleteCloudTeamMember(userId).catch((err) => console.warn('Error eliminando miembro en la nube:', err))
 }
 
 export const DEFAULT_AUTH_STATE: AuthState = {
@@ -215,8 +242,8 @@ export function loginWithPreset(role: UserRole): AuthUser {
   return targetUser
 }
 
-// Registrar un nuevo bar y su propietario (Onboarding SaaS para bares pequeños)
-export function registerBusinessOwner(params: {
+// Registrar un nuevo bar y su propietario (Onboarding SaaS con validación central en Supabase)
+export async function registerBusinessOwner(params: {
   firstName: string
   lastName: string
   barName: string
@@ -224,14 +251,32 @@ export function registerBusinessOwner(params: {
   passwordOrPin: string
   phone?: string
   city?: string
-}): AuthUser {
+}): Promise<AuthUser> {
+  const cleanEmail = params.email.trim().toLowerCase()
   const fullName = `${params.firstName.trim()} ${params.lastName.trim()}`
   const initials = `${params.firstName.trim()[0] || 'B'}${params.lastName.trim()[0] || 'P'}`.toUpperCase()
+
+  // 1. Validar si el correo ya está registrado en la nube (comprobación multi-dispositivo)
+  const isDuplicate = await checkCloudEmailExists(cleanEmail)
+  if (isDuplicate) {
+    throw new Error(
+      `El correo "${cleanEmail}" ya se encuentra registrado con otro bar. Por favor inicia sesión con tu contraseña o PIN.`
+    )
+  }
+
+  // 2. Registrar en Supabase Cloud para persistencia entre diferentes portátiles
+  let businessId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `biz-${Date.now()}`
+  const cloudRes = await registerCloudAccount(params)
+  if (cloudRes.success && cloudRes.account) {
+    businessId = cloudRes.account.business_id
+  } else if (cloudRes.error && cloudRes.error.includes('ya está registrado')) {
+    throw new Error(cloudRes.error)
+  }
 
   const newUser: AuthUser = {
     id: 'owner-' + Date.now(),
     name: fullName,
-    email: params.email.trim().toLowerCase(),
+    email: cleanEmail,
     role: 'owner',
     roleTitle: `Propietario (${params.barName.trim()})`,
     avatar: initials,
@@ -239,6 +284,7 @@ export function registerBusinessOwner(params: {
     barName: params.barName.trim(),
     phone: params.phone?.trim(),
     city: params.city?.trim(),
+    businessId: businessId,
   }
 
   // Lista de usuarios NUEVA y AISLADA para este bar: SOLO el nuevo propietario
@@ -250,6 +296,7 @@ export function registerBusinessOwner(params: {
     ownerName: fullName,
     phone: params.phone,
     city: params.city,
+    businessId: businessId,
   })
 
   // Activar sesión inmediatamente
@@ -280,20 +327,45 @@ export function loginWithNewUser(name: string, role: UserRole): AuthUser {
   return newUser
 }
 
-// Mejorado loginWithCredentials con mejor validación contra usuarios activos del bar
-export function loginWithCredentials(identifier: string, pinOrPass: string): { success: boolean; message?: string; user?: AuthUser } {
-  // Buscar primero en los usuarios registrados del bar y luego en presets de respaldo
+// Autenticación con credenciales validando en la nube (permite acceso desde cualquier portátil)
+export async function loginWithCredentials(
+  identifier: string,
+  pinOrPass: string
+): Promise<{ success: boolean; message?: string; user?: AuthUser }> {
+  const cleanId = identifier.trim()
+  const cleanPass = pinOrPass.trim()
+
+  // 1. Intentar validar credenciales contra Supabase en la nube
+  try {
+    const cloudRes = await loginCloudAccount(cleanId, cleanPass)
+    if (cloudRes.success && cloudRes.user) {
+      setAuthState({
+        user: cloudRes.user,
+        isAuthenticated: true,
+      })
+      // Agregar a la lista local si aún no está en este navegador
+      const localUsers = getBarUsers()
+      if (!localUsers.some((u) => u.id === cloudRes.user!.id)) {
+        saveBarUsers([cloudRes.user, ...localUsers])
+      }
+      return { success: true, user: cloudRes.user }
+    }
+  } catch (err) {
+    console.warn('Consulta a Supabase en login falló, probando caché local:', err)
+  }
+
+  // 2. Fallback local por si el equipo está desconectado
   const barUsers = getBarUsers()
   const candidates = barUsers.length > 0 ? barUsers : PRESET_USERS
   const found = candidates.find(
     (u) =>
-      u.email.toLowerCase() === identifier.trim().toLowerCase() ||
-      u.pin === pinOrPass.trim() ||
-      u.name.toLowerCase().includes(identifier.trim().toLowerCase())
+      u.email.toLowerCase() === cleanId.toLowerCase() ||
+      u.pin === cleanPass ||
+      u.name.toLowerCase().includes(cleanId.toLowerCase())
   ) || PRESET_USERS.find(
     (u) =>
-      u.email.toLowerCase() === identifier.trim().toLowerCase() ||
-      u.pin === pinOrPass.trim()
+      u.email.toLowerCase() === cleanId.toLowerCase() ||
+      u.pin === cleanPass
   )
 
   if (found) {
@@ -304,16 +376,16 @@ export function loginWithCredentials(identifier: string, pinOrPass: string): { s
     return { success: true, user: found }
   }
 
-  // Si no coincide, crear usuario custom staff (compatibilidad hacia atrás)
-  if (identifier.trim().length > 0) {
+  // 3. Si no coincide, crear usuario custom staff si ingresó algún identificador
+  if (cleanId.length > 0) {
     const customUser: AuthUser = {
       id: 'custom-' + Date.now(),
-      name: identifier.trim(),
-      email: `${identifier.trim().toLowerCase().replace(/\s+/g, '')}@rockbar.com`,
+      name: cleanId,
+      email: `${cleanId.toLowerCase().replace(/\s+/g, '')}@bar.com`,
       role: 'staff',
       roleTitle: 'Personal de Turno',
-      avatar: identifier.trim().slice(0, 2).toUpperCase(),
-      pin: pinOrPass || '0000',
+      avatar: cleanId.slice(0, 2).toUpperCase(),
+      pin: cleanPass || '0000',
     }
     setAuthState({
       user: customUser,
@@ -322,7 +394,7 @@ export function loginWithCredentials(identifier: string, pinOrPass: string): { s
     return { success: true, user: customUser }
   }
 
-  return { success: false, message: 'Usuario o credenciales inválidas' }
+  return { success: false, message: 'Usuario, correo o PIN incorrectos. Verifica tus credenciales.' }
 }
 
 export function logout(): void {

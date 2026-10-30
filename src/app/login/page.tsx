@@ -49,13 +49,14 @@ export default function LoginPage() {
   const [selectedRole, setSelectedRole] = useState<UserRole>('owner')
   const [identifier, setIdentifier] = useState('')
   const [pinOrPass, setPinOrPass] = useState('')
+  const [loading, setLoading] = useState(false)
 
   // Mensajes de alerta y feedback
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
 
-  // Manejar Registro de Nuevo Bar
-  const handleRegister = (e: React.FormEvent) => {
+  // Manejar Registro de Nuevo Bar con comprobación en la nube
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg('')
 
@@ -84,8 +85,9 @@ export default function LoginPage() {
       return
     }
 
+    setLoading(true)
     try {
-      const newUser = registerBusinessOwner({
+      const newUser = await registerBusinessOwner({
         firstName,
         lastName,
         barName,
@@ -99,9 +101,12 @@ export default function LoginPage() {
       setTimeout(() => {
         router.push('/')
       }, 700)
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error al registrar bar:', err)
-      setErrorMsg('Ocurrió un error al registrar el bar. Intenta de nuevo.')
+      const msg = err instanceof Error ? err.message : 'Ocurrió un error al registrar el bar. Intenta de nuevo.'
+      setErrorMsg(msg)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -121,8 +126,8 @@ export default function LoginPage() {
     }, 400)
   }
 
-  // Manejar Login Tradicional con Credenciales
-  const handleFormLogin = (e: React.FormEvent) => {
+  // Manejar Login Tradicional con Credenciales contra Supabase
+  const handleFormLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg('')
     if (!identifier && !pinOrPass) {
@@ -130,14 +135,21 @@ export default function LoginPage() {
       return
     }
 
-    const res = loginWithCredentials(identifier, pinOrPass)
-    if (res.success && res.user) {
-      setSuccessMsg(`¡Bienvenido ${res.user.name}! Accediendo como ${res.user.roleTitle}...`)
-      setTimeout(() => {
-        router.push('/')
-      }, 400)
-    } else {
-      setErrorMsg(res.message || 'Credenciales no válidas.')
+    setLoading(true)
+    try {
+      const res = await loginWithCredentials(identifier, pinOrPass)
+      if (res.success && res.user) {
+        setSuccessMsg(`¡Bienvenido ${res.user.name}! Accediendo como ${res.user.roleTitle}...`)
+        setTimeout(() => {
+          router.push('/')
+        }, 400)
+      } else {
+        setErrorMsg(res.message || 'Credenciales no válidas. Verifica tu correo y contraseña o PIN.')
+      }
+    } catch {
+      setErrorMsg('Error al conectar con el servicio de autenticación.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -403,11 +415,21 @@ export default function LoginPage() {
               {/* Botón de Enviar */}
               <button
                 type="submit"
-                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-sm transition-all shadow-xl shadow-red-950/50 flex items-center justify-center space-x-2 cursor-pointer"
+                disabled={loading}
+                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 disabled:opacity-60 text-white font-bold text-sm transition-all shadow-xl shadow-red-950/50 flex items-center justify-center space-x-2 cursor-pointer"
               >
-                <Sparkles className="w-4 h-4" />
-                <span>Crear Cuenta & Comenzar con mi Bar</span>
-                <ArrowRight className="w-4 h-4" />
+                {loading ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                    <span>Validando en la Nube...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>Crear Cuenta & Comenzar con mi Bar</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
 
               <div className="text-center pt-2">
@@ -508,10 +530,20 @@ export default function LoginPage() {
 
                 <button
                   type="submit"
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-red-950/40 flex items-center justify-center space-x-2 cursor-pointer transition-all"
+                  disabled={loading}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 disabled:opacity-60 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-red-950/40 flex items-center justify-center space-x-2 cursor-pointer transition-all"
                 >
-                  <Shield className="w-4 h-4" />
-                  <span>Entrar al Sistema</span>
+                  {loading ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                      <span>Autenticando en la Nube...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="w-4 h-4" />
+                      <span>Entrar al Sistema</span>
+                    </>
+                  )}
                 </button>
 
                 <div className="text-center pt-2">

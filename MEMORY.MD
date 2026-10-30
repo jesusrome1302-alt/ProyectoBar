@@ -301,3 +301,9 @@ npm install -D <pkg> # Instalar devDependency
        - Catálogo de productos en 0 con banner interactivo: botón para crear primer producto desde cero o cargar plantilla estándar de 18 bebidas colombianas.
        - Saneamiento automático de datos residuales en clientes existentes.
      - **Calidad garantizada:** 0 errores y 0 warnings en ESLint (`npm run lint`), compilación estática de 13 rutas exitosa (`npm run build`).
+  10. **Autenticación Central y Sincronización Multi-Dispositivo con Supabase:**
+     - **Prevención de correos duplicados:** Validación en tiempo real contra la tabla `public.bar_accounts` en Supabase Cloud. Si un usuario intenta registrar una cuenta con un correo ya existente desde otro portátil o dispositivo, el sistema lo detecta inmediatamente y bloquea el registro con un mensaje claro invitándolo a iniciar sesión.
+     - **Acceso multidispositivo (Dueño y Personal):** El propietario puede iniciar sesión desde cualquier portátil o teléfono ingresando su correo y contraseña/PIN. Los meseros y administradores pueden ingresar con su PIN personal de 4 dígitos.
+     - **Sincronización de personal (`bar_team_members`):** Los empleados creados o eliminados en `/usuarios` se sincronizan en la nube y quedan disponibles de inmediato en todos los portátiles del bar.
+     - **Sincronización de operativa (`bar_data`):** Mesas, ventas, caja y productos se guardan de forma centralizada en Supabase asociadas al `business_id` del bar.
+     - **Migración SQL versionada:** Creado `supabase/migrations/002_multi_device_sync.sql` con definición de tablas y políticas RLS para acceso seguro.

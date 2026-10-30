@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from 'react'
 import './globals.css'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -7,7 +8,7 @@ import Sidebar from '@/components/Sidebar'
 import MobileNav from '@/components/MobileNav'
 import { Bell, UserCheck, LogOut } from 'lucide-react'
 import { useAuthStore, logout } from '@/lib/authStore'
-import { useBarStore } from '@/lib/barState'
+import { useBarStore, syncCloudBarData } from '@/lib/barState'
 import LoginPage from './login/page'
 
 export default function RootLayout({
@@ -21,6 +22,13 @@ export default function RootLayout({
   const isLoginPage = pathname === '/login'
   const isAuthorized = isAuthenticated && !isLoginPage
   const barDisplayName = user?.barName || barData.settings?.barName || 'MI BAR'
+
+  // Sincronizar estado operativo del bar desde la nube si hay businessId
+  useEffect(() => {
+    if (user?.businessId) {
+      syncCloudBarData(user.businessId).catch(() => {})
+    }
+  }, [user?.businessId])
 
   const roleKey = (user?.role && ['owner', 'admin', 'staff'].includes(user.role)) ? user.role : 'owner'
   const roleStyles = {

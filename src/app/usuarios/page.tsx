@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   getBarUsers,
+  saveBarUsers,
   addBarMember,
   deleteBarMember,
   useAuthStore,
@@ -11,6 +12,7 @@ import {
   UserRole,
   AuthUser
 } from '@/lib/authStore'
+import { getCloudTeamMembers } from '@/lib/supabaseClient'
 import {
   ShieldAlert,
   UserCheck,
@@ -37,18 +39,45 @@ export default function UsuariosPage() {
   const [newPin, setNewPin] = useState('')
   const [modalError, setModalError] = useState('')
 
-  // Sincronizar usuarios del bar en tiempo real
+  // Sincronizar usuarios del bar en tiempo real y consultar nube
   useEffect(() => {
     const handleUpdate = () => {
       setUsersList(getBarUsers())
     }
     window.addEventListener('rock_bar_users_updated', handleUpdate)
     window.addEventListener('storage', handleUpdate)
+
+    // Sincronizar miembros desde Supabase Cloud si hay businessId
+    if (user?.businessId) {
+      getCloudTeamMembers(user.businessId)
+        .then((cloudMembers) => {
+          if (cloudMembers && cloudMembers.length > 0) {
+            const current = getBarUsers()
+            const owner = current.find((u) => u.role === 'owner') || user
+            const formattedMembers: AuthUser[] = cloudMembers.map((m) => ({
+              id: m.id,
+              name: m.name,
+              email: m.email || '',
+              role: m.role,
+              roleTitle: m.role_title || (m.role === 'admin' ? 'Administrador / Gerente' : 'Mesero / Staff'),
+              avatar: m.avatar || m.name.slice(0, 2).toUpperCase(),
+              pin: m.pin,
+              barName: user?.barName,
+              businessId: user?.businessId,
+            }))
+            const merged = owner ? [owner, ...formattedMembers.filter((fm) => fm.id !== owner.id)] : formattedMembers
+            saveBarUsers(merged)
+            setUsersList(merged)
+          }
+        })
+        .catch(() => {})
+    }
+
     return () => {
       window.removeEventListener('rock_bar_users_updated', handleUpdate)
       window.removeEventListener('storage', handleUpdate)
     }
-  }, [])
+  }, [user?.businessId, user])
 
   const handleAddMember = (e: React.FormEvent) => {
     e.preventDefault()

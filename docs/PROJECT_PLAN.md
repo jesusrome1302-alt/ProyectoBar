@@ -12,7 +12,7 @@ Este documento detalla el plan de desarrollo incremental, los módulos del siste
 - **ETAPA 6:** Caja, apertura y cierre de turnos, gastos, retiros, arqueos y cuadres. *(Completada)*
 - **ETAPA 7:** Inventario, compras, proveedores y ajustes de existencias. *(Completada)*
 - **ETAPA 8:** Reportes, filtros, sistema de login, control de acceso por roles (owner, admin, staff), portal de registro SaaS multinegocio e inicialización de cuentas 100% en CERO (0). *(Completada)*
-- **ETAPA 9:** Pruebas de integración, seguridad, aislamiento de negocio, documentación y despliegue en Vercel. *(En progreso - Vercel Conectado)*
+- **ETAPA 9:** Sincronización multi-dispositivo en la nube con Supabase, prevención de correos duplicados, migración SQL 002 y despliegue en Vercel. *(En progreso - Conectado a Supabase)*
 
 ## 2. Decisiones Pendientes (Registro)
 | Decisión | Estado |

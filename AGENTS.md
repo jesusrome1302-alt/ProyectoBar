@@ -27,6 +27,7 @@ Este archivo contiene las directrices, convenciones, arquitectura y comandos par
 - No guardar secretos en el cliente.
 - Seguir un enfoque incremental paso a paso.
 - **Aislamiento Multi-Bar y Estado en Cero:** Toda cuenta o bar registrado debe inicializarse en 0 absoluto (mesas limpias a $0, caja cerrada a $0, movimientos vacíos, sin productos o con plantilla bajo demanda) y con acceso exclusivo a su propio personal (sin usuarios demostrativos residuales).
+- **Sincronización Central en la Nube:** Las cuentas y datos operativos se validan y persisten de forma centralizada en Supabase para evitar cuentas duplicadas entre diferentes dispositivos y mantener las mesas y ventas sincronizadas en tiempo real.
 
 ## 5 Limites
 

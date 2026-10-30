@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { saveCloudBarData, getCloudBarData } from '@/lib/supabaseClient'
 
 export interface OrderItemState {
   productId: string
@@ -464,9 +465,49 @@ export function saveBarData(data: BarData): void {
     })
 
     window.dispatchEvent(new Event('rock_bar_state_updated'))
+
+    // Sincronización en segundo plano con la nube (Supabase) para soporte multi-dispositivo
+    try {
+      const authRaw = localStorage.getItem('ROCK_BAR_AUTH_SESSION_V1')
+      if (authRaw) {
+        const auth = JSON.parse(authRaw)
+        const businessId = auth?.user?.businessId
+        if (businessId) {
+          saveCloudBarData(businessId, data).catch((e) =>
+            console.warn('Error sincronizando bar_data en Supabase:', e)
+          )
+        }
+      }
+    } catch {
+      // Ignorar error al leer auth
+    }
   } catch {
     // Ignorar cuota de localStorage
   }
+}
+
+// Sincronizar datos del bar desde la nube (para cuando se ingresa desde otro portátil)
+export async function syncCloudBarData(businessId?: string): Promise<boolean> {
+  if (typeof window === 'undefined') return false
+  try {
+    let targetBizId = businessId
+    if (!targetBizId) {
+      const authRaw = localStorage.getItem('ROCK_BAR_AUTH_SESSION_V1')
+      if (authRaw) {
+        const auth = JSON.parse(authRaw)
+        targetBizId = auth?.user?.businessId
+      }
+    }
+    if (!targetBizId) return false
+    const cloudData = await getCloudBarData(targetBizId)
+    if (cloudData && cloudData.tables && cloudData.tables.length > 0) {
+      saveBarData(cloudData)
+      return true
+    }
+  } catch (err) {
+    console.warn('Error al sincronizar datos desde la nube:', err)
+  }
+  return false
 }
 
 export function addProductItem(item: Omit<ProductState, 'id'>): ProductState {
@@ -674,6 +715,7 @@ export function registerNewBusinessBar(params: {
   phone?: string
   address?: string
   city?: string
+  businessId?: string
 }): void {
   const cleanName = params.barName.trim().toUpperCase()
 
@@ -723,6 +765,10 @@ export function registerNewBusinessBar(params: {
   }
 
   saveBarData(cleanData)
+
+  if (params.businessId) {
+    saveCloudBarData(params.businessId, cleanData).catch(() => {})
+  }
 }
 
 // Cargar plantilla opcional de bebidas estándar colombianas
