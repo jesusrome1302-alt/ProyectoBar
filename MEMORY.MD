@@ -274,4 +274,14 @@ npm install -D <pkg> # Instalar devDependency
   5. **Filtros de fecha básicos:** Selector de rango de fechas para reportes de ventas y movimientos de caja
   6. **Exportación de datos CSV:** Funcionalidad para exportar reportes de ventas y movimientos de inventario
   7. **0 errores y 0 warnings** en ESLint (`npm run lint`), compilación estática exitosa (`npm run build`) en todas las rutas.
-  8. **Vinculación a GitHub:** Configurado repositorio remoto origin (`https://github.com/jesusrome1302-alt/ProyectoBar.git`).
+  8. **Vinculación a GitHub y Vercel:** Configurado repositorio remoto origin (`https://github.com/jesusrome1302-alt/ProyectoBar.git`), código subido a la rama `main` y desplegado con éxito en Vercel.
+- **30/10/2026:** Sistema de Login y Control de Acceso por Rol (ETAPA 8 Completada):
+  1. **Store de autenticación reactivo (`src/lib/authStore.ts`):** Basado en `useSyncExternalStore` con sincronización en `localStorage` y actualización instantánea en toda la app sin recarga.
+  2. **Perfiles preconfigurados con acceso rápido:**
+     - Propietario / Dueño: Carlos Santana (`owner`, PIN 1111) - Acceso 100% total a configuración, fiscal, inventario, reportes, arqueos y usuarios.
+     - Administrador / Gerente: Andrés Calamaro (`admin`, PIN 2222) - Acceso a ventas, mesas, cobro, catálogo, kardex, caja y reportes.
+     - Mesero / Personal: Fito Páez (`staff`, PIN 3333) - Acceso restringido exclusivamente a toma de pedidos en mesas y ventas en barra.
+  3. **Página de Login (`/login`):** Interfaz con diseño Rock Bar, acceso por 1 clic en tarjetas de perfil o autenticación mediante credenciales / PIN.
+  4. **Navegación reactiva:** `Sidebar` y `MobileNav` filtran de forma dinámica las opciones visibles según los permisos del usuario activo, eliminando duplicaciones.
+  5. **Módulo de Usuarios y Matriz de Permisos (`/usuarios`):** Panel interactivo para alternar roles y consultar la tabla detallada de privilegios de cada perfil.
+  6. **Calidad:** 0 errores y 0 warnings en ESLint (`npm run lint`), compilación estática exitosa (`npm run build`).
