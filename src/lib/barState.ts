@@ -108,12 +108,14 @@ export interface InventoryMovementRecord {
   id: string
   productId: string
   productName: string
-  type: 'purchase' | 'sale' | 'loss' | 'adjustment'
+  type: 'purchase' | 'sale' | 'loss' | 'adjustment' | 'transfer'
   quantity: number
   reason: string
   time: string
   user: string
   resultingStock: number
+  resultingNevera?: number
+  resultingBodega?: number
 }
 
 export interface SaleReceiptRecord {
@@ -147,8 +149,11 @@ export interface ProductState {
   category: string
   price: number
   cost: number
-  stock: number
-  min_stock: number
+  stock: number // Total global = stock_nevera + stock_bodega
+  stock_nevera?: number // Unidades frías en nevera / barra listas para servir
+  stock_bodega?: number // Unidades en bodega / depósito / almacén
+  min_stock: number // Mínimo global para compras a proveedores
+  min_stock_nevera?: number // Mínimo en nevera para alerta de reponer / enfriar
   barcode?: string
   active?: boolean
   description?: string
@@ -182,33 +187,33 @@ export const DEFAULT_SETTINGS: BarSettings = {
 const STORAGE_KEY = 'ROCK_BAR_APP_STATE_V1'
 
 export const INITIAL_PRODUCTS: ProductState[] = [
-  // Cervezas
-  { id: 'prod-1', name: 'Corona Extra 355ml', category: 'Cervezas', price: 14000, cost: 7500, stock: 36, min_stock: 12, barcode: '7701234001' },
-  { id: 'prod-2', name: 'Club Colombia Dorada 330ml', category: 'Cervezas', price: 10000, cost: 5200, stock: 48, min_stock: 15, barcode: '7701234002' },
-  { id: 'prod-3', name: 'Heineken Long Neck', category: 'Cervezas', price: 15000, cost: 8000, stock: 24, min_stock: 10, barcode: '7701234003' },
-  { id: 'prod-4', name: 'BBC Cajicá Miel', category: 'Cervezas', price: 16000, cost: 8800, stock: 12, min_stock: 10, barcode: '7701234004' },
-  { id: 'prod-5', name: 'Poker Lata 330ml', category: 'Cervezas', price: 8000, cost: 4000, stock: 50, min_stock: 15, barcode: '7701234005' },
-  { id: 'prod-6', name: 'Águila Original 330ml', category: 'Cervezas', price: 8000, cost: 4100, stock: 60, min_stock: 20, barcode: '7701234006' },
+  // Cervezas (Inventario Dual Nevera + Bodega)
+  { id: 'prod-1', name: 'Corona Extra 355ml', category: 'Cervezas', price: 14000, cost: 7500, stock: 36, stock_nevera: 12, stock_bodega: 24, min_stock: 12, min_stock_nevera: 6, barcode: '7701234001' },
+  { id: 'prod-2', name: 'Club Colombia Dorada 330ml', category: 'Cervezas', price: 10000, cost: 5200, stock: 48, stock_nevera: 16, stock_bodega: 32, min_stock: 15, min_stock_nevera: 8, barcode: '7701234002' },
+  { id: 'prod-3', name: 'Heineken Long Neck', category: 'Cervezas', price: 15000, cost: 8000, stock: 24, stock_nevera: 4, stock_bodega: 20, min_stock: 10, min_stock_nevera: 8, barcode: '7701234003' },
+  { id: 'prod-4', name: 'BBC Cajicá Miel', category: 'Cervezas', price: 16000, cost: 8800, stock: 12, stock_nevera: 2, stock_bodega: 10, min_stock: 10, min_stock_nevera: 6, barcode: '7701234004' },
+  { id: 'prod-5', name: 'Poker Lata 330ml', category: 'Cervezas', price: 8000, cost: 4000, stock: 50, stock_nevera: 18, stock_bodega: 32, min_stock: 15, min_stock_nevera: 10, barcode: '7701234005' },
+  { id: 'prod-6', name: 'Águila Original 330ml', category: 'Cervezas', price: 8000, cost: 4100, stock: 60, stock_nevera: 24, stock_bodega: 36, min_stock: 20, min_stock_nevera: 12, barcode: '7701234006' },
 
   // Licores
-  { id: 'prod-7', name: 'Trago Whisky Johnnie Walker Black', category: 'Licores', price: 28000, cost: 16000, stock: 25, min_stock: 5, barcode: '7701234007' },
-  { id: 'prod-8', name: 'Trago Ron Medellín 8 Años', category: 'Licores', price: 18000, cost: 9500, stock: 30, min_stock: 6, barcode: '7701234008' },
-  { id: 'prod-9', name: 'Trago Aguardiente Antioqueño Azul', category: 'Licores', price: 12000, cost: 6500, stock: 40, min_stock: 10, barcode: '7701234009' },
-  { id: 'prod-10', name: 'Trago Tequila José Cuervo', category: 'Licores', price: 24000, cost: 13000, stock: 20, min_stock: 4, barcode: '7701234010' },
+  { id: 'prod-7', name: 'Trago Whisky Johnnie Walker Black', category: 'Licores', price: 28000, cost: 16000, stock: 25, stock_nevera: 0, stock_bodega: 25, min_stock: 5, min_stock_nevera: 0, barcode: '7701234007' },
+  { id: 'prod-8', name: 'Trago Ron Medellín 8 Años', category: 'Licores', price: 18000, cost: 9500, stock: 30, stock_nevera: 0, stock_bodega: 30, min_stock: 6, min_stock_nevera: 0, barcode: '7701234008' },
+  { id: 'prod-9', name: 'Trago Aguardiente Antioqueño Azul', category: 'Licores', price: 12000, cost: 6500, stock: 40, stock_nevera: 10, stock_bodega: 30, min_stock: 10, min_stock_nevera: 5, barcode: '7701234009' },
+  { id: 'prod-10', name: 'Trago Tequila José Cuervo', category: 'Licores', price: 24000, cost: 13000, stock: 20, stock_nevera: 0, stock_bodega: 20, min_stock: 4, min_stock_nevera: 0, barcode: '7701234010' },
 
   // Cócteles
-  { id: 'prod-11', name: 'Cóctel Rock Margarita', category: 'Cócteles', price: 32000, cost: 11000, stock: 50, min_stock: 10, barcode: '7701234011' },
-  { id: 'prod-12', name: 'Mojito Cubano Clásico', category: 'Cócteles', price: 28000, cost: 9500, stock: 50, min_stock: 10, barcode: '7701234012' },
-  { id: 'prod-13', name: 'Gin Tonic Botanicals', category: 'Cócteles', price: 35000, cost: 13000, stock: 40, min_stock: 10, barcode: '7701234013' },
+  { id: 'prod-11', name: 'Cóctel Rock Margarita', category: 'Cócteles', price: 32000, cost: 11000, stock: 50, stock_nevera: 50, stock_bodega: 0, min_stock: 10, min_stock_nevera: 0, barcode: '7701234011' },
+  { id: 'prod-12', name: 'Mojito Cubano Clásico', category: 'Cócteles', price: 28000, cost: 9500, stock: 50, stock_nevera: 50, stock_bodega: 0, min_stock: 10, min_stock_nevera: 0, barcode: '7701234012' },
+  { id: 'prod-13', name: 'Gin Tonic Botanicals', category: 'Cócteles', price: 35000, cost: 13000, stock: 40, stock_nevera: 40, stock_bodega: 0, min_stock: 10, min_stock_nevera: 0, barcode: '7701234013' },
 
   // Snacks
-  { id: 'prod-14', name: 'Nachos Cheddar & Jalapeños', category: 'Snacks', price: 26000, cost: 11500, stock: 18, min_stock: 5, barcode: '7701234014' },
-  { id: 'prod-15', name: 'Alitas BBQ Rocker x8', category: 'Snacks', price: 34000, cost: 16000, stock: 15, min_stock: 6, barcode: '7701234015' },
-  { id: 'prod-16', name: 'Papas Rústicas con Tocineta', category: 'Snacks', price: 22000, cost: 9000, stock: 22, min_stock: 8, barcode: '7701234016' },
+  { id: 'prod-14', name: 'Nachos Cheddar & Jalapeños', category: 'Snacks', price: 26000, cost: 11500, stock: 18, stock_nevera: 0, stock_bodega: 18, min_stock: 5, min_stock_nevera: 0, barcode: '7701234014' },
+  { id: 'prod-15', name: 'Alitas BBQ Rocker x8', category: 'Snacks', price: 34000, cost: 16000, stock: 15, stock_nevera: 0, stock_bodega: 15, min_stock: 6, min_stock_nevera: 0, barcode: '7701234015' },
+  { id: 'prod-16', name: 'Papas Rústicas con Tocineta', category: 'Snacks', price: 22000, cost: 9000, stock: 22, stock_nevera: 0, stock_bodega: 22, min_stock: 8, min_stock_nevera: 0, barcode: '7701234016' },
 
   // Sin Alcohol
-  { id: 'prod-17', name: 'Red Bull 250ml', category: 'Sin Alcohol', price: 15000, cost: 8500, stock: 20, min_stock: 8, barcode: '7701234017' },
-  { id: 'prod-18', name: 'Agua Manantial con Gas', category: 'Sin Alcohol', price: 6000, cost: 2500, stock: 30, min_stock: 10, barcode: '7701234018' },
+  { id: 'prod-17', name: 'Red Bull 250ml', category: 'Sin Alcohol', price: 15000, cost: 8500, stock: 20, stock_nevera: 6, stock_bodega: 14, min_stock: 8, min_stock_nevera: 6, barcode: '7701234017' },
+  { id: 'prod-18', name: 'Agua Manantial con Gas', category: 'Sin Alcohol', price: 6000, cost: 2500, stock: 30, stock_nevera: 12, stock_bodega: 18, min_stock: 10, min_stock_nevera: 6, barcode: '7701234018' },
 ]
 
 export const INITIAL_SUPPLIERS: SupplierState[] = [
@@ -410,6 +415,32 @@ export function loadBarData(): BarData {
       parsed.settings = DEFAULT_SETTINGS
     }
 
+    // Normalizar inventario dual (nevera y bodega) si faltan propiedades
+    if (parsed.products && Array.isArray(parsed.products)) {
+      parsed.products = parsed.products.map((p: ProductState) => {
+        const hasNevera = p.stock_nevera !== undefined && p.stock_nevera !== null
+        const hasBodega = p.stock_bodega !== undefined && p.stock_bodega !== null
+        if (hasNevera && hasBodega) {
+          return {
+            ...p,
+            stock: (p.stock_nevera || 0) + (p.stock_bodega || 0),
+          }
+        }
+        const total = p.stock ?? 0
+        const isBeerOrCold = p.category === 'Cervezas' || p.category === 'Sin Alcohol'
+        const nev = isBeerOrCold ? Math.min(total, Math.ceil(total * 0.4)) : total
+        const bod = Math.max(0, total - nev)
+        const minNev = p.min_stock_nevera ?? Math.max(2, Math.floor((p.min_stock || 10) / 2))
+        return {
+          ...p,
+          stock: nev + bod,
+          stock_nevera: nev,
+          stock_bodega: bod,
+          min_stock_nevera: minNev,
+        }
+      })
+    }
+
     // Si el establecimiento fue registrado por un usuario comercial y aún tiene órdenes o movimientos residuales del mock viejo, limpiar a 0
     if (parsed.settings?.barName && parsed.settings.barName !== 'ROCK BAR') {
       const hasOldMockOrders = parsed.tables?.some(t => t.items?.some(i => i.productId === 'prod-8' || i.productId === 'prod-15'))
@@ -513,9 +544,18 @@ export async function syncCloudBarData(businessId?: string): Promise<boolean> {
 
 export function addProductItem(item: Omit<ProductState, 'id'>): ProductState {
   const data = loadBarData()
+  const stockNevera = item.stock_nevera !== undefined ? Number(item.stock_nevera) : (item.stock || 0)
+  const stockBodega = item.stock_bodega !== undefined ? Number(item.stock_bodega) : 0
+  const totalStock = stockNevera + stockBodega
+  const minStockNevera = item.min_stock_nevera !== undefined ? Number(item.min_stock_nevera) : Math.max(2, Math.floor((item.min_stock || 10) / 2))
+
   const newProduct: ProductState = {
     ...item,
     id: 'prod-' + Date.now(),
+    stock_nevera: stockNevera,
+    stock_bodega: stockBodega,
+    stock: totalStock,
+    min_stock_nevera: minStockNevera,
     active: item.active !== undefined ? item.active : true,
   }
   data.products = [newProduct, ...(data.products || INITIAL_PRODUCTS)]
@@ -527,11 +567,70 @@ export function updateProductItem(id: string, updates: Partial<ProductState>): v
   const data = loadBarData()
   data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
     if (p.id === id) {
-      return { ...p, ...updates }
+      const merged = { ...p, ...updates }
+      const stockNevera = merged.stock_nevera !== undefined ? Number(merged.stock_nevera) : (merged.stock || 0)
+      const stockBodega = merged.stock_bodega !== undefined ? Number(merged.stock_bodega) : 0
+      merged.stock_nevera = Math.max(0, stockNevera)
+      merged.stock_bodega = Math.max(0, stockBodega)
+      merged.stock = merged.stock_nevera + merged.stock_bodega
+      return merged
     }
     return p
   })
   saveBarData(data)
+}
+
+// Transferir unidades de Bodega a Nevera (Reabastecer Nevera / Frío)
+export function transferStockToNevera(productId: string, quantity: number): boolean {
+  if (quantity <= 0) return false
+  const data = loadBarData()
+  let transferred = false
+  const timeNow = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  const dateStr = `Hoy, ${timeNow}`
+  const user = data.operatorName || 'Personal de Barra'
+
+  data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
+    if (p.id === productId) {
+      const currentNevera = p.stock_nevera ?? p.stock
+      const currentBodega = p.stock_bodega ?? 0
+      const qtyToMove = Math.min(quantity, currentBodega)
+
+      if (qtyToMove <= 0) return p
+
+      const newNevera = currentNevera + qtyToMove
+      const newBodega = currentBodega - qtyToMove
+      const totalStock = newNevera + newBodega
+      transferred = true
+
+      const invMov: InventoryMovementRecord = {
+        id: 'inv-' + Date.now() + '-' + p.id,
+        productId: p.id,
+        productName: p.name,
+        type: 'transfer',
+        quantity: qtyToMove,
+        reason: `Reabastecimiento de Nevera: ${qtyToMove} uds transferidas de Bodega a Nevera`,
+        time: dateStr,
+        user,
+        resultingStock: totalStock,
+        resultingNevera: newNevera,
+        resultingBodega: newBodega,
+      }
+      data.inventoryMovements = [invMov, ...(data.inventoryMovements || [])]
+
+      return {
+        ...p,
+        stock_nevera: newNevera,
+        stock_bodega: newBodega,
+        stock: totalStock,
+      }
+    }
+    return p
+  })
+
+  if (transferred) {
+    saveBarData(data)
+  }
+  return transferred
 }
 
 export function toggleProductActive(id: string): void {
@@ -865,10 +964,25 @@ export function addItemToTable(tableId: number, product: ProductState, quantity:
     return t
   })
 
-  // Ajustar existencias
+  // Ajustar existencias (prioridad: nevera / frío primero, luego bodega)
   data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
     if (p.id === product.id) {
-      return { ...p, stock: Math.max(0, p.stock - quantity) }
+      const currentNevera = p.stock_nevera ?? p.stock
+      const currentBodega = p.stock_bodega ?? 0
+      const deductFromNevera = Math.min(quantity, currentNevera)
+      const remaining = quantity - deductFromNevera
+      const deductFromBodega = Math.min(remaining, currentBodega)
+
+      const newNevera = Math.max(0, currentNevera - deductFromNevera)
+      const newBodega = Math.max(0, currentBodega - deductFromBodega)
+      const newStock = newNevera + newBodega
+
+      return {
+        ...p,
+        stock_nevera: newNevera,
+        stock_bodega: newBodega,
+        stock: newStock,
+      }
     }
     return p
   })
@@ -917,10 +1031,35 @@ export function updateTableItemQty(tableId: number, productId: string, delta: nu
     return t
   })
 
-  // Ajustar stock
+  // Ajustar stock (prioridad de salida o devolución en nevera)
   data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
     if (p.id === productId) {
-      return { ...p, stock: Math.max(0, p.stock - delta) }
+      const currentNevera = p.stock_nevera ?? p.stock
+      const currentBodega = p.stock_bodega ?? 0
+
+      if (delta > 0) {
+        // Se añadieron más unidades: descontar de nevera primero
+        const deductFromNevera = Math.min(delta, currentNevera)
+        const remaining = delta - deductFromNevera
+        const deductFromBodega = Math.min(remaining, currentBodega)
+        const newNevera = Math.max(0, currentNevera - deductFromNevera)
+        const newBodega = Math.max(0, currentBodega - deductFromBodega)
+        return {
+          ...p,
+          stock_nevera: newNevera,
+          stock_bodega: newBodega,
+          stock: newNevera + newBodega,
+        }
+      } else {
+        // Se restaron unidades: devolver a la nevera
+        const qtyToReturn = Math.abs(delta)
+        const newNevera = currentNevera + qtyToReturn
+        return {
+          ...p,
+          stock_nevera: newNevera,
+          stock: newNevera + currentBodega,
+        }
+      }
     }
     return p
   })
@@ -961,7 +1100,14 @@ export function removeTableItem(tableId: number, productId: string): void {
   if (qtyToReturn > 0) {
     data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
       if (p.id === productId) {
-        return { ...p, stock: p.stock + qtyToReturn }
+        const currentNevera = p.stock_nevera ?? p.stock
+        const currentBodega = p.stock_bodega ?? 0
+        const newNevera = currentNevera + qtyToReturn
+        return {
+          ...p,
+          stock_nevera: newNevera,
+          stock: newNevera + currentBodega,
+        }
       }
       return p
     })
@@ -986,7 +1132,14 @@ export function clearTableOrder(tableId: number): void {
   data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
     const qty = returnMap.get(p.id)
     if (qty) {
-      return { ...p, stock: p.stock + qty }
+      const currentNevera = p.stock_nevera ?? p.stock
+      const currentBodega = p.stock_bodega ?? 0
+      const newNevera = currentNevera + qty
+      return {
+        ...p,
+        stock_nevera: newNevera,
+        stock: newNevera + currentBodega,
+      }
     }
     return p
   })
@@ -1173,11 +1326,14 @@ export function registerPurchase(purchaseData: Omit<PurchaseRecord, 'id' | 'date
     user,
   }
 
-  // Actualizar existencias y costo unitario de cada producto comprado
+  // Actualizar existencias y costo unitario de cada producto comprado (ingresan a Bodega)
   data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
     const purchasedItem = purchaseData.items.find((it) => it.productId === p.id)
     if (purchasedItem) {
-      const newStock = p.stock + purchasedItem.quantity
+      const currentNevera = p.stock_nevera ?? 0
+      const currentBodega = p.stock_bodega ?? p.stock
+      const newBodega = currentBodega + purchasedItem.quantity
+      const newStock = currentNevera + newBodega
       const newCost = purchasedItem.unitCost > 0 ? purchasedItem.unitCost : p.cost
 
       // Registrar movimiento en el kardex
@@ -1191,11 +1347,15 @@ export function registerPurchase(purchaseData: Omit<PurchaseRecord, 'id' | 'date
         time: dateStr,
         user,
         resultingStock: newStock,
+        resultingNevera: currentNevera,
+        resultingBodega: newBodega,
       }
       data.inventoryMovements = [invMov, ...(data.inventoryMovements || [])]
 
       return {
         ...p,
+        stock_bodega: newBodega,
+        stock_nevera: currentNevera,
         stock: newStock,
         cost: newCost,
       }

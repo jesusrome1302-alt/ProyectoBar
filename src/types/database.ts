@@ -40,8 +40,11 @@ export interface Product {
   barcode?: string
   price: number
   cost: number
-  stock: number
-  min_stock: number
+  stock: number // Total (stock_nevera + stock_bodega)
+  stock_nevera?: number
+  stock_bodega?: number
+  min_stock: number // Alerta compra proveedor
+  min_stock_nevera?: number // Alerta reponer nevera / enfriar
   active: boolean
 }
 

@@ -14,6 +14,7 @@ Este documento detalla el plan de desarrollo incremental, los módulos del siste
 - **ETAPA 8:** Reportes, filtros, sistema de login, control de acceso por roles (owner, admin, staff), portal de registro SaaS multinegocio e inicialización de cuentas 100% en CERO (0). *(Completada)*
 - **ETAPA 9:** Sincronización multi-dispositivo en la nube con Supabase, prevención de correos duplicados, migración SQL 002 y despliegue en Vercel. *(En progreso - Conectado a Supabase)*
 - **ETAPA 10:** Identidad visual del bar: Carga y compresión de fotos/logos en WebP, visualización en insignia de perfil, cabecera superior, barra lateral y módulo de configuración. *(Completada)*
+- **ETAPA 11:** Inventario Dual Nevera vs. Bodega: Desglose de existencias frías y almacén, alertas de nevera baja, modal de transferencia rápida de bodega a nevera y sincronización con el punto de venta. *(Completada)*
 
 ## 2. Decisiones Pendientes (Registro)
 | Decisión | Estado |

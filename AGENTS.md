@@ -29,6 +29,7 @@ Este archivo contiene las directrices, convenciones, arquitectura y comandos par
 - **Aislamiento Multi-Bar y Estado en Cero:** Toda cuenta o bar registrado debe inicializarse en 0 absoluto (mesas limpias a $0, caja cerrada a $0, movimientos vacíos, sin productos o con plantilla bajo demanda) y con acceso exclusivo a su propio personal (sin usuarios demostrativos residuales).
 - **Sincronización Central en la Nube:** Las cuentas y datos operativos se validan y persisten de forma centralizada en Supabase para evitar cuentas duplicadas entre diferentes dispositivos y mantener las mesas y ventas sincronizadas en tiempo real.
 - **Identidad Visual y Compresión de Imágenes:** Las fotos y logotipos se procesan y comprimen en el cliente en formato WebP (máx 400x400 px, ~20-30KB) mediante HTML5 Canvas para optimizar el rendimiento, evitar saturación de almacenamiento y mantener sincronizado el perfil y el bar.
+- **Inventario Dual Nevera vs. Bodega:** Los productos gestionan existencias divididas entre Nevera (unidades frías listas para servir) y Bodega (cajas en reserva). Las ventas descuentan prioritariamente de Nevera, las compras ingresan a Bodega, y las transferencias de Bodega a Nevera se auditan en el Kardex manteniendo la integridad de stock total = nevera + bodega.
 
 ## 5 Limites
 

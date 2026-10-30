@@ -24,6 +24,7 @@ import {
   Edit2,
   Power,
   Sparkles,
+  Snowflake,
 } from 'lucide-react'
 import {
   useBarStore,
@@ -32,6 +33,7 @@ import {
   toggleProductActive,
   deleteProductItem,
   adjustProductStock,
+  transferStockToNevera,
   addSupplier,
   deleteSupplier,
   registerPurchase,
@@ -72,7 +74,9 @@ export default function ProductosPage() {
   const [formCategory, setFormCategory] = useState<string>('Cervezas')
   const [formPrice, setFormPrice] = useState<number>(12000)
   const [formCost, setFormCost] = useState<number>(6000)
-  const [formStock, setFormStock] = useState<number>(24)
+  const [formStockNevera, setFormStockNevera] = useState<number>(12)
+  const [formStockBodega, setFormStockBodega] = useState<number>(12)
+  const [formMinStockNevera, setFormMinStockNevera] = useState<number>(6)
   const [formMinStock, setFormMinStock] = useState<number>(10)
   const [formBarcode, setFormBarcode] = useState<string>('')
 
@@ -82,10 +86,17 @@ export default function ProductosPage() {
   const [editCategory, setEditCategory] = useState<string>('Cervezas')
   const [editPrice, setEditPrice] = useState<number>(12000)
   const [editCost, setEditCost] = useState<number>(6000)
-  const [editStock, setEditStock] = useState<number>(24)
+  const [editStockNevera, setEditStockNevera] = useState<number>(12)
+  const [editStockBodega, setEditStockBodega] = useState<number>(12)
+  const [editMinStockNevera, setEditMinStockNevera] = useState<number>(6)
   const [editMinStock, setEditMinStock] = useState<number>(10)
   const [editBarcode, setEditBarcode] = useState<string>('')
   const [editActive, setEditActive] = useState<boolean>(true)
+
+  // Modal Transferencia Nevera (Reabastecer de Bodega)
+  const [showTransferModal, setShowTransferModal] = useState<boolean>(false)
+  const [transferProduct, setTransferProduct] = useState<ProductState | null>(null)
+  const [transferQty, setTransferQty] = useState<number>(12)
 
   // Formulario Nuevo Proveedor
   const [supName, setSupName] = useState<string>('')
@@ -112,8 +123,15 @@ export default function ProductosPage() {
   const [adjQuantity, setAdjQuantity] = useState<number>(1)
   const [adjReason, setAdjReason] = useState<string>('Botella rota durante servicio')
 
+  const lowNeveraCount = products.filter((p) => {
+    const nev = p.stock_nevera ?? p.stock ?? 0
+    const minNev = p.min_stock_nevera ?? Math.max(2, Math.floor((p.min_stock || 10) / 2))
+    return nev <= minNev
+  }).length
+
   const categories = [
     { id: 'all', name: 'Todos' },
+    { id: 'low_nevera', name: `❄️ Reponer Nevera (${lowNeveraCount})` },
     { id: 'Cervezas', name: 'Cervezas' },
     { id: 'Licores', name: 'Licores' },
     { id: 'Cócteles', name: 'Cócteles' },
@@ -123,17 +141,25 @@ export default function ProductosPage() {
 
   const formatCOP = (val: number) => '$ ' + Math.abs(val).toLocaleString('es-CO')
 
-  // Manejar creación de producto
+  // Manejar creación de producto con inventario dual
   const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault()
     if (!formName.trim() || formPrice <= 0) return
+
+    const stockNevera = Number(formStockNevera) || 0
+    const stockBodega = Number(formStockBodega) || 0
+    const totalStock = stockNevera + stockBodega
+    const minNevera = Number(formMinStockNevera) || 6
 
     const newProd = addProductItem({
       name: formName.trim(),
       category: formCategory,
       price: formPrice,
       cost: formCost,
-      stock: formStock,
+      stock: totalStock,
+      stock_nevera: stockNevera,
+      stock_bodega: stockBodega,
+      min_stock_nevera: minNevera,
       min_stock: formMinStock,
       barcode: formBarcode.trim() || 'SKU-' + Math.floor(100000 + Math.random() * 900000),
     })
@@ -142,11 +168,13 @@ export default function ProductosPage() {
     setFormName('')
     setFormPrice(12000)
     setFormCost(6000)
-    setFormStock(24)
+    setFormStockNevera(12)
+    setFormStockBodega(12)
+    setFormMinStockNevera(6)
     setFormMinStock(10)
     setFormBarcode('')
 
-    setNotification(`¡Producto "${newProd.name}" creado con éxito y disponible en catálogo!`)
+    setNotification(`¡"${newProd.name}" registrado con ${stockNevera} uds en Nevera y ${stockBodega} uds en Bodega (Total: ${totalStock})!`)
     setTimeout(() => setNotification(''), 4500)
   }
 
@@ -157,7 +185,12 @@ export default function ProductosPage() {
     setEditCategory(p.category)
     setEditPrice(p.price)
     setEditCost(p.cost)
-    setEditStock(p.stock)
+    const nev = p.stock_nevera !== undefined ? p.stock_nevera : p.stock
+    const bod = p.stock_bodega !== undefined ? p.stock_bodega : 0
+    const minNev = p.min_stock_nevera !== undefined ? p.min_stock_nevera : Math.max(2, Math.floor(p.min_stock / 2))
+    setEditStockNevera(nev)
+    setEditStockBodega(bod)
+    setEditMinStockNevera(minNev)
     setEditMinStock(p.min_stock)
     setEditBarcode(p.barcode || '')
     setEditActive(p.active !== false)
@@ -169,20 +202,48 @@ export default function ProductosPage() {
     e.preventDefault()
     if (!editingProductId || !editName.trim() || editPrice <= 0) return
 
+    const total = editStockNevera + editStockBodega
+
     updateProductItem(editingProductId, {
       name: editName.trim(),
       category: editCategory,
       price: editPrice,
       cost: editCost,
-      stock: editStock,
+      stock: total,
+      stock_nevera: editStockNevera,
+      stock_bodega: editStockBodega,
+      min_stock_nevera: editMinStockNevera,
       min_stock: editMinStock,
       barcode: editBarcode.trim(),
       active: editActive,
     })
 
     setShowEditProductModal(false)
-    setNotification(`¡Producto "${editName.trim()}" actualizado correctamente!`)
+    setNotification(`¡"${editName.trim()}" actualizado! Nevera: ${editStockNevera} | Bodega: ${editStockBodega} | Total: ${total} uds`)
     setTimeout(() => setNotification(''), 4000)
+  }
+
+  // Abrir modal de transferencia de bodega a nevera
+  const openTransferModal = (p: ProductState) => {
+    setTransferProduct(p)
+    const availableBodega = p.stock_bodega ?? 0
+    setTransferQty(Math.min(12, availableBodega > 0 ? availableBodega : 1))
+    setShowTransferModal(true)
+  }
+
+  // Confirmar transferencia a nevera
+  const handleConfirmTransfer = () => {
+    if (!transferProduct || transferQty <= 0) return
+    const success = transferStockToNevera(transferProduct.id, transferQty)
+    if (success) {
+      setNotification(`❄️ ¡${transferQty} unidades de "${transferProduct.name}" pasadas a la Nevera con éxito!`)
+      setShowTransferModal(false)
+      setTransferProduct(null)
+      setTimeout(() => setNotification(''), 4500)
+    } else {
+      setNotification(`⚠️ No se pudo transferir: stock insuficiente en bodega.`)
+      setTimeout(() => setNotification(''), 3500)
+    }
   }
 
   // Alternar estado activo / pausado
@@ -307,15 +368,24 @@ export default function ProductosPage() {
     setTimeout(() => setNotification(''), 4000)
   }
 
-  // Filtrado de productos
+  // Filtrado de productos (incluye filtro por alerta de nevera baja)
   const filteredProducts = products.filter((p) => {
-    const matchesCat = activeCategory === 'all' || p.category.toLowerCase().includes(activeCategory.toLowerCase())
+    let matchesCat = true
+    if (activeCategory === 'low_nevera') {
+      const nev = p.stock_nevera ?? p.stock ?? 0
+      const minNev = p.min_stock_nevera ?? Math.max(2, Math.floor((p.min_stock || 10) / 2))
+      matchesCat = nev <= minNev
+    } else if (activeCategory !== 'all') {
+      matchesCat = p.category.toLowerCase().includes(activeCategory.toLowerCase())
+    }
     const matchesQuery = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || (p.barcode && p.barcode.includes(searchQuery))
     return matchesCat && matchesQuery
   })
 
-  // Métricas de inventario
+  // Métricas de inventario dual
   const totalStockUnits = products.reduce((acc, p) => acc + (p.stock || 0), 0)
+  const totalNeveraUnits = products.reduce((acc, p) => acc + (p.stock_nevera ?? p.stock ?? 0), 0)
+  const totalBodegaUnits = products.reduce((acc, p) => acc + (p.stock_bodega ?? 0), 0)
   const lowStockCount = products.filter((p) => p.stock <= p.min_stock).length
   const totalInventoryCost = products.reduce((acc, p) => acc + (p.stock || 0) * (p.cost || 0), 0)
   const totalInventoryRetail = products.reduce((acc, p) => acc + (p.stock || 0) * (p.price || 0), 0)
@@ -448,32 +518,59 @@ export default function ProductosPage() {
         </button>
       </div>
 
-      {/* Métricas Globales de Inventario */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      {/* Métricas Globales de Inventario con desglose Nevera y Bodega */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
         <div className="rock-card p-4 rounded-xl">
-          <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Unidades en Bodega</p>
+          <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Total en Sistema</p>
           <p className="text-xl sm:text-2xl font-black text-white mt-1">{totalStockUnits} uds</p>
-          <span className="text-[11px] text-zinc-500">{products.length} referencias activas</span>
+          <span className="text-[11px] text-zinc-500">{products.length} refs • {lowStockCount > 0 ? `${lowStockCount} por comprar` : 'Stock abastecido'}</span>
         </div>
 
-        <div className="rock-card p-4 rounded-xl">
-          <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Valorización a Costo</p>
-          <p className="text-xl sm:text-2xl font-black text-amber-400 mt-1">{formatCOP(totalInventoryCost)}</p>
-          <span className="text-[11px] text-zinc-500">Capital invertido en stock</span>
+        <div className="rock-card p-4 rounded-xl border border-cyan-500/30 bg-cyan-950/10">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold text-cyan-400 uppercase tracking-wider">❄️ En Nevera</p>
+            <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded font-bold">Frías</span>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-cyan-300 mt-1">{totalNeveraUnits} uds</p>
+          <span className="text-[11px] text-zinc-500">Listas para servir</span>
         </div>
 
-        <div className="rock-card p-4 rounded-xl">
-          <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Valorización a Venta</p>
-          <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-1">{formatCOP(totalInventoryRetail)}</p>
-          <span className="text-[11px] text-zinc-500">Retorno comercial bruto</span>
+        <div className="rock-card p-4 rounded-xl border border-amber-500/30 bg-amber-950/10">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider">📦 En Bodega</p>
+            <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold">Reserva</span>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-amber-300 mt-1">{totalBodegaUnits} uds</p>
+          <span className="text-[11px] text-zinc-500">Cajas en almacén</span>
         </div>
 
-        <div className="rock-card p-4 rounded-xl">
-          <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Alertas de Stock</p>
-          <p className={`text-xl sm:text-2xl font-black mt-1 ${lowStockCount > 0 ? 'text-red-500' : 'text-emerald-400'}`}>
-            {lowStockCount}
+        <button
+          type="button"
+          onClick={() => setActiveCategory(activeCategory === 'low_nevera' ? 'all' : 'low_nevera')}
+          className={`rock-card p-4 rounded-xl text-left transition-all cursor-pointer ${
+            lowNeveraCount > 0
+              ? 'border-red-500/50 bg-red-950/20 hover:border-red-400 hover:bg-red-950/30 shadow-lg shadow-red-950/30'
+              : 'border-emerald-500/30 bg-emerald-950/10'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold text-zinc-300 uppercase tracking-wider">⚠️ Nevera Baja</p>
+            {lowNeveraCount > 0 && (
+              <span className="text-[9px] bg-red-500 text-white font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                Reponer
+              </span>
+            )}
+          </div>
+          <p className={`text-xl sm:text-2xl font-black mt-1 ${lowNeveraCount > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+            {lowNeveraCount} {lowNeveraCount === 1 ? 'bebida' : 'bebidas'}
           </p>
-          <span className="text-[11px] text-zinc-500">Por debajo del mínimo</span>
+          <span className="text-[11px] text-zinc-400 underline decoration-dotted">Clic para filtrar</span>
+        </button>
+
+        <div className="rock-card p-4 rounded-xl col-span-2 sm:col-span-1">
+          <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Valor a Venta</p>
+          <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-1">{formatCOP(totalInventoryRetail)}</p>
+          <span className="text-[11px] text-zinc-500">Costo: {formatCOP(totalInventoryCost)}</span>
         </div>
       </div>
 
@@ -536,7 +633,9 @@ export default function ProductosPage() {
                     setFormCategory('Cervezas')
                     setFormPrice(10000)
                     setFormCost(5000)
-                    setFormStock(20)
+                    setFormStockNevera(10)
+                    setFormStockBodega(10)
+                    setFormMinStockNevera(5)
                     setFormMinStock(5)
                     setFormBarcode('')
                     setShowProductModal(true)
@@ -565,13 +664,17 @@ export default function ProductosPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredProducts.map((p) => {
               const isLowStock = p.stock <= p.min_stock
+              const stockNev = p.stock_nevera ?? p.stock ?? 0
+              const stockBod = p.stock_bodega ?? 0
+              const minNev = p.min_stock_nevera ?? Math.max(2, Math.floor((p.min_stock || 10) / 2))
+              const isLowNevera = stockNev <= minNev
               const margin = p.price > 0 ? Math.round(((p.price - p.cost) / p.price) * 100) : 0
 
               return (
                 <div
                   key={p.id}
                   className={`rock-card p-5 rounded-2xl transition-all relative overflow-hidden group hover:border-red-600/70 ${
-                    isLowStock ? 'border-amber-500/50' : ''
+                    isLowNevera ? 'border-amber-500/60 shadow-lg shadow-amber-950/20' : isLowStock ? 'border-red-500/50' : ''
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-3">
@@ -591,8 +694,10 @@ export default function ProductosPage() {
                         className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center space-x-1 ${
                           p.stock <= 0
                             ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                            : isLowStock
+                            : isLowNevera
                             ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            : isLowStock
+                            ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
                             : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         }`}
                       >
@@ -600,6 +705,11 @@ export default function ProductosPage() {
                           <>
                             <AlertCircle className="w-3 h-3 mr-1 inline" />
                             <span>Agotado</span>
+                          </>
+                        ) : isLowNevera ? (
+                          <>
+                            <Snowflake className="w-3 h-3 mr-1 inline text-cyan-400" />
+                            <span>Nevera Baja</span>
                           </>
                         ) : isLowStock ? (
                           <>
@@ -609,7 +719,7 @@ export default function ProductosPage() {
                         ) : (
                           <>
                             <CheckCircle className="w-3 h-3 mr-1 inline" />
-                            <span>Disponible</span>
+                            <span>Óptimo</span>
                           </>
                         )}
                       </span>
@@ -618,7 +728,7 @@ export default function ProductosPage() {
                       <button
                         type="button"
                         onClick={() => openEditProduct(p)}
-                        title="Editar precios, costos, stock o datos del producto"
+                        title="Editar precios, costos, stock de nevera/bodega o datos del producto"
                         className="p-1 rounded-lg text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 transition-colors cursor-pointer"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
@@ -653,9 +763,10 @@ export default function ProductosPage() {
                   <h3 className="font-bold text-white text-base leading-snug group-hover:text-amber-400 transition-colors mb-1">
                     {p.name}
                   </h3>
-                  <p className="text-[11px] text-zinc-500 font-mono mb-4">SKU: {p.barcode || 'N/A'}</p>
+                  <p className="text-[11px] text-zinc-500 font-mono mb-3">SKU: {p.barcode || 'N/A'}</p>
 
-                  <div className="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800/60 mb-4 grid grid-cols-2 gap-2">
+                  {/* Precios y Costos */}
+                  <div className="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800/60 mb-3 grid grid-cols-2 gap-2">
                     <div>
                       <p className="text-[10px] text-zinc-400 uppercase font-semibold">Precio Venta</p>
                       <p className="text-base font-black text-white tracking-wide">{formatCOP(p.price)}</p>
@@ -667,16 +778,76 @@ export default function ProductosPage() {
                     </div>
                   </div>
 
-                  {/* Ajustador de Stock en Vivo */}
-                  <div className="flex items-center justify-between text-xs pt-2 border-t border-zinc-800/80">
-                    <div>
-                      <span className="text-zinc-400">Stock: </span>
-                      <strong className={isLowStock ? 'text-amber-400 font-black' : 'text-zinc-200'}>
-                        {p.stock} uds
-                      </strong>
-                      <span className="text-[10px] text-zinc-500 ml-1">(mín: {p.min_stock})</span>
+                  {/* Tarjeta de Inventario Dual: Nevera + Bodega */}
+                  <div className="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800/60 mb-3 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-zinc-400 font-semibold">Total en Sistema:</span>
+                      <strong className="text-sm font-black text-white">{p.stock} uds</strong>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-900">
+                      {/* Nevera */}
+                      <div className={`p-2 rounded-lg border flex flex-col justify-between ${
+                        isLowNevera
+                          ? 'bg-amber-500/10 border-amber-500/40 text-amber-300'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-300'
+                      }`}>
+                        <div className="flex items-center justify-between text-[10px] font-bold">
+                          <span className="flex items-center space-x-1">
+                            <span>❄️</span>
+                            <span>Nevera</span>
+                          </span>
+                          {isLowNevera && (
+                            <span className="bg-amber-500/20 text-amber-400 px-1 rounded text-[9px] font-black animate-pulse">
+                              ¡Baja!
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-base font-black mt-1">
+                          {stockNev} <span className="text-[10px] font-normal text-zinc-400">frías</span>
+                        </p>
+                        <span className="text-[9px] text-zinc-500">mínimo: {minNev}</span>
+                      </div>
+
+                      {/* Bodega */}
+                      <div className="p-2 rounded-lg border bg-zinc-900 border-zinc-800 text-zinc-300 flex flex-col justify-between">
+                        <div className="flex items-center justify-between text-[10px] font-bold">
+                          <span className="flex items-center space-x-1">
+                            <span>📦</span>
+                            <span>Bodega</span>
+                          </span>
+                        </div>
+                        <p className="text-base font-black mt-1 text-zinc-200">
+                          {stockBod} <span className="text-[10px] font-normal text-zinc-400">reserva</span>
+                        </p>
+                        <span className="text-[9px] text-zinc-500">en cajas</span>
+                      </div>
+                    </div>
+
+                    {/* Botón rápido para transferir de Bodega a Nevera */}
+                    {stockBod > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => openTransferModal(p)}
+                        className={`w-full py-1.5 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+                          isLowNevera
+                            ? 'bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 text-white shadow-md shadow-amber-900/30'
+                            : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700/60'
+                        }`}
+                      >
+                        <Snowflake className="w-3.5 h-3.5 text-cyan-300" />
+                        <span>{isLowNevera ? '¡Pasar de Bodega a Nevera!' : 'Pasar a Nevera'}</span>
+                      </button>
+                    ) : isLowNevera ? (
+                      <p className="text-[10px] text-red-400 font-semibold text-center pt-1">
+                        ⚠️ Bodega en 0. Requiere compra a proveedor.
+                      </p>
+                    ) : null}
+                  </div>
+
+                  {/* Ajustador de Stock Manual */}
+                  <div className="flex items-center justify-between text-xs pt-2 border-t border-zinc-800/80">
+                    <span className="text-[11px] text-zinc-500">Ajuste rápido:</span>
                     <div className="flex items-center space-x-1">
                       <button
                         type="button"
@@ -1045,27 +1216,76 @@ export default function ProductosPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Stock Inicial (unidades)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={formStock}
-                    onChange={(e) => setFormStock(Number(e.target.value))}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-red-500"
-                  />
+              {/* Distribución Dual: Nevera y Bodega */}
+              <div className="p-3.5 bg-zinc-950/70 rounded-2xl border border-zinc-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white flex items-center space-x-1.5">
+                    <span>❄️📦</span>
+                    <span>Distribución de Inventario</span>
+                  </span>
+                  <span className="text-xs font-black text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                    Total: {formStockNevera + formStockBodega} unidades
+                  </span>
                 </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Stock Mínimo (Alerta)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={formMinStock}
-                    onChange={(e) => setFormMinStock(Number(e.target.value))}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-red-500"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                      ❄️ Stock en Nevera (Frías / Barra) *
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={formStockNevera}
+                      onChange={(e) => setFormStockNevera(Math.max(0, Number(e.target.value)))}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500 font-bold"
+                    />
+                    <span className="text-[10px] text-zinc-500">Listas para servir</span>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                      📦 Stock en Bodega (Almacén / Cajas) *
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={formStockBodega}
+                      onChange={(e) => setFormStockBodega(Math.max(0, Number(e.target.value)))}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500 font-bold"
+                    />
+                    <span className="text-[10px] text-zinc-500">Cajas de reserva</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-zinc-900">
+                  <div>
+                    <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                      ⚠️ Mínimo en Nevera (Alerta)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={formMinStockNevera}
+                      onChange={(e) => setFormMinStockNevera(Math.max(1, Number(e.target.value)))}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-red-500"
+                    />
+                    <span className="text-[9px] text-zinc-500">Avisa para enfriar</span>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                      🚨 Mínimo Total (Alerta Compra)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={formMinStock}
+                      onChange={(e) => setFormMinStock(Math.max(1, Number(e.target.value)))}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-red-500"
+                    />
+                    <span className="text-[9px] text-zinc-500">Avisa para pedir proveedor</span>
+                  </div>
                 </div>
               </div>
 
@@ -1183,27 +1403,76 @@ export default function ProductosPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Stock Actual (unidades)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={editStock}
-                    onChange={(e) => setEditStock(Number(e.target.value))}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 font-bold"
-                  />
+              {/* Distribución Dual: Nevera y Bodega */}
+              <div className="p-3.5 bg-zinc-950/70 rounded-2xl border border-zinc-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white flex items-center space-x-1.5">
+                    <span>❄️📦</span>
+                    <span>Distribución de Inventario</span>
+                  </span>
+                  <span className="text-xs font-black text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                    Total: {editStockNevera + editStockBodega} unidades
+                  </span>
                 </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Stock Mínimo (Alerta)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={editMinStock}
-                    onChange={(e) => setEditMinStock(Number(e.target.value))}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                      ❄️ Stock en Nevera (Frías / Barra) *
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editStockNevera}
+                      onChange={(e) => setEditStockNevera(Math.max(0, Number(e.target.value)))}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 font-bold"
+                    />
+                    <span className="text-[10px] text-zinc-500">Listas para servir</span>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                      📦 Stock en Bodega (Almacén / Cajas) *
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editStockBodega}
+                      onChange={(e) => setEditStockBodega(Math.max(0, Number(e.target.value)))}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 font-bold"
+                    />
+                    <span className="text-[10px] text-zinc-500">Cajas de reserva</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-zinc-900">
+                  <div>
+                    <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                      ⚠️ Mínimo en Nevera (Alerta)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={editMinStockNevera}
+                      onChange={(e) => setEditMinStockNevera(Math.max(1, Number(e.target.value)))}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
+                    />
+                    <span className="text-[9px] text-zinc-500">Avisa para enfriar</span>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                      🚨 Mínimo Total (Alerta Compra)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={editMinStock}
+                      onChange={(e) => setEditMinStock(Math.max(1, Number(e.target.value)))}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
+                    />
+                    <span className="text-[9px] text-zinc-500">Avisa para pedir proveedor</span>
+                  </div>
                 </div>
               </div>
 
@@ -1242,6 +1511,108 @@ export default function ProductosPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: TRANSFERIR DE BODEGA A NEVERA (REABASTECER) */}
+      {/* ========================================================================= */}
+      {showTransferModal && transferProduct && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="rock-card w-full max-w-md p-6 rounded-3xl border border-zinc-700 shadow-2xl relative space-y-4 animate-scaleUp">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center font-bold">
+                  <Snowflake className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">Reabastecer Nevera</h3>
+                  <p className="text-xs text-zinc-400">Pasar cervezas de bodega a frío para servir</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTransferModal(false)}
+                className="text-zinc-500 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-zinc-950/80 rounded-2xl border border-zinc-800 space-y-2">
+              <p className="text-sm font-bold text-white">{transferProduct.name}</p>
+              <div className="grid grid-cols-2 gap-3 text-xs pt-1">
+                <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800">
+                  <span className="text-zinc-400 block text-[10px] uppercase font-bold">❄️ En Nevera</span>
+                  <span className="text-base font-black text-amber-400">
+                    {transferProduct.stock_nevera ?? transferProduct.stock} uds
+                  </span>
+                  <span className="text-[9px] text-zinc-500 block">mín: {transferProduct.min_stock_nevera ?? 6}</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800">
+                  <span className="text-zinc-400 block text-[10px] uppercase font-bold">📦 En Bodega</span>
+                  <span className="text-base font-black text-cyan-400">
+                    {transferProduct.stock_bodega ?? 0} uds
+                  </span>
+                  <span className="text-[9px] text-zinc-500 block">disponibles</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-zinc-300 block">
+                ¿Cuántas unidades vas a transferir a la nevera?
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={transferProduct.stock_bodega ?? 0}
+                value={transferQty}
+                onChange={(e) => setTransferQty(Math.max(1, Math.min(transferProduct.stock_bodega ?? 0, Number(e.target.value))))}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-xl font-black text-center text-white focus:outline-none focus:border-cyan-500 font-mono"
+              />
+
+              {/* Botones de atajo rápido */}
+              <div className="flex items-center justify-center space-x-2 pt-1 flex-wrap gap-y-1">
+                {[6, 12, 24].map((qty) => (
+                  <button
+                    key={qty}
+                    type="button"
+                    disabled={(transferProduct.stock_bodega ?? 0) < qty}
+                    onClick={() => setTransferQty(qty)}
+                    className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-xs font-bold text-zinc-200 transition-colors cursor-pointer"
+                  >
+                    +{qty} uds
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setTransferQty(transferProduct.stock_bodega ?? 0)}
+                  className="px-3 py-1.5 rounded-lg bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600/30 border border-cyan-500/30 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Todas ({transferProduct.stock_bodega ?? 0})
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-3 border-t border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setShowTransferModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmTransfer}
+                disabled={transferQty <= 0 || (transferProduct.stock_bodega ?? 0) <= 0}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 shadow-lg shadow-cyan-900/30 transition-all cursor-pointer disabled:opacity-50"
+              >
+                Confirmar y Enfriar
+              </button>
+            </div>
           </div>
         </div>
       )}

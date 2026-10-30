@@ -292,7 +292,7 @@ export default function VentasPage() {
               return (
                 <div
                   key={p.id}
-                  className={`rock-card p-3.5 rounded-xl flex flex-col justify-between h-36 relative transition-all group ${
+                  className={`rock-card p-3.5 rounded-xl flex flex-col justify-between min-h-[156px] relative transition-all group ${
                     isDisabled
                       ? 'opacity-60 border-zinc-800/50'
                       : 'hover:border-red-600 hover:bg-zinc-900/90'
@@ -310,12 +310,30 @@ export default function VentasPage() {
                             : 'text-zinc-400'
                         }`}
                       >
-                        {isInactive ? 'Pausado' : `${p.stock} uds`}
+                        {isInactive ? 'Pausado' : `Total: ${p.stock}`}
                       </span>
                     </div>
                     <p className="font-bold text-white text-xs sm:text-sm line-clamp-2 leading-tight group-hover:text-amber-400 transition-colors">
                       {p.name}
                     </p>
+
+                    {/* Desglose Nevera / Bodega para personal */}
+                    {!isInactive && (
+                      <div className="flex items-center space-x-1.5 mt-1 text-[9px] font-semibold">
+                        <span
+                          className={`px-1.5 py-0.5 rounded border flex items-center space-x-1 ${
+                            (p.stock_nevera ?? p.stock) <= (p.min_stock_nevera ?? 6)
+                              ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 font-bold'
+                              : 'bg-zinc-800 text-cyan-300 border-zinc-700'
+                          }`}
+                        >
+                          <span>❄️ {p.stock_nevera ?? p.stock} frías</span>
+                        </span>
+                        <span className="text-zinc-400">
+                          📦 {p.stock_bodega ?? 0}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-2 border-t border-zinc-800/80">
