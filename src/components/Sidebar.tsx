@@ -1,8 +1,16 @@
 import Link from 'next/link'
-import { LayoutDashboard, UtensilsCrossed, ShoppingBag, Package, ReceiptText, DollarSign, BarChart3, Settings } from 'lucide-react'
+import { LayoutDashboard, UtensilsCrossed, ShoppingBag, Package, ReceiptText, DollarSign, BarChart3, Settings, ShieldAlert } from 'lucide-react'
 
-export default function Sidebar() {
-  const navItems = [
+type NavItem = {
+  name: string
+  href: string
+  icon: React.ComponentType<{ className: string }>
+  condition?: boolean
+}
+
+export default function Sidebar({ isOwner, isAdminOrOwner, userName }: { isOwner: boolean; isAdminOrOwner: boolean; userName: string }) {
+  // Ítems de navegación - owner ve todos
+  const ownerNavItems: NavItem[] = [
     { name: 'Panel Principal', href: '/', icon: LayoutDashboard },
     { name: 'Mesas', href: '/mesas', icon: UtensilsCrossed },
     { name: 'Ventas / Barra', href: '/ventas', icon: ShoppingBag },
@@ -11,6 +19,18 @@ export default function Sidebar() {
     { name: 'Caja', href: '/caja', icon: DollarSign },
     { name: 'Reportes', href: '/reportes', icon: BarChart3 },
     { name: 'Configuración', href: '/configuracion', icon: Settings },
+  ]
+
+  // Ítems restringidos - solo admin/owner
+  const restrictedNavItems: NavItem[] = [
+    { name: 'Usuarios y Permisos', href: '/usuarios', icon: ShieldAlert, condition: isAdminOrOwner },
+  ]
+
+  // Ítems que todo el mundo (incluyendo staff) puede ver
+  const publicNavItems: NavItem[] = [
+    { name: 'Panel Principal', href: '/', icon: LayoutDashboard },
+    { name: 'Mesas', href: '/mesas', icon: UtensilsCrossed },
+    { name: 'Ventas / Barra', href: '/ventas', icon: ShoppingBag },
   ]
 
   return (
@@ -27,9 +47,40 @@ export default function Sidebar() {
           </div>
         </div>
 
-        {/* Navegación */}
+        {/* Navegación - muestra diferente contenido según rol */}
         <nav className="p-4 space-y-1.5">
-          {navItems.map((item) => {
+          {/* Siempre mostramos items públicos */}
+          {publicNavItems.map((item) => {
+            const Icon = item.icon
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center space-x-3 px-4 py-3 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all font-medium group"
+              >
+                <Icon className="w-5 h-5 text-zinc-500 group-hover:text-red-500 transition-colors" />
+                <span>{item.name}</span>
+              </Link>
+            )
+          })}
+
+          {/* Items adicionales para owner/admin (condicionales) */}
+          {isOwner && isAdminOrOwner && ownerNavItems.map((item) => {
+            const Icon = item.icon
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center space-x-3 px-4 py-3 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all font-medium group"
+              >
+                <Icon className="w-5 h-5 text-zinc-500 group-hover:text-red-500 transition-colors" />
+                <span>{item.name}</span>
+              </Link>
+            )
+          })}
+
+          {/* Items restringidos (admin/owner solo) */}
+          {isAdminOrOwner && restrictedNavItems.map((item) => {
             const Icon = item.icon
             return (
               <Link
@@ -51,7 +102,7 @@ export default function Sidebar() {
           <div className="flex items-center space-x-3 truncate">
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
             <div className="truncate">
-              <p className="text-xs font-semibold text-zinc-300 truncate">Modo Local</p>
+              <p className="text-xs font-semibold text-zinc-300 truncate">{userName || 'Modo Local'}</p>
               <p className="text-[10px] text-zinc-500 truncate">Conectado</p>
             </div>
           </div>

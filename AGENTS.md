@@ -5,7 +5,7 @@ Este archivo contiene las directrices, convenciones, arquitectura y comandos par
 ## 1. Stack Tecnológico
 - **Frontend / Fullstack:** Next.js (App Router) + TypeScript + Tailwind CSS.
 - **Base de datos y Auth:** Supabase + PostgreSQL + Supabase Auth.
-- **Control de versiones:** Git y GitHub.
+- **Control de versiones:** Git y GitHub (`https://github.com/jesusrome1302-alt/ProyectoBar.git`).
 - **Formato y Moneda:** Español (Colombia), Pesos Colombianos (COP `$`).
 
 ## 2. Comandos Principales

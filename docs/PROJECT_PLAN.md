@@ -11,8 +11,8 @@ Este documento detalla el plan de desarrollo incremental, los módulos del siste
 - **ETAPA 5:** Venta directa, cuentas por mesa, pagos parciales y cierre de cuentas. *(Completada)*
 - **ETAPA 6:** Caja, apertura y cierre de turnos, gastos, retiros, arqueos y cuadres. *(Completada)*
 - **ETAPA 7:** Inventario, compras, proveedores y ajustes de existencias. *(Completada)*
-- **ETAPA 8:** Reportes, filtros, exportaciones y permisos definitivos. *(Siguiente)*
-- **ETAPA 9:** Pruebas, seguridad, documentación y preparación para despliegue.
+- **ETAPA 8:** Reportes, filtros, exportaciones y permisos definitivos. *(En progreso / Base implementada)*
+- **ETAPA 9:** Pruebas, seguridad, documentación y preparación para despliegue. *(Siguiente)*
 
 ## 2. Decisiones Pendientes (Registro)
 | Decisión | Estado |

@@ -1,91 +1,214 @@
-import { BarChart3, TrendingUp, Calendar, Download, Award } from 'lucide-react'
+"use client"
+
+import { DollarSign, BarChart3, Zap, Calendar } from 'lucide-react'
+import { useState } from 'react'
 
 export default function ReportesPage() {
-  const topProducts = [
-    { name: 'Cerveza Corona 355ml', sold: 48, revenue: 672000, category: 'Cervezas' },
-    { name: 'Cóctel Rock Margarita', sold: 34, revenue: 1088000, category: 'Cócteles' },
-    { name: 'Alitas BBQ Rocker x8', sold: 26, revenue: 884000, category: 'Snacks' },
-    { name: 'Whisky Johnnie Walker Black', sold: 5, revenue: 1200000, category: 'Licores' },
-    { name: 'Club Colombia Dorada', sold: 42, revenue: 420000, category: 'Cervezas' },
+  const [fechaInicio, setFechaInicio] = useState<string>('2026-10-01')
+  const [fechaFin, setFechaFin] = useState<string>('2026-10-31')
+  const [filtroTipo, setFiltroTipo] = useState<'todos' | 'ventas' | 'caja' | 'productos'>('todos')
+
+  const reportesData = [
+    {
+      id: 1,
+      tipo: 'venta',
+      titulo: 'Ventas del Mes',
+      valor: '$ 1,245,600',
+      variacion: '+12.5%',
+      icon: DollarSign,
+      tiempo: 'Oct 2026',
+      subtitulo: 'Comparado con septiembre',
+    },
+    {
+      id: 2,
+      tipo: 'mesa',
+      titulo: 'Mesas Ocupadas',
+      valor: '67%',
+      variacion: '+8.3%',
+      icon: BarChart3,
+      tiempo: 'Turno actual',
+      subtitulo: 'Promedio de ocupación',
+    },
+    {
+      id: 3,
+      tipo: 'producto',
+      titulo: 'Productos Más Vendidos',
+      valor: '1.248 unidades',
+      variacion: '+24.1%',
+      icon: BarChart3,
+      tiempo: 'Ultima semana',
+      subtitulo: 'Top 5 de productos',
+    },
+    {
+      id: 4,
+      tipo: 'caja',
+      titulo: 'Resumen de Caja',
+      valor: '$ 89,500',
+      variacion: '-3.2%',
+      icon: Zap,
+      tiempo: 'Ultimo turnover',
+      subtitulo: 'Efectivo vs. Tarjetas',
+    },
   ]
 
-  const formatCOP = (val: number) => '$ ' + val.toLocaleString('es-CO')
+  const ventasMensuales = [
+    { mes: 'Sep', ventas: 980000 },
+    { mes: 'Oct', ventas: 1245600 },
+    { mes: 'Nov', ventas: 1100000 },
+    { mes: 'Dic', ventas: 950000 },
+  ]
 
   return (
-    <div className="space-y-6">
-      {/* Cabecera */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2 border-b border-zinc-800">
-        <div>
-          <div className="flex items-center space-x-2 text-xs font-bold text-blue-400 uppercase tracking-widest mb-1">
-            <BarChart3 className="w-4 h-4" />
-            <span>Métricas & Rendimiento</span>
+    <div className="space-y-8">
+      {/* Header del módulo de reportes */}
+      <div className="relative overflow-hidden rounded-3xl rock-gradient p-6 sm:p-8 border border-red-900/40 shadow-2xl">
+        <div className="relative z-10">
+          <div className="inline-flex items-center space-x-2 bg-red-600/30 border border-red-500/40 px-3 py-1 rounded-full text-amber-400 text-xs font-semibold mb-4">
+            <span>📊 Reportes</span>
+            <span>•</span>
+            <span>Rock Bar POS</span>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            Reportes Operativos
+          <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight mb-2">
+            Módulo de Reportes
           </h2>
-          <p className="text-zinc-400 text-xs sm:text-sm mt-0.5">
-            Análisis de ventas, productos más pedidos y cierres financieros.
+          <p className="text-zinc-300 text-sm sm:text-base">
+            Información operativa y financiera del negocio. Usa los filtros para narrowing down.
           </p>
         </div>
-
-        <div className="flex items-center space-x-2">
-          <button className="flex items-center space-x-2 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 font-bold px-4 py-2.5 rounded-xl transition-all text-xs">
-            <Calendar className="w-4 h-4 text-zinc-400" />
-            <span>Últimos 7 Días</span>
-          </button>
-          <button className="flex items-center space-x-2 bg-red-600 hover:bg-red-500 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-red-900/30 transition-all text-xs">
-            <Download className="w-4 h-4" />
-            <span>Exportar</span>
-          </button>
-        </div>
       </div>
 
-      {/* Tarjetas de Resumen */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="rock-card p-5 rounded-2xl">
-          <p className="text-xs font-semibold text-zinc-400 uppercase">Facturación Período</p>
-          <p className="text-2xl sm:text-3xl font-black text-white mt-1">{formatCOP(4264000)}</p>
-          <span className="text-xs text-emerald-400 font-bold flex items-center mt-2">
-            <TrendingUp className="w-3.5 h-3.5 mr-1" />
-            +18.4% respecto al ciclo anterior
-          </span>
-        </div>
-        <div className="rock-card p-5 rounded-2xl">
-          <p className="text-xs font-semibold text-zinc-400 uppercase">Cuentas Cerradas</p>
-          <p className="text-2xl sm:text-3xl font-black text-amber-400 mt-1">114</p>
-          <span className="text-xs text-zinc-400 mt-2 block">Ticket promedio: {formatCOP(37400)}</span>
-        </div>
-        <div className="rock-card p-5 rounded-2xl">
-          <p className="text-xs font-semibold text-zinc-400 uppercase">Margen Bruto Estimado</p>
-          <p className="text-2xl sm:text-3xl font-black text-emerald-400 mt-1">51.2%</p>
-          <span className="text-xs text-zinc-400 mt-2 block">Utilidad estimada: {formatCOP(2183000)}</span>
-        </div>
-      </div>
-
-      {/* Tabla de Productos Más Vendidos */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-white tracking-wide flex items-center space-x-2">
-            <Award className="w-4 h-4 text-amber-400" />
-            <span>Productos Más Vendidos</span>
-          </h3>
-        </div>
-
-        <div className="rock-card rounded-2xl overflow-hidden divide-y divide-zinc-800">
-          {topProducts.map((p, idx) => (
-            <div key={p.name} className="p-4 flex items-center justify-between hover:bg-zinc-900/40 transition-colors">
-              <div className="flex items-center space-x-3">
-                <span className="w-6 h-6 rounded-lg bg-zinc-800 text-zinc-300 font-bold text-xs flex items-center justify-center">
-                  #{idx + 1}
-                </span>
+      {/* Tarjetas de resumen */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {reportesData.map((report) => {
+          const Icon = report.icon
+          return (
+            <div key={report.id} className="rock-card p-6 rounded-2xl shadow-lg relative overflow-hidden group">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-bold text-white">{p.name}</p>
-                  <p className="text-xs text-zinc-500">{p.category} • {p.sold} unidades servidas</p>
+                  <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">{report.tipo}</p>
+                  <p className="text-2xl font-black text-white mt-1">{report.valor}</p>
+                </div>
+                <div className={`p-3 rounded-xl bg-amber-500/10 text-amber-400 group-hover:scale-110 transition-transform`}>
+                  <Icon className="w-6 h-6" />
                 </div>
               </div>
-              <p className="text-sm font-black text-white">{formatCOP(p.revenue)}</p>
+              <div className="mt-4 flex items-center text-xs font-medium text-zinc-400">
+                <span className="text-emerald-400 font-bold mr-1.5 flex items-center">
+                  <Zap className="w-3.5 h-3.5 mr-0.5" /> {report.variacion}
+                </span>
+                <span>{report.tiempo}</span>
+              </div>
             </div>
-          ))}
+          )
+        })}
+      </div>
+
+      {/* Filtros */}
+      <div className="bg-zinc-900/80 p-6 rounded-2xl border border-zinc-800/60 mb-8">
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div>
+            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">FechaInicio</label>
+            <div className="relative">
+              <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500 w-3.5 h-3.5" />
+              <input
+                type="date"
+                value={fechaInicio}
+                onChange={(e) => setFechaInicio(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded border border-zinc-700 background-zinc-900 text-zinc-100"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">FechaFin</label>
+            <div className="relative">
+              <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500 w-3.5 h-3.5" />
+              <input
+                type="date"
+                value={fechaFin}
+                onChange={(e) => setFechaFin(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded border border-zinc-700 background-zinc-900 text-zinc-100"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Tipo</label>
+            <select
+              value={filtroTipo}
+              onChange={(e) => setFiltroTipo(e.target.value as 'todos' | 'ventas' | 'caja' | 'productos')}
+              className="w-full pl-4 py-2 rounded border border-zinc-700 background-zinc-900 text-zinc-100"
+            >
+              <option value="todos">Todos</option>
+              <option value="ventas">Ventas</option>
+              <option value="caja">Caja</option>
+              <option value="productos">Productos</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Usuario</label>
+            <select
+              value=""
+              onChange={() => {}}
+              className="w-full pl-4 py-2 rounded border border-zinc-700 background-zinc-900 text-zinc-100"
+            >
+              <option value="">Todos</option>
+              <option value="admin">Administrador</option>
+              <option value="staff">Empleado</option>
+            </select>
+          </div>
+        </div>
+        <button
+          onClick={() => alert('Generando reporte...')}
+          className="w-full py-2 rounded border border-amber-500 bg-amber-500/10 text-amber-400 font-medium uppercase tracking-wider hover:bg-amber-600/20 transition-colors"
+        >
+          Generar Reporte CSV
+        </button>
+      </div>
+
+      {/* Gráficos y tablas de datos */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Ventas Mensuales */}
+        <div className="rock-card p-6 rounded-2xl shadow-lg">
+          <h3 className="text-lg font-bold text-white tracking-wide mb-4">Ventas Mensuales</h3>
+          <div className="h-64 bg-zinc-950 rounded-xl p-4 flex flex-col justify-end space-y-2">
+            <div className="flex items-end justify-between h-44 pt-4 px-2">
+              {ventasMensuales.map((vm) => (
+                <div key={vm.mes} className="flex flex-col items-center flex-1 space-y-1">
+                  <span className="text-[10px] text-zinc-400">${(vm.ventas / 1000).toFixed(0)}k</span>
+                  <div
+                    className="w-8 bg-gradient-to-t from-red-600 to-amber-500 rounded-t-md transition-all hover:brightness-125"
+                    style={{ height: `${(vm.ventas / 1300000) * 100}%` }}
+                  />
+                  <span className="text-xs font-semibold text-zinc-300">{vm.mes}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Top Productos */}
+        <div className="rock-card p-6 rounded-2xl shadow-lg">
+          <h3 className="text-lg font-bold text-white tracking-wide mb-4">Top Productos</h3>
+          <ol className="space-y-3 text-zinc-300">
+            <li>Cerveza Premium - 342 unidades</li>
+            <li>Cóctel Especial - 189 unidades</li>
+            <li>Nachos - 234 unidades</li>
+            <li>Whisky Premium - 89 unidades</li>
+          </ol>
+        </div>
+
+        {/* Cierre de Turno */}
+        <div className="rock-card p-6 rounded-2xl shadow-lg">
+          <h3 className="text-lg font-bold text-white tracking-wide mb-4">Cierre de Turno</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-zinc-500">Efectivo</p>
+              <p className="text-2xl font-black text-white">$ 45,200</p>
+            </div>
+            <div>
+              <p className="text-zinc-500">Tarjetas</p>
+              <p className="text-2xl font-black text-white">$ 38,900</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

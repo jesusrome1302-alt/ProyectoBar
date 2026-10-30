@@ -1,20 +1,36 @@
+"use client"
+
 import './globals.css'
+import { useState } from 'react'
 import Sidebar from '@/components/Sidebar'
 import MobileNav from '@/components/MobileNav'
 import { Bell } from 'lucide-react'
+
+// Inicializar state usando function pattern para evitar setState sincrono en useEffect
+// Usar verificación de window para compatibilidad con prerender del lado del servidor
+const storedRole = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null
+const storedName = typeof window !== 'undefined' ? localStorage.getItem('userName') : null
+const useUserRole = storedRole as 'owner' | 'admin' | 'staff' | null
+const useUserName = storedName || 'Gerente'
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const [userRole] = useState<'owner' | 'admin' | 'staff' | null>(useUserRole)
+  const [userName] = useState(useUserName)
+  
+  const isOwner = userRole === 'owner'
+  const isAdminOrOwner = userRole === 'owner' || userRole === 'admin'
+  
   return (
     <html lang="es" className="dark">
       <body className="bg-[#121214] text-zinc-100 min-h-screen antialiased selection:bg-red-600 selection:text-white">
-        <div className="flex min-h-screen">
+        <div className="flex min-h-span">
           {/* Sidebar Escritorio */}
-          <Sidebar />
-
+          <Sidebar isOwner={isOwner} isAdminOrOwner={isAdminOrOwner} userName={userName} />
+          
           {/* Contenido Principal */}
           <div className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
             {/* Header Superior */}
@@ -39,8 +55,8 @@ export default function RootLayout({
                     RB
                   </div>
                   <div className="hidden sm:block text-left">
-                    <p className="text-xs font-bold text-zinc-200">Administrador</p>
-                    <p className="text-[10px] text-amber-500 font-medium">Propietario</p>
+                    <p className="text-xs font-bold text-zinc-200">{userName}</p>
+                    <p className="text-[10px] text-amber-500 font-medium">{userRole?.toUpperCase() || 'ADMIN'}</p>
                   </div>
                 </div>
               </div>
@@ -54,7 +70,7 @@ export default function RootLayout({
         </div>
 
         {/* Navegación inferior móvil */}
-        <MobileNav />
+        <MobileNav isOwner={isOwner} isAdminOrOwner={isAdminOrOwner} />
       </body>
     </html>
   )
