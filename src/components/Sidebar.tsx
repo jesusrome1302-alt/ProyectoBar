@@ -42,7 +42,7 @@ export default function Sidebar() {
   const { user } = useAuthStore()
   const barData = useBarStore()
   const currentRole: UserRole = user?.role || 'owner'
-  const barDisplayName = user?.barName || barData.settings?.barName || 'ROCK BAR'
+  const barDisplayName = user?.barName || barData.settings?.barName || 'MI BAR'
 
   // Filtrar ítems autorizados para el rol actual
   const authorizedItems = NAV_ITEMS.filter((item) => item.roles.includes(currentRole))
@@ -107,7 +107,7 @@ export default function Sidebar() {
         <div className="bg-zinc-900/80 p-3 rounded-2xl border border-zinc-800/80 flex items-center justify-between">
           <div className="flex items-center space-x-2.5 truncate">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-red-600 to-amber-600 flex items-center justify-center text-xs font-black text-white shrink-0">
-              {user?.avatar || 'RB'}
+              {user?.avatar || 'PR'}
             </div>
             <div className="truncate">
               <p className="text-xs font-bold text-zinc-200 truncate">{user?.name || 'Usuario'}</p>

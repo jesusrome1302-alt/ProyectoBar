@@ -333,177 +333,35 @@ export const DEFAULT_INVENTORY_MOVEMENTS: InventoryMovementRecord[] = [
 ]
 
 export const DEFAULT_BAR_DATA: BarData = {
-  operatorName: 'Cajero Principal',
+  operatorName: 'Administrador',
   activeTableId: 1,
-  tables: [
-    {
-      id: 1,
-      name: 'Mesa 1',
-      capacity: 4,
-      status: 'occupied',
-      openedAt: '05:00 PM',
-      operator: 'Cajero Principal',
-      items: [
-        { productId: 'prod-8', name: 'Trago Ron Medellín 8 Años', quantity: 4, unitPrice: 18000, subtotal: 72000 },
-        { productId: 'prod-15', name: 'Alitas BBQ Rocker x8', quantity: 1, unitPrice: 34000, subtotal: 34000 },
-        { productId: 'prod-16', name: 'Papas Rústicas con Tocineta', quantity: 1, unitPrice: 22000, subtotal: 22000 },
-      ],
-      payments: [],
-      total: 128000,
-      paid: 0,
-      pending: 128000,
-    },
-    {
-      id: 2,
-      name: 'Mesa 2',
-      capacity: 2,
-      status: 'available',
-      operator: 'Cajero Principal',
-      items: [],
-      payments: [],
-      total: 0,
-      paid: 0,
-      pending: 0,
-    },
-    {
-      id: 3,
-      name: 'Mesa 3',
-      capacity: 6,
-      status: 'occupied',
-      openedAt: '05:20 PM',
-      operator: 'Cajero Principal',
-      items: [
-        { productId: 'prod-1', name: 'Corona Extra 355ml', quantity: 3, unitPrice: 14000, subtotal: 42000, notes: 'Bien frías' },
-        { productId: 'prod-11', name: 'Cóctel Rock Margarita', quantity: 1, unitPrice: 32000, subtotal: 32000 },
-        { productId: 'prod-17', name: 'Red Bull 250ml', quantity: 1, unitPrice: 15000, subtotal: 15000 },
-      ],
-      payments: [
-        { id: 'p-1', method: 'Nequi / Daviplata', amount: 50000, timestamp: '05:40 PM', operator: 'Cajero Principal' },
-      ],
-      total: 89000,
-      paid: 50000,
-      pending: 39000,
-    },
-    {
-      id: 4,
-      name: 'Mesa 4',
-      capacity: 4,
-      status: 'available',
-      operator: 'Cajero Principal',
-      items: [],
-      payments: [],
-      total: 0,
-      paid: 0,
-      pending: 0,
-    },
-    {
-      id: 5,
-      name: 'Mesa 5',
-      capacity: 8,
-      status: 'occupied',
-      openedAt: '04:15 PM',
-      operator: 'Cajero Principal',
-      items: [
-        { productId: 'prod-7', name: 'Trago Whisky Johnnie Walker Black', quantity: 5, unitPrice: 28000, subtotal: 140000 },
-        { productId: 'prod-14', name: 'Nachos Cheddar & Jalapeños', quantity: 2, unitPrice: 26000, subtotal: 52000 },
-        { productId: 'prod-5', name: 'Poker Lata 330ml', quantity: 2, unitPrice: 8000, subtotal: 16000 },
-      ],
-      payments: [
-        { id: 'p-2', method: 'Tarjeta Débito', amount: 150000, timestamp: '05:10 PM', operator: 'Cajero Principal' },
-        { id: 'p-3', method: 'Efectivo', amount: 58000, timestamp: '05:30 PM', operator: 'Cajero Principal' },
-      ],
-      total: 208000,
-      paid: 208000,
-      pending: 0,
-    },
-    {
-      id: 6,
-      name: 'Mesa 6',
-      capacity: 4,
-      status: 'available',
-      operator: 'Cajero Principal',
-      items: [],
-      payments: [],
-      total: 0,
-      paid: 0,
-      pending: 0,
-    },
-    {
-      id: 7,
-      name: 'Mesa 7',
-      capacity: 4,
-      status: 'reserved',
-      operator: 'Cajero Principal',
-      items: [],
-      payments: [],
-      total: 0,
-      paid: 0,
-      pending: 0,
-    },
-    {
-      id: 8,
-      name: 'Mesa 8',
-      capacity: 2,
-      status: 'available',
-      operator: 'Cajero Principal',
-      items: [],
-      payments: [],
-      total: 0,
-      paid: 0,
-      pending: 0,
-    },
-    {
-      id: 9,
-      name: 'Mesa 9',
-      capacity: 6,
-      status: 'occupied',
-      openedAt: '05:35 PM',
-      operator: 'Cajero Principal',
-      items: [
-        { productId: 'prod-12', name: 'Mojito Cubano Clásico', quantity: 2, unitPrice: 28000, subtotal: 56000 },
-      ],
-      payments: [],
-      total: 56000,
-      paid: 0,
-      pending: 56000,
-    },
-  ],
+  tables: Array.from({ length: 8 }, (_, idx) => ({
+    id: idx + 1,
+    name: `Mesa ${idx + 1}`,
+    capacity: 4,
+    status: 'available',
+    operator: 'Administrador',
+    items: [],
+    payments: [],
+    total: 0,
+    paid: 0,
+    pending: 0,
+  })),
   cash: {
-    initialCash: 150000,
-    cashSales: 58000,
-    electronicSales: 200000,
-    expenses: 25000,
-    expectedCash: 183000,
-    status: 'open',
-    openedAt: '04:00 PM',
-    currentSessionId: 'ses-actual',
+    initialCash: 0,
+    cashSales: 0,
+    electronicSales: 0,
+    expenses: 0,
+    expectedCash: 0,
+    status: 'closed',
+    openedAt: '',
   },
-  movements: [
-    { id: 'm-1', type: 'in', category: 'Base Inicial', description: 'Base inicial de turno', amount: 150000, time: '04:00 PM', user: 'Cajero Principal' },
-    { id: 'm-2', type: 'out', category: 'Insumos', description: 'Compra de hielo de emergencia', amount: -25000, time: '04:45 PM', user: 'Cajero Principal' },
-    { id: 'm-3', type: 'sale', category: 'Venta', description: 'Abono efectivo Mesa 5', amount: 58000, time: '05:30 PM', user: 'Cajero Principal' },
-  ],
-  products: INITIAL_PRODUCTS,
-  sessions: [
-    {
-      id: 'ses-prev-1',
-      openedAt: 'Ayer, 03:30 PM',
-      closedAt: 'Ayer, 11:45 PM',
-      operator: 'Cajero Principal',
-      initialCash: 150000,
-      cashSales: 520000,
-      electronicSales: 780000,
-      expenses: 35000,
-      expectedCash: 635000,
-      actualCash: 635000,
-      difference: 0,
-      notes: 'Turno cerrado con cuadre exacto. Se deja base de 150.000 para el día siguiente.',
-      status: 'closed',
-    },
-  ],
-  suppliers: INITIAL_SUPPLIERS,
-  purchases: DEFAULT_PURCHASES,
-  inventoryMovements: DEFAULT_INVENTORY_MOVEMENTS,
+  movements: [],
+  products: [],
+  sessions: [],
+  suppliers: [],
+  purchases: [],
+  inventoryMovements: [],
   closedSales: [],
   settings: DEFAULT_SETTINGS,
 }
@@ -527,20 +385,21 @@ export function loadBarData(): BarData {
     }
     cachedRaw = raw
     const parsed = JSON.parse(raw) as BarData
-    if (!parsed.products || parsed.products.length === 0) {
-      parsed.products = INITIAL_PRODUCTS
+
+    if (!parsed.products) {
+      parsed.products = []
     }
     if (!parsed.sessions) {
-      parsed.sessions = DEFAULT_BAR_DATA.sessions
+      parsed.sessions = []
     }
     if (!parsed.suppliers) {
-      parsed.suppliers = DEFAULT_BAR_DATA.suppliers
+      parsed.suppliers = []
     }
     if (!parsed.purchases) {
-      parsed.purchases = DEFAULT_BAR_DATA.purchases
+      parsed.purchases = []
     }
     if (!parsed.inventoryMovements) {
-      parsed.inventoryMovements = DEFAULT_BAR_DATA.inventoryMovements
+      parsed.inventoryMovements = []
     }
     if (!parsed.closedSales) {
       parsed.closedSales = []
@@ -548,6 +407,37 @@ export function loadBarData(): BarData {
     if (!parsed.settings) {
       parsed.settings = DEFAULT_SETTINGS
     }
+
+    // Si el establecimiento fue registrado por un usuario comercial y aún tiene órdenes o movimientos residuales del mock viejo, limpiar a 0
+    if (parsed.settings?.barName && parsed.settings.barName !== 'ROCK BAR') {
+      const hasOldMockOrders = parsed.tables?.some(t => t.items?.some(i => i.productId === 'prod-8' || i.productId === 'prod-15'))
+      if (hasOldMockOrders) {
+        parsed.tables = Array.from({ length: 8 }, (_, idx) => ({
+          id: idx + 1,
+          name: `Mesa ${idx + 1}`,
+          capacity: 4,
+          status: 'available',
+          operator: parsed.operatorName || 'Personal',
+          items: [],
+          payments: [],
+          total: 0,
+          paid: 0,
+          pending: 0,
+        }))
+        parsed.movements = []
+        parsed.cash = {
+          initialCash: 0,
+          cashSales: 0,
+          electronicSales: 0,
+          expenses: 0,
+          expectedCash: 0,
+          status: 'closed',
+          openedAt: '',
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
+      }
+    }
+
     cachedData = parsed
     return cachedData
   } catch {
@@ -777,7 +667,7 @@ export function updateBarSettings(newSettings: Partial<BarSettings>): void {
   saveBarData(data)
 }
 
-// Inicializar un nuevo bar registrado en el sistema
+// Inicializar un nuevo bar registrado en el sistema 100% en CERO
 export function registerNewBusinessBar(params: {
   barName: string
   ownerName: string
@@ -785,16 +675,60 @@ export function registerNewBusinessBar(params: {
   address?: string
   city?: string
 }): void {
-  const data = loadBarData()
   const cleanName = params.barName.trim().toUpperCase()
-  data.operatorName = params.ownerName
-  data.settings = {
-    ...(data.settings || DEFAULT_SETTINGS),
-    barName: cleanName,
-    address: params.address ? `${params.address}, ${params.city || ''}` : `${params.city || 'Colombia'}`,
-    phone: params.phone || '+57 (300) 000-0000',
-    footerText: `¡Gracias por visitar ${cleanName}! Vuelve pronto.`,
+
+  // 8 mesas disponibles y limpias en $0
+  const cleanTables: TableState[] = Array.from({ length: 8 }, (_, idx) => ({
+    id: idx + 1,
+    name: `Mesa ${idx + 1}`,
+    capacity: 4,
+    status: 'available' as const,
+    operator: params.ownerName,
+    items: [],
+    payments: [],
+    total: 0,
+    paid: 0,
+    pending: 0,
+  }))
+
+  const cleanData: BarData = {
+    operatorName: params.ownerName,
+    activeTableId: 1,
+    tables: cleanTables,
+    cash: {
+      initialCash: 0,
+      cashSales: 0,
+      electronicSales: 0,
+      expenses: 0,
+      expectedCash: 0,
+      status: 'closed',
+      openedAt: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
+    },
+    movements: [],
+    products: [], // Catálogo en 0 para nuevo bar
+    sessions: [],
+    suppliers: [],
+    purchases: [],
+    inventoryMovements: [],
+    closedSales: [],
+    settings: {
+      barName: cleanName,
+      nit: 'Pendiente por registrar',
+      address: params.address ? `${params.address}, ${params.city || ''}` : `${params.city || 'Colombia'}`,
+      phone: params.phone || '+57 (300) 000-0000',
+      footerText: `¡Gracias por tu visita a ${cleanName}! Vuelve pronto.`,
+      tipPercentage: 10,
+      taxPercentage: 8,
+    },
   }
+
+  saveBarData(cleanData)
+}
+
+// Cargar plantilla opcional de bebidas estándar colombianas
+export function loadSuggestedProductsTemplate(): void {
+  const data = loadBarData()
+  data.products = INITIAL_PRODUCTS
   saveBarData(data)
 }
 

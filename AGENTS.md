@@ -26,6 +26,7 @@ Este archivo contiene las directrices, convenciones, arquitectura y comandos par
 - Validar permisos en servidor y base de datos (Row Level Security - RLS).
 - No guardar secretos en el cliente.
 - Seguir un enfoque incremental paso a paso.
+- **Aislamiento Multi-Bar y Estado en Cero:** Toda cuenta o bar registrado debe inicializarse en 0 absoluto (mesas limpias a $0, caja cerrada a $0, movimientos vacíos, sin productos o con plantilla bajo demanda) y con acceso exclusivo a su propio personal (sin usuarios demostrativos residuales).
 
 ## 5 Limites
 

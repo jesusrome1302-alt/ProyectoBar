@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Edit2,
   Power,
+  Sparkles,
 } from 'lucide-react'
 import {
   useBarStore,
@@ -35,6 +36,7 @@ import {
   deleteSupplier,
   registerPurchase,
   registerInventoryAdjustment,
+  loadSuggestedProductsTemplate,
   ProductState,
   SupplierState,
   PurchaseRecord,
@@ -514,8 +516,53 @@ export default function ProductosPage() {
             </div>
           </div>
 
-          {/* Grid de Productos */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Grid de Productos o Estado en Cero */}
+          {products.length === 0 ? (
+            <div className="rock-card p-10 sm:p-14 text-center rounded-3xl border border-zinc-800 space-y-5 max-w-xl mx-auto my-6">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 mx-auto flex items-center justify-center text-3xl">
+                📦
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-white">Catálogo de Productos en Cero (0)</h3>
+                <p className="text-sm text-zinc-400 mt-1.5 leading-relaxed">
+                  Tu bar está limpio y listo para empezar. Puedes ingresar tus productos manualmente o cargar la plantilla sugerida con 18 bebidas estándar de Colombia.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormName('')
+                    setFormCategory('Cervezas')
+                    setFormPrice(10000)
+                    setFormCost(5000)
+                    setFormStock(20)
+                    setFormMinStock(5)
+                    setFormBarcode('')
+                    setShowProductModal(true)
+                  }}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-red-950/40 cursor-pointer"
+                >
+                  + Crear Primer Producto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    loadSuggestedProductsTemplate()
+                  }}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-amber-500/30 font-bold text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Cargar Plantilla Sugerida</span>
+                </button>
+              </div>
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="rock-card p-10 text-center text-zinc-500 rounded-2xl">
+              No se encontraron productos con el filtro aplicado.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredProducts.map((p) => {
               const isLowStock = p.stock <= p.min_stock
               const margin = p.price > 0 ? Math.round(((p.price - p.cost) / p.price) * 100) : 0
@@ -661,6 +708,7 @@ export default function ProductosPage() {
               )
             })}
           </div>
+          )}
         </div>
       )}
 

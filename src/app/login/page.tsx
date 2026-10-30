@@ -3,11 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  PRESET_USERS,
-  loginWithPreset,
+  getBarUsers,
   loginWithCredentials,
   registerBusinessOwner,
-  UserRole
+  setAuthState,
+  UserRole,
+  AuthUser
 } from '@/lib/authStore'
 import {
   Shield,
@@ -104,11 +105,17 @@ export default function LoginPage() {
     }
   }
 
-  // Manejar Login Rápido por Perfil Demostrativo
-  const handleQuickLogin = (role: UserRole) => {
+  // Usuarios registrados del bar
+  const [barUsers] = useState<AuthUser[]>(() => getBarUsers())
+
+  // Manejar Login Rápido por Perfil del Bar
+  const handleQuickLogin = (targetUser: AuthUser) => {
     setErrorMsg('')
-    const loggedUser = loginWithPreset(role)
-    setSuccessMsg(`¡Bienvenido ${loggedUser.name}! Accediendo como ${loggedUser.roleTitle}...`)
+    setAuthState({
+      user: targetUser,
+      isAuthenticated: true,
+    })
+    setSuccessMsg(`¡Bienvenido ${targetUser.name}! Accediendo al sistema...`)
     setTimeout(() => {
       router.push('/')
     }, 400)
@@ -434,16 +441,16 @@ export default function LoginPage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {PRESET_USERS.map((preset) => {
-                    const colors = roleColors[preset.role]
-                    const isSelected = selectedRole === preset.role
+                  {barUsers.map((member) => {
+                    const colors = roleColors[member.role] || roleColors.staff
+                    const isSelected = selectedRole === member.role
 
                     return (
                       <div
-                        key={preset.id}
+                        key={member.id}
                         onClick={() => {
-                          setSelectedRole(preset.role)
-                          handleQuickLogin(preset.role)
+                          setSelectedRole(member.role)
+                          handleQuickLogin(member)
                         }}
                         className={`cursor-pointer rounded-2xl p-3.5 border transition-all duration-200 group ${
                           isSelected
@@ -453,16 +460,16 @@ export default function LoginPage() {
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className={`w-8 h-8 rounded-lg bg-gradient-to-tr ${colors.accent} flex items-center justify-center font-black text-white text-xs`}>
-                            {preset.avatar}
+                            {member.avatar}
                           </div>
                           <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${colors.badge}`}>
-                            {preset.role.toUpperCase()}
+                            {member.role.toUpperCase()}
                           </span>
                         </div>
                         <h4 className="font-bold text-xs text-white group-hover:text-amber-400 transition-colors truncate">
-                          {preset.name}
+                          {member.name}
                         </h4>
-                        <p className="text-[10px] text-zinc-500 truncate">{preset.roleTitle}</p>
+                        <p className="text-[10px] text-zinc-500 truncate">{member.roleTitle}</p>
                       </div>
                     )
                   })}

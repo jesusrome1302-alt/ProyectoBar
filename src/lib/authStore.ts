@@ -25,7 +25,6 @@ export interface NewUserFormData {
   temporaryPin?: string
 }
 
-// Expandir PRESET_USERS con funcionalidad de creación
 export const PRESET_USERS: AuthUser[] = [
   {
     id: 'user-owner-1',
@@ -62,34 +61,98 @@ export interface AuthState {
 }
 
 const AUTH_STORAGE_KEY = 'ROCK_BAR_AUTH_SESSION_V1'
+const USERS_STORAGE_KEY = 'ROCK_BAR_USERS_STORE_V2'
 
-// Nuevo usuario creado temporalmente (será persistido en localStorage)
-let tempUserIdCounter = 1000
-
-// Función para crear un nuevo usuario (solo puede ser llamada por el owner)
-export function createNewUser(formData: NewUserFormData, creatorRole: UserRole): AuthUser {
-  // Verificar que el creador sea owner
-  if (creatorRole !== 'owner') {
-    throw new Error('Solo el propietario puede crear nuevos usuarios')
+// Obtener la lista de usuarios pertenecientes al bar actual (100% aislada)
+export function getBarUsers(): AuthUser[] {
+  if (typeof window === 'undefined') {
+    return []
   }
+  try {
+    const currentSession = getAuthState().user
+    const isCustomBar = Boolean(
+      currentSession && (currentSession.barName || currentSession.id.startsWith('user-business-') || currentSession.id.startsWith('new-'))
+    )
 
-  const newId = `user-${formData.role}-${tempUserIdCounter++}`
-  const newUser: AuthUser = {
-    id: newId,
-    name: formData.name,
-    email: formData.email,
-    role: formData.role,
-    roleTitle: formData.roleTitle || `${formData.role.charAt(0).toUpperCase() + formData.role.slice(1)} / Personal`,
-    avatar: formData.name.slice(0, 2).toUpperCase(),
-    pin: formData.temporaryPin || Math.floor(1000 + Math.random() * 9000).toString(),
+    const raw = localStorage.getItem(USERS_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as AuthUser[]
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        if (isCustomBar) {
+          // Filtrar estrictamente cualquier usuario residual de demostración de Rock Bar
+          const filtered = parsed.filter(
+            (u) => !['user-owner-1', 'user-admin-1', 'user-staff-1'].includes(u.id)
+          )
+          if (filtered.length > 0) {
+            // Asegurar que el usuario activo propietario esté en la lista
+            const hasCurrent = filtered.some((u) => u.id === currentSession?.id || u.email === currentSession?.email)
+            if (!hasCurrent && currentSession) {
+              filtered.unshift(currentSession)
+              saveBarUsers(filtered)
+            }
+            return filtered
+          }
+          if (currentSession) {
+            saveBarUsers([currentSession])
+            return [currentSession]
+          }
+        }
+        return parsed
+      }
+    }
+
+    // Si no hay lista en USERS_STORAGE_KEY pero hay sesión activa
+    if (currentSession) {
+      const initialUsers = [currentSession]
+      saveBarUsers(initialUsers)
+      return initialUsers
+    }
+  } catch (err) {
+    console.error('Error cargando usuarios del bar:', err)
   }
+  return []
+}
 
-  return newUser
+// Guardar lista de usuarios aislada del bar
+export function saveBarUsers(users: AuthUser[]): void {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users))
+      window.dispatchEvent(new Event('rock_bar_users_updated'))
+    } catch (err) {
+      console.error('Error guardando usuarios del bar:', err)
+    }
+  }
+}
+
+// Agregar un empleado (mesero o admin) al bar actual
+export function addBarMember(data: { name: string; email?: string; role: UserRole; pin: string }): AuthUser {
+  const currentUsers = getBarUsers()
+  const roleTitle = data.role === 'admin' ? 'Administrador / Gerente' : 'Mesero / Staff'
+  const newMember: AuthUser = {
+    id: `user-${data.role}-${Date.now()}`,
+    name: data.name.trim(),
+    email: data.email?.trim() || `${data.name.trim().toLowerCase().replace(/\s+/g, '')}@bar.com`,
+    role: data.role,
+    roleTitle,
+    avatar: data.name.trim().slice(0, 2).toUpperCase(),
+    pin: data.pin.trim(),
+  }
+  const updated = [...currentUsers, newMember]
+  saveBarUsers(updated)
+  return newMember
+}
+
+// Eliminar un miembro del personal del bar
+export function deleteBarMember(userId: string): void {
+  const currentUsers = getBarUsers()
+  const filtered = currentUsers.filter((u) => u.id !== userId)
+  saveBarUsers(filtered)
 }
 
 export const DEFAULT_AUTH_STATE: AuthState = {
-  user: PRESET_USERS[0],
-  isAuthenticated: true,
+  user: null,
+  isAuthenticated: false,
 }
 
 let currentAuthState: AuthState = DEFAULT_AUTH_STATE
@@ -178,15 +241,10 @@ export function registerBusinessOwner(params: {
     city: params.city?.trim(),
   }
 
-  // Agregar al inicio de perfiles activos
-  const existingIdx = PRESET_USERS.findIndex((u) => u.email === newUser.email)
-  if (existingIdx >= 0) {
-    PRESET_USERS[existingIdx] = newUser
-  } else {
-    PRESET_USERS.unshift(newUser)
-  }
+  // Lista de usuarios NUEVA y AISLADA para este bar: SOLO el nuevo propietario
+  saveBarUsers([newUser])
 
-  // Sincronizar en barState el nuevo negocio y nombre del bar
+  // Sincronizar en barState el nuevo negocio y nombre del bar con plataforma en 0
   registerNewBusinessBar({
     barName: params.barName,
     ownerName: fullName,
@@ -209,7 +267,7 @@ export function loginWithNewUser(name: string, role: UserRole): AuthUser {
   const newUser: AuthUser = {
     id: 'new-' + Date.now(),
     name: name.trim(),
-    email: `${name.trim().toLowerCase().replace(/\s+/g, '')}@rockbar.com`,
+    email: `${name.trim().toLowerCase().replace(/\s+/g, '')}@bar.com`,
     role: role,
     roleTitle: `${role.charAt(0).toUpperCase() + role.slice(1)} / Personal`,
     avatar: name.trim().slice(0, 2).toUpperCase(),
@@ -222,14 +280,20 @@ export function loginWithNewUser(name: string, role: UserRole): AuthUser {
   return newUser
 }
 
-// Mejorado loginWithCredentials con mejor validación
+// Mejorado loginWithCredentials con mejor validación contra usuarios activos del bar
 export function loginWithCredentials(identifier: string, pinOrPass: string): { success: boolean; message?: string; user?: AuthUser } {
-  // Buscar por email o PIN en users preset
-  const found = PRESET_USERS.find(
+  // Buscar primero en los usuarios registrados del bar y luego en presets de respaldo
+  const barUsers = getBarUsers()
+  const candidates = barUsers.length > 0 ? barUsers : PRESET_USERS
+  const found = candidates.find(
     (u) =>
       u.email.toLowerCase() === identifier.trim().toLowerCase() ||
       u.pin === pinOrPass.trim() ||
       u.name.toLowerCase().includes(identifier.trim().toLowerCase())
+  ) || PRESET_USERS.find(
+    (u) =>
+      u.email.toLowerCase() === identifier.trim().toLowerCase() ||
+      u.pin === pinOrPass.trim()
   )
 
   if (found) {

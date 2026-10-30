@@ -291,3 +291,13 @@ npm install -D <pkg> # Instalar devDependency
      - Activación automática: Al registrarse, el sistema inicializa el espacio de trabajo con el nombre del bar (`registerNewBusinessBar`), lo asigna como Propietario (`owner`) y desbloquea el acceso instantáneo al POS.
      - Auth Guard en `layout.tsx`: Acceso bloqueado a la operativa interna si no hay sesión activa, mostrando el portal de Login / Registro.
      - Identidad dinámica: Cabecera superior y barra lateral adoptan automáticamente el nombre del bar registrado.
+  9. **Inicialización Completa en Cero (0) y Aislamiento de Negocio para Nuevos Bares Registrados:**
+     - **Aislamiento estricto de usuarios:** Al registrar un bar (ej. "BEER FRIENDS"), el establecimiento cuenta exclusivamente con su Propietario registrado. Los usuarios demo de Rock Bar (Carlos Santana, Andrés Calamaro, Fito Páez) quedan estrictamente purgados y no aparecen ni en `/usuarios` ni en el login rápido.
+     - **Gestión de equipo propio (`/usuarios`):** El propietario puede registrar sus propios empleados (meseros y administradores) con nombre, rol y PIN de 4 dígitos, además de eliminar personal cuando lo requiera.
+     - **Plataforma 100% en CERO:**
+       - 8 mesas limpias, disponibles y en $0 COP.
+       - Caja cerrada con base y ventas en $0 COP.
+       - 0 movimientos de caja, 0 compras residuales y 0 sesiones anteriores.
+       - Catálogo de productos en 0 con banner interactivo: botón para crear primer producto desde cero o cargar plantilla estándar de 18 bebidas colombianas.
+       - Saneamiento automático de datos residuales en clientes existentes.
+     - **Calidad garantizada:** 0 errores y 0 warnings en ESLint (`npm run lint`), compilación estática de 13 rutas exitosa (`npm run build`).

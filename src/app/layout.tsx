@@ -20,7 +20,7 @@ export default function RootLayout({
   const barData = useBarStore()
   const isLoginPage = pathname === '/login'
   const isAuthorized = isAuthenticated && !isLoginPage
-  const barDisplayName = user?.barName || barData.settings?.barName || 'ROCK BAR'
+  const barDisplayName = user?.barName || barData.settings?.barName || 'MI BAR'
 
   const roleKey = (user?.role && ['owner', 'admin', 'staff'].includes(user.role)) ? user.role : 'owner'
   const roleStyles = {
@@ -92,11 +92,11 @@ export default function RootLayout({
                     className="flex items-center space-x-2.5 pl-3 border-l border-zinc-800 hover:opacity-85 transition-opacity group cursor-pointer"
                   >
                     <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr ${roleStyles.gradient} flex items-center justify-center font-bold text-white text-xs shadow-md shadow-red-900/30 group-hover:scale-105 transition-transform`}>
-                      {user?.avatar || 'RB'}
+                      {user?.avatar || 'PR'}
                     </div>
                     <div className="hidden sm:block text-left">
                       <div className="flex items-center space-x-1.5">
-                        <p className="text-xs font-bold text-zinc-200">{user?.name || 'Carlos Santana'}</p>
+                        <p className="text-xs font-bold text-zinc-200">{user?.name || 'Propietario'}</p>
                         <UserCheck className="w-3 h-3 text-zinc-500 group-hover:text-amber-500 transition-colors" />
                       </div>
                       <span className={`inline-block text-[9px] font-bold px-1.5 py-0.2 rounded border uppercase ${roleStyles.badge}`}>
