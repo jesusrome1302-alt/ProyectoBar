@@ -285,3 +285,4 @@ npm install -D <pkg> # Instalar devDependency
   4. **Navegación reactiva:** `Sidebar` y `MobileNav` filtran de forma dinámica las opciones visibles según los permisos del usuario activo, eliminando duplicaciones.
   5. **Módulo de Usuarios y Matriz de Permisos (`/usuarios`):** Panel interactivo para alternar roles y consultar la tabla detallada de privilegios de cada perfil.
   6. **Calidad:** 0 errores y 0 warnings en ESLint (`npm run lint`), compilación estática exitosa (`npm run build`).
+  7. **Estabilidad y Caché de Sesión:** Corregido caché de referencia inmutable en `getAuthState` dentro de `useSyncExternalStore` para prevenir loops de render infinito en el cliente.

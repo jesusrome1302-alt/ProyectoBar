@@ -17,6 +17,7 @@ export default function RootLayout({
   const { user } = useAuthStore()
   const isLoginPage = pathname === '/login'
 
+  const roleKey = (user?.role && ['owner', 'admin', 'staff'].includes(user.role)) ? user.role : 'owner'
   const roleStyles = {
     owner: {
       badge: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
@@ -33,7 +34,7 @@ export default function RootLayout({
       tag: '🍸 STAFF',
       gradient: 'from-emerald-600 to-teal-600',
     },
-  }[user?.role || 'owner']
+  }[roleKey]
 
   return (
     <html lang="es" className="dark">

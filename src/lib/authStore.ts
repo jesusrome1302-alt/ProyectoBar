@@ -48,13 +48,14 @@ export interface AuthState {
 }
 
 const AUTH_STORAGE_KEY = 'ROCK_BAR_AUTH_SESSION_V1'
-const DEFAULT_AUTH_STATE: AuthState = {
-  // Por defecto, usuario administrador si no hay sesión para evitar bloqueos
+
+export const DEFAULT_AUTH_STATE: AuthState = {
   user: PRESET_USERS[0],
   isAuthenticated: true,
 }
 
 let currentAuthState: AuthState = DEFAULT_AUTH_STATE
+let cachedRaw: string | null = null
 const authListeners = new Set<() => void>()
 
 export function getAuthState(): AuthState {
@@ -63,33 +64,32 @@ export function getAuthState(): AuthState {
   }
   try {
     const raw = localStorage.getItem(AUTH_STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as AuthState
-      if (parsed && parsed.user) {
-        currentAuthState = parsed
-        return currentAuthState
-      }
+    if (!raw) {
+      return DEFAULT_AUTH_STATE
+    }
+    // Si el contenido crudo no cambió, retornar la MISMA referencia en memoria para evitar renders infinitos
+    if (raw === cachedRaw && currentAuthState) {
+      return currentAuthState
+    }
+    cachedRaw = raw
+    const parsed = JSON.parse(raw) as AuthState
+    if (parsed && parsed.user) {
+      currentAuthState = parsed
+      return currentAuthState
     }
   } catch (err) {
-    console.error('Error al cargar sesión de usuario:', err)
+    console.error('Error al leer sesión de usuario:', err)
   }
-  // Si no hay sesión guardada en localStorage, guardar el usuario por defecto (Owner)
-  try {
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(DEFAULT_AUTH_STATE))
-    localStorage.setItem('userRole', DEFAULT_AUTH_STATE.user?.role || 'owner')
-    localStorage.setItem('userName', DEFAULT_AUTH_STATE.user?.name || 'Carlos Santana')
-  } catch {
-    // ignorar en entornos restringidos
-  }
-  currentAuthState = DEFAULT_AUTH_STATE
-  return currentAuthState
+  return DEFAULT_AUTH_STATE
 }
 
 export function setAuthState(newState: AuthState): void {
   currentAuthState = newState
   if (typeof window !== 'undefined') {
     try {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newState))
+      const raw = JSON.stringify(newState)
+      cachedRaw = raw
+      localStorage.setItem(AUTH_STORAGE_KEY, raw)
       if (newState.user) {
         localStorage.setItem('userRole', newState.user.role)
         localStorage.setItem('userName', newState.user.name)
@@ -161,7 +161,23 @@ export function logout(): void {
 
 function subscribeAuth(callback: () => void) {
   authListeners.add(callback)
-  const handler = () => callback()
+  const handler = () => {
+    if (typeof window !== 'undefined') {
+      const raw = localStorage.getItem(AUTH_STORAGE_KEY)
+      if (raw !== cachedRaw) {
+        cachedRaw = raw
+        if (raw) {
+          try {
+            currentAuthState = JSON.parse(raw)
+          } catch {
+            currentAuthState = DEFAULT_AUTH_STATE
+          }
+        }
+      }
+    }
+    callback()
+  }
+
   if (typeof window !== 'undefined') {
     window.addEventListener('rock_bar_auth_updated', handler)
     window.addEventListener('storage', handler)
