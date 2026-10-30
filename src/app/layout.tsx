@@ -1,15 +1,16 @@
 "use client"
 
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import './globals.css'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import MobileNav from '@/components/MobileNav'
-import { Bell, UserCheck, LogOut } from 'lucide-react'
+import { Bell, UserCheck, LogOut, Camera } from 'lucide-react'
 import { useAuthStore, logout } from '@/lib/authStore'
 import { useBarStore, syncCloudBarData } from '@/lib/barState'
 import LoginPage from './login/page'
+import PhotoUploadModal from '@/components/PhotoUploadModal'
 
 export default function RootLayout({
   children,
@@ -19,9 +20,11 @@ export default function RootLayout({
   const pathname = usePathname()
   const { user, isAuthenticated } = useAuthStore()
   const barData = useBarStore()
+  const [showPhotoModal, setShowPhotoModal] = useState(false)
   const isLoginPage = pathname === '/login'
   const isAuthorized = isAuthenticated && !isLoginPage
   const barDisplayName = user?.barName || barData.settings?.barName || 'MI BAR'
+  const userPhoto = user?.photoUrl || barData.settings?.logoUrl
 
   // Sincronizar estado operativo del bar desde la nube si hay businessId
   useEffect(() => {
@@ -94,15 +97,34 @@ export default function RootLayout({
                     <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-600 rounded-full animate-ping"></span>
                   </button>
 
-                  <Link
-                    href="/login"
-                    title="Clic para cambiar de rol o usuario"
-                    className="flex items-center space-x-2.5 pl-3 border-l border-zinc-800 hover:opacity-85 transition-opacity group cursor-pointer"
-                  >
-                    <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr ${roleStyles.gradient} flex items-center justify-center font-bold text-white text-xs shadow-md shadow-red-900/30 group-hover:scale-105 transition-transform`}>
-                      {user?.avatar || 'PR'}
-                    </div>
-                    <div className="hidden sm:block text-left">
+                  <div className="flex items-center space-x-2.5 pl-3 border-l border-zinc-800">
+                    <button
+                      type="button"
+                      onClick={() => setShowPhotoModal(true)}
+                      title="Clic para subir o ver la foto del bar / perfil"
+                      className="relative group cursor-pointer focus:outline-none"
+                    >
+                      {userPhoto ? (
+                        <img
+                          src={userPhoto}
+                          alt={user?.name || 'Foto del Bar'}
+                          className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-cover border border-amber-500/40 shadow-md shadow-amber-950/40 group-hover:scale-105 group-hover:border-amber-400 transition-all"
+                        />
+                      ) : (
+                        <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr ${roleStyles.gradient} flex items-center justify-center font-bold text-white text-xs shadow-md shadow-red-900/30 group-hover:scale-105 transition-transform`}>
+                          {user?.avatar || 'PR'}
+                        </div>
+                      )}
+                      <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-zinc-950 border border-zinc-700 group-hover:border-amber-400 rounded-full flex items-center justify-center text-[9px] text-zinc-400 group-hover:text-amber-400 shadow transition-colors">
+                        <Camera className="w-2.5 h-2.5" />
+                      </span>
+                    </button>
+
+                    <Link
+                      href="/login"
+                      title="Clic para cambiar de rol o usuario"
+                      className="hidden sm:block text-left hover:opacity-85 transition-opacity group cursor-pointer"
+                    >
                       <div className="flex items-center space-x-1.5">
                         <p className="text-xs font-bold text-zinc-200">{user?.name || 'Propietario'}</p>
                         <UserCheck className="w-3 h-3 text-zinc-500 group-hover:text-amber-500 transition-colors" />
@@ -110,8 +132,8 @@ export default function RootLayout({
                       <span className={`inline-block text-[9px] font-bold px-1.5 py-0.2 rounded border uppercase ${roleStyles.badge}`}>
                         {roleStyles.tag}
                       </span>
-                    </div>
-                  </Link>
+                    </Link>
+                  </div>
 
                   <button
                     type="button"
@@ -131,6 +153,12 @@ export default function RootLayout({
             </main>
           </div>
         </div>
+
+        {/* Modal para subir y gestionar la foto del bar / perfil */}
+        <PhotoUploadModal
+          isOpen={showPhotoModal}
+          onClose={() => setShowPhotoModal(false)}
+        />
 
         {/* Navegación inferior móvil (no se muestra en login) */}
         {!isLoginPage && <MobileNav />}

@@ -17,6 +17,7 @@ export interface AuthUser {
   role: UserRole
   roleTitle: string
   avatar: string
+  photoUrl?: string
   pin: string
   barName?: string
   phone?: string
@@ -240,6 +241,24 @@ export function loginWithPreset(role: UserRole): AuthUser {
     isAuthenticated: true,
   })
   return targetUser
+}
+
+// Actualizar foto de perfil o logotipo del usuario
+export function updateUserPhoto(photoUrl: string): void {
+  const current = getAuthState()
+  if (current.user) {
+    const updatedUser: AuthUser = {
+      ...current.user,
+      photoUrl,
+    }
+    setAuthState({
+      ...current,
+      user: updatedUser,
+    })
+    const users = getBarUsers()
+    const updatedUsers = users.map((u) => (u.id === updatedUser.id ? updatedUser : u))
+    saveBarUsers(updatedUsers)
+  }
 }
 
 // Registrar un nuevo bar y su propietario (Onboarding SaaS con validación central en Supabase)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   Settings,
   Building2,
@@ -12,14 +12,20 @@ import {
   User,
   X,
   Sparkles,
+  Camera,
+  Upload,
+  Trash2,
 } from 'lucide-react'
 import {
   useBarStore,
   loadBarData,
   saveBarData,
   updateBarSettings,
+  updateBarLogo,
   clearOperationalDataOnly,
 } from '@/lib/barState'
+import { useAuthStore, updateUserPhoto } from '@/lib/authStore'
+import { processImageFile } from '@/lib/imageUtils'
 
 export default function ConfiguracionPage() {
   const barData = useBarStore()
@@ -44,8 +50,45 @@ export default function ConfiguracionPage() {
   const [tipPercentage, setTipPercentage] = useState<number>(settings.tipPercentage || 10)
   const [taxPercentage, setTaxPercentage] = useState<number>(settings.taxPercentage || 8)
 
+  const { user } = useAuthStore()
+  const logoInputRef = useRef<HTMLInputElement>(null)
+  const [logoUrl, setLogoUrl] = useState<string>(settings.logoUrl || user?.photoUrl || '')
+  const [isProcessingLogo, setIsProcessingLogo] = useState<boolean>(false)
+  const [logoError, setLogoError] = useState<string>('')
+
   const [notification, setNotification] = useState<string>('')
   const [showResetModal, setShowResetModal] = useState<boolean>(false)
+
+  // Subir y optimizar foto o logotipo del bar
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setLogoError('')
+    setIsProcessingLogo(true)
+    try {
+      const optimized = await processImageFile(file, 400, 400, 0.85)
+      setLogoUrl(optimized)
+      updateBarLogo(optimized)
+      updateUserPhoto(optimized)
+      setNotification('¡Logotipo del bar guardado y sincronizado con éxito!')
+      setTimeout(() => setNotification(''), 4000)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al procesar la imagen'
+      setLogoError(msg)
+    } finally {
+      setIsProcessingLogo(false)
+    }
+  }
+
+  // Quitar foto del bar
+  const handleRemoveLogo = () => {
+    setLogoUrl('')
+    updateBarLogo('')
+    updateUserPhoto('')
+    setNotification('Foto del bar eliminada. Se restableció el icono por defecto.')
+    setTimeout(() => setNotification(''), 4000)
+  }
 
   // Guardar configuración general
   const handleSaveSettings = (e: React.FormEvent) => {
@@ -59,6 +102,7 @@ export default function ConfiguracionPage() {
       footerText: footerText.trim(),
       tipPercentage,
       taxPercentage,
+      logoUrl,
     })
 
     const data = loadBarData()
@@ -105,6 +149,91 @@ export default function ConfiguracionPage() {
 
       <form onSubmit={handleSaveSettings} className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Identidad Visual & Logotipo del Bar */}
+          <div className="rock-card p-6 rounded-2xl space-y-4 lg:col-span-2">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center space-x-3">
+                <Camera className="w-5 h-5 text-amber-500" />
+                <div>
+                  <h3 className="font-bold text-white text-base">Identidad Visual & Logotipo del Bar</h3>
+                  <p className="text-xs text-zinc-400">Esta foto se muestra en la cabecera, perfil de usuario y barra lateral</p>
+                </div>
+              </div>
+              <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full font-semibold">
+                WebP Ultra Ligero
+              </span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-6 p-4 bg-zinc-900/50 rounded-2xl border border-zinc-800/80">
+              <div className="relative group shrink-0">
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt="Logo del Bar"
+                    className="w-24 h-24 rounded-2xl object-cover border-2 border-amber-500/40 shadow-xl shadow-amber-950/40"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-2xl bg-gradient-to-tr from-red-600 to-amber-600 flex items-center justify-center text-3xl font-black text-white shadow-xl shadow-red-950/40 border border-zinc-700">
+                    🎸
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  title="Cambiar foto del bar"
+                  className="absolute inset-0 bg-black/60 rounded-2xl opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-xs font-semibold transition-opacity cursor-pointer"
+                >
+                  <Camera className="w-6 h-6 mb-1 text-amber-400" />
+                  <span>Cambiar</span>
+                </button>
+              </div>
+
+              <div className="space-y-3 flex-1 text-center sm:text-left">
+                <div>
+                  <h4 className="text-sm font-bold text-white">Foto o Logotipo de tu Establecimiento</h4>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Sube una foto desde tu computador o celular. Se escala y comprime automáticamente para guardarse sin demoras en la nube y sincronizarse en todos tus dispositivos.
+                  </p>
+                </div>
+
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                />
+
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    disabled={isProcessingLogo}
+                    className="flex items-center space-x-2 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl border border-zinc-700 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <Upload className="w-4 h-4 text-amber-400" />
+                    <span>{isProcessingLogo ? 'Procesando imagen...' : 'Subir Imagen desde el Dispositivo'}</span>
+                  </button>
+
+                  {logoUrl && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveLogo}
+                      className="flex items-center space-x-1.5 text-xs text-red-400 hover:text-red-300 bg-red-950/20 hover:bg-red-950/40 border border-red-900/40 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Quitar Foto</span>
+                    </button>
+                  )}
+                </div>
+
+                {logoError && (
+                  <p className="text-xs text-red-400 font-medium">{logoError}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Información del Negocio */}
           <div className="rock-card p-6 rounded-2xl space-y-4">
             <div className="flex items-center space-x-3 pb-3 border-b border-zinc-800">

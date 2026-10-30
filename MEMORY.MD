@@ -307,3 +307,10 @@ npm install -D <pkg> # Instalar devDependency
      - **Sincronización de personal (`bar_team_members`):** Los empleados creados o eliminados en `/usuarios` se sincronizan en la nube y quedan disponibles de inmediato en todos los portátiles del bar.
      - **Sincronización de operativa (`bar_data`):** Mesas, ventas, caja y productos se guardan de forma centralizada en Supabase asociadas al `business_id` del bar.
      - **Migración SQL versionada:** Creado `supabase/migrations/002_multi_device_sync.sql` con definición de tablas y políticas RLS para acceso seguro.
+   11. **Carga y Visualización de Foto o Logotipo del Bar en Perfil y Establecimiento:**
+      - **Compresión ultraligera del lado del cliente (`imageUtils.ts`):** Procesamiento de imágenes mediante HTML5 Canvas que convierte cualquier imagen subida (PNG, JPEG, WebP) a WebP de máximo 400x400 píxeles con calidad 0.85 (~15KB-30KB), evitando desbordamiento de cuota en `localStorage` y garantizando carga instantánea.
+      - **Modal interactivo de subida (`PhotoUploadModal.tsx`):** Accesible con 1 clic directamente sobre la insignia de perfil en la cabecera superior (con icono de cámara sutil). Permite previsualizar en vivo, subir desde la computadora/celular, guardar y quitar la foto.
+      - **Visualización en perfil y cabecera (`layout.tsx`):** Sustituye las iniciales de texto por la foto del bar con borde y sombras elegantes en la insignia de perfil del usuario activo (ej. Jesús Arias • Propietario).
+      - **Integración en Barra Lateral (`Sidebar.tsx`):** Se muestra en el encabezado de marca del bar (reemplazando el icono genérico de guitarra) y en la tarjeta de sesión de usuario en la parte inferior.
+      - **Gestión en Configuración del Establecimiento (`/configuracion`):** Tarjeta dedicada "Identidad Visual & Logotipo del Bar" con vista previa ampliada de 96x96 px, botón de subida directa, opción para quitar la foto y retroalimentación reactiva.
+      - **Sincronización:** Se persiste tanto en `AuthUser.photoUrl` como en `BarSettings.logoUrl`, sincronizándose en la nube vía Supabase.

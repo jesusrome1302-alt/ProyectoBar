@@ -58,9 +58,17 @@ export default function Sidebar() {
       <div>
         {/* Logo / Cabecera Personalizada del Bar */}
         <Link href="/" className="p-6 border-b border-zinc-800 flex items-center space-x-3 block hover:bg-zinc-900/40 transition-colors">
-          <div className="bg-red-600 p-2.5 rounded-xl text-white font-black text-xl tracking-wider shadow-lg shadow-red-900/50 flex items-center justify-center shrink-0">
-            🎸
-          </div>
+          {barData.settings?.logoUrl ? (
+            <img
+              src={barData.settings.logoUrl}
+              alt="Logo Bar"
+              className="w-10 h-10 rounded-xl object-cover border border-amber-500/40 shadow-lg shadow-red-900/30 shrink-0"
+            />
+          ) : (
+            <div className="bg-red-600 p-2.5 rounded-xl text-white font-black text-xl tracking-wider shadow-lg shadow-red-900/50 flex items-center justify-center shrink-0">
+              🎸
+            </div>
+          )}
           <div className="truncate">
             <h1 className="font-bold text-base text-white tracking-wide truncate">{barDisplayName}</h1>
             <p className="text-[10px] text-amber-500 font-semibold uppercase tracking-wider">Sistema POS & Bar</p>
@@ -106,9 +114,17 @@ export default function Sidebar() {
       <div className="p-4 border-t border-zinc-800 space-y-2">
         <div className="bg-zinc-900/80 p-3 rounded-2xl border border-zinc-800/80 flex items-center justify-between">
           <div className="flex items-center space-x-2.5 truncate">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-red-600 to-amber-600 flex items-center justify-center text-xs font-black text-white shrink-0">
-              {user?.avatar || 'PR'}
-            </div>
+            {user?.photoUrl || barData.settings?.logoUrl ? (
+              <img
+                src={user?.photoUrl || barData.settings?.logoUrl}
+                alt="Avatar"
+                className="w-8 h-8 rounded-lg object-cover border border-amber-500/40 shrink-0"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-red-600 to-amber-600 flex items-center justify-center text-xs font-black text-white shrink-0">
+                {user?.avatar || 'PR'}
+              </div>
+            )}
             <div className="truncate">
               <p className="text-xs font-bold text-zinc-200 truncate">{user?.name || 'Usuario'}</p>
               <p className="text-[10px] text-zinc-400 truncate">{user?.roleTitle || 'Personal'}</p>

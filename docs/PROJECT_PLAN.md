@@ -13,12 +13,13 @@ Este documento detalla el plan de desarrollo incremental, los módulos del siste
 - **ETAPA 7:** Inventario, compras, proveedores y ajustes de existencias. *(Completada)*
 - **ETAPA 8:** Reportes, filtros, sistema de login, control de acceso por roles (owner, admin, staff), portal de registro SaaS multinegocio e inicialización de cuentas 100% en CERO (0). *(Completada)*
 - **ETAPA 9:** Sincronización multi-dispositivo en la nube con Supabase, prevención de correos duplicados, migración SQL 002 y despliegue en Vercel. *(En progreso - Conectado a Supabase)*
+- **ETAPA 10:** Identidad visual del bar: Carga y compresión de fotos/logos en WebP, visualización en insignia de perfil, cabecera superior, barra lateral y módulo de configuración. *(Completada)*
 
 ## 2. Decisiones Pendientes (Registro)
 | Decisión | Estado |
 | :--- | :--- |
-| Nombre comercial del bar | Pendiente |
-| Nombre y estilo visual de la aplicación | Pendiente |
+| Nombre comercial del bar | Resuelto (Personalizable en registro y configuración) |
+| Nombre y estilo visual de la aplicación | Resuelto (Personalización de foto, logotipo y nombre comercial en perfil y sidebar) |
 | Número exacto de mesas y nombres | Resuelto (Mesas y cuentas dinámicas personalizadas con nombre de cliente y sub-cuentas separadas) |
 | Catálogo inicial y precios reales | Pendiente |
 | Métodos de pago que utiliza el negocio | Pendiente |

@@ -138,6 +138,7 @@ export interface BarSettings {
   footerText: string
   tipPercentage: number
   taxPercentage: number
+  logoUrl?: string
 }
 
 export interface ProductState {
@@ -705,6 +706,16 @@ export function openTableWithCustomer(id: number, customerName?: string, notes?:
 export function updateBarSettings(newSettings: Partial<BarSettings>): void {
   const data = loadBarData()
   data.settings = { ...(data.settings || DEFAULT_SETTINGS), ...newSettings }
+  saveBarData(data)
+}
+
+// Actualizar logotipo / foto del bar
+export function updateBarLogo(logoUrl: string): void {
+  const data = loadBarData()
+  data.settings = {
+    ...(data.settings || DEFAULT_SETTINGS),
+    logoUrl,
+  }
   saveBarData(data)
 }
 
