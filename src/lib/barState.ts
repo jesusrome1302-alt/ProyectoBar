@@ -499,19 +499,21 @@ export function loadBarData(): BarData {
             pending: 0,
           }
         }
-        // Consolidar cualquier ítem con productId repetido para evitar claves duplicadas en React
+        // Consolidar ítems que tengan tanto el mismo productId como el mismo unitPrice
+        // (permitiendo que coexistan en la misma mesa las unidades con descuento y las unidades a precio normal)
         const mergedMap = new Map<string, OrderItemState>()
         for (const it of t.items || []) {
-          const existing = mergedMap.get(it.productId)
+          const itemKey = `${it.productId}__${it.unitPrice}`
+          const existing = mergedMap.get(itemKey)
           if (existing) {
             const newQty = existing.quantity + it.quantity
-            mergedMap.set(it.productId, {
+            mergedMap.set(itemKey, {
               ...existing,
               quantity: newQty,
               subtotal: newQty * existing.unitPrice,
             })
           } else {
-            mergedMap.set(it.productId, {
+            mergedMap.set(itemKey, {
               ...it,
               subtotal: it.quantity * it.unitPrice,
             })
@@ -1095,10 +1097,13 @@ export function applyManualDiscountToTable(
   data.tables = data.tables.map((t) => {
     if (t.id !== tableId) return t
 
-    const updatedItems = (t.items || []).map((it) => {
-      if (targetProductId && it.productId !== targetProductId) return it
+    const rawUpdated = (t.items || []).map((it) => {
+      const itemKey = `${it.productId}__${it.unitPrice}`
+      if (targetProductId && it.productId !== targetProductId && itemKey !== targetProductId) {
+        return it
+      }
 
-      // Buscar el precio base original del catálogo para no descontar dos veces sobre un precio ya rebajado
+      // Buscar el precio base original del catálogo para calcular el descuento
       const catalogProduct = (data.products || []).find((p) => p.id === it.productId)
       const basePrice = catalogProduct ? catalogProduct.price : it.unitPrice
 
@@ -1111,12 +1116,34 @@ export function applyManualDiscountToTable(
         newUnitPrice = Math.max(0, basePrice - discountValue)
       }
 
+      const baseName = catalogProduct ? catalogProduct.name : it.name.replace(/\s*\(Desc\.\)|\s*\(Promo\)/g, '')
+      const discountedName = newUnitPrice < basePrice ? `${baseName} (Desc.)` : baseName
+
       return {
         ...it,
+        name: discountedName,
         unitPrice: newUnitPrice,
         subtotal: newUnitPrice * it.quantity,
       }
     })
+
+    // Consolidar si dos filas quedaron al mismo precio tras el descuento
+    const mergedMap = new Map<string, OrderItemState>()
+    for (const it of rawUpdated) {
+      const key = `${it.productId}__${it.unitPrice}`
+      const existing = mergedMap.get(key)
+      if (existing) {
+        const newQty = existing.quantity + it.quantity
+        mergedMap.set(key, {
+          ...existing,
+          quantity: newQty,
+          subtotal: newQty * existing.unitPrice,
+        })
+      } else {
+        mergedMap.set(key, it)
+      }
+    }
+    const updatedItems = Array.from(mergedMap.values())
 
     const totalAmount = updatedItems.reduce((acc, it) => acc + it.subtotal, 0)
     const paid = t.paid || 0
@@ -1134,7 +1161,7 @@ export function applyManualDiscountToTable(
   saveBarData(data)
 }
 
-// Agregar producto a una mesa
+// Agregar producto a una mesa (si ya había unidades con descuento a otro precio, agrega una fila nueva al precio actual)
 export function addItemToTable(tableId: number, product: ProductState, quantity: number = 1): void {
   const data = loadBarData()
   const timeNow = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
@@ -1143,20 +1170,18 @@ export function addItemToTable(tableId: number, product: ProductState, quantity:
   data.tables = data.tables.map((t) => {
     if (t.id === tableId) {
       const currentItems = [...(t.items || [])]
-      const existingIdx = currentItems.findIndex((it) => it.productId === product.id)
+      // Busca únicamente una fila que tenga el MISMO producto Y el MISMO precio unitario actual
+      const existingIdx = currentItems.findIndex(
+        (it) => it.productId === product.id && it.unitPrice === finalPrice
+      )
 
       if (existingIdx >= 0) {
         const item = currentItems[existingIdx]
         const newQty = item.quantity + quantity
-        // Si el ítem en la mesa ya tenía un descuento aplicado (ej. $7.500 < $9.000), conservar su precio con descuento
-        const effectiveUnitPrice =
-          item.unitPrice > 0 && item.unitPrice < finalPrice ? item.unitPrice : finalPrice
         currentItems[existingIdx] = {
           ...item,
-          name: appliedPromo ? `${product.name} (Promo)` : item.name,
-          unitPrice: effectiveUnitPrice,
           quantity: newQty,
-          subtotal: newQty * effectiveUnitPrice,
+          subtotal: newQty * item.unitPrice,
         }
       } else {
         currentItems.push({
@@ -1212,15 +1237,22 @@ export function addItemToTable(tableId: number, product: ProductState, quantity:
   saveBarData(data)
 }
 
-// Cambiar cantidad de un producto en la mesa
-export function updateTableItemQty(tableId: number, productId: string, delta: number): void {
+// Cambiar cantidad de un producto en la mesa (identificando también su precio unitario para no afectar otra fila del mismo producto)
+export function updateTableItemQty(
+  tableId: number,
+  productId: string,
+  delta: number,
+  unitPrice?: number
+): void {
   const data = loadBarData()
 
   data.tables = data.tables.map((t) => {
     if (t.id === tableId) {
       const updatedItems: OrderItemState[] = []
       for (const it of t.items || []) {
-        if (it.productId === productId) {
+        const matches =
+          it.productId === productId && (unitPrice === undefined || it.unitPrice === unitPrice)
+        if (matches) {
           const newQty = it.quantity + delta
           if (newQty > 0) {
             updatedItems.push({
@@ -1289,17 +1321,23 @@ export function updateTableItemQty(tableId: number, productId: string, delta: nu
   saveBarData(data)
 }
 
-// Eliminar un producto específico de la mesa
-export function removeTableItem(tableId: number, productId: string): void {
+// Eliminar una fila específica de producto de la mesa (diferenciando por unitPrice si hay con descuento y sin descuento)
+export function removeTableItem(
+  tableId: number,
+  productId: string,
+  unitPrice?: number
+): void {
   const data = loadBarData()
   let qtyToReturn = 0
 
   data.tables = data.tables.map((t) => {
     if (t.id === tableId) {
-      const found = (t.items || []).find((it) => it.productId === productId)
+      const matches = (it: OrderItemState) =>
+        it.productId === productId && (unitPrice === undefined || it.unitPrice === unitPrice)
+      const found = (t.items || []).find(matches)
       if (found) qtyToReturn = found.quantity
 
-      const filtered = (t.items || []).filter((it) => it.productId !== productId)
+      const filtered = (t.items || []).filter((it) => !matches(it))
       const totalAmount = filtered.reduce((acc, it) => acc + it.subtotal, 0)
       const paid = t.paid || 0
       const pending = Math.max(0, totalAmount - paid)

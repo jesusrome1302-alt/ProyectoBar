@@ -169,29 +169,23 @@ export default function VentasPage() {
     }
 
     const { finalPrice, appliedPromo } = getEffectiveProductPrice(prod, promotions)
-    const existingItem = currentOrder.find((it) => it.productId === prod.id)
-    const effectiveAddedPrice =
-      existingItem && existingItem.unitPrice > 0 && existingItem.unitPrice < finalPrice
-        ? existingItem.unitPrice
-        : finalPrice
-
     addItemToTable(selectedTableId, prod, 1)
     setNotification(
-      appliedPromo || effectiveAddedPrice < prod.price
-        ? `🍺 ¡"${prod.name}" agregado ($ ${effectiveAddedPrice.toLocaleString('es-CO')}) a ${currentTableObj?.name || 'Mesa'}!`
-        : `¡"${prod.name}" agregado a ${currentTableObj?.name || 'Mesa'}!`
+      appliedPromo
+        ? `🍺 ¡"${prod.name}" agregado con promo ($ ${finalPrice.toLocaleString('es-CO')}) a ${currentTableObj?.name || 'Mesa'}!`
+        : `¡"${prod.name}" ($ ${finalPrice.toLocaleString('es-CO')}) agregado a ${currentTableObj?.name || 'Mesa'}!`
     )
     setTimeout(() => setNotification(''), 3000)
   }
 
-  // Modificar cantidad en la comanda (+ o -)
-  const handleUpdateQty = (productId: string, delta: number) => {
-    updateTableItemQty(selectedTableId, productId, delta)
+  // Modificar cantidad en la comanda (+ o -) en la fila específica (con o sin descuento)
+  const handleUpdateQty = (productId: string, delta: number, unitPrice?: number) => {
+    updateTableItemQty(selectedTableId, productId, delta, unitPrice)
   }
 
-  // Eliminar un producto individual de la orden
-  const handleRemoveItem = (productId: string, productName: string) => {
-    removeTableItem(selectedTableId, productId)
+  // Eliminar una fila específica de la orden
+  const handleRemoveItem = (productId: string, productName: string, unitPrice?: number) => {
+    removeTableItem(selectedTableId, productId, unitPrice)
     setNotification(`"${productName}" retirado de la comanda.`)
     setTimeout(() => setNotification(''), 3000)
   }
@@ -615,7 +609,7 @@ export default function VentasPage() {
             >
               {currentOrder.map((it: OrderItemState, idx: number) => (
                 <div
-                  key={`${selectedTableId}-${it.productId}-${idx}`}
+                  key={`${selectedTableId}-${it.productId}-${it.unitPrice}-${idx}`}
                   className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800/80 flex items-center justify-between text-xs transition-all hover:border-zinc-700"
                 >
                   <div className="space-y-0.5 flex-1 pr-2">
@@ -630,7 +624,7 @@ export default function VentasPage() {
                     <div className="flex items-center space-x-1 bg-zinc-900 border border-zinc-800 rounded-lg p-0.5">
                       <button
                         type="button"
-                        onClick={() => handleUpdateQty(it.productId, -1)}
+                        onClick={() => handleUpdateQty(it.productId, -1, it.unitPrice)}
                         className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white cursor-pointer"
                         title="Restar 1 unidad"
                       >
@@ -639,7 +633,7 @@ export default function VentasPage() {
                       <span className="font-mono font-bold text-white text-xs px-1.5">{it.quantity}</span>
                       <button
                         type="button"
-                        onClick={() => handleUpdateQty(it.productId, 1)}
+                        onClick={() => handleUpdateQty(it.productId, 1, it.unitPrice)}
                         className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white cursor-pointer"
                         title="Sumar 1 unidad"
                       >
@@ -654,7 +648,7 @@ export default function VentasPage() {
                     {/* Botón Eliminar Ítem Individual */}
                     <button
                       type="button"
-                      onClick={() => handleRemoveItem(it.productId, it.name)}
+                      onClick={() => handleRemoveItem(it.productId, it.name, it.unitPrice)}
                       className="p-1 text-zinc-500 hover:text-red-400 hover:bg-zinc-900 rounded transition-colors cursor-pointer"
                       title="Eliminar de la comanda"
                     >
@@ -1205,8 +1199,8 @@ export default function VentasPage() {
                         className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white"
                       >
                         <option value="">A todos los productos de la comanda ({currentOrder.length} ítems)</option>
-                        {currentOrder.map((it) => (
-                          <option key={it.productId} value={it.productId}>
+                        {currentOrder.map((it, idx) => (
+                          <option key={`${it.productId}-${it.unitPrice}-${idx}`} value={`${it.productId}__${it.unitPrice}`}>
                             Solo a: {it.name} ({it.quantity} x {formatCOP(it.unitPrice)})
                           </option>
                         ))}
