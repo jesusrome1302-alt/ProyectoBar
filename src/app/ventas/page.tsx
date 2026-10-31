@@ -14,6 +14,10 @@ import {
   Edit2,
   X,
   UtensilsCrossed,
+  Tag,
+  Clock,
+  Zap,
+  Power,
 } from 'lucide-react'
 import Link from 'next/link'
 import {
@@ -25,14 +29,32 @@ import {
   setActiveTableId,
   addTable,
   updateTable,
+  getEffectiveProductPrice,
+  isPromotionActiveNow,
+  addPromotionRule,
+  togglePromotionRule,
+  toggleForcePromotionNow,
+  deletePromotionRule,
+  applyManualDiscountToTable,
   TableState,
   OrderItemState,
   ProductState,
 } from '@/lib/barState'
 
+const DAYS_LIST = [
+  { id: 1, label: 'Lun' },
+  { id: 2, label: 'Mar' },
+  { id: 3, label: 'Mié' },
+  { id: 4, label: 'Jue' },
+  { id: 5, label: 'Vie' },
+  { id: 6, label: 'Sáb' },
+  { id: 0, label: 'Dom' },
+]
+
 export default function VentasPage() {
   const barData = useBarStore()
   const tables = barData.tables || []
+  const promotions = barData.promotions || []
   const selectedTableId = barData.activeTableId || 1
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [activeCategory, setActiveCategory] = useState<string>('all')
@@ -41,6 +63,7 @@ export default function VentasPage() {
   // Modales en el POS
   const [showNewTableModal, setShowNewTableModal] = useState<boolean>(false)
   const [showEditCustomerModal, setShowEditCustomerModal] = useState<boolean>(false)
+  const [showDiscountsModal, setShowDiscountsModal] = useState<boolean>(false)
 
   // Formulario Nueva Mesa/Cuenta rápida
   const [quickTableName, setQuickTableName] = useState<string>('')
@@ -48,6 +71,22 @@ export default function VentasPage() {
 
   // Formulario Editar Cliente de la Comanda
   const [editCustomerVal, setEditCustomerVal] = useState<string>('')
+
+  // Estado del Modal de Descuentos (Pestaña: 'auto' | 'manual')
+  const [discountTab, setDiscountTab] = useState<'auto' | 'manual'>('auto')
+  const [promoName, setPromoName] = useState<string>('Cervezas más económicas hasta las 10 PM')
+  const [promoCategory, setPromoCategory] = useState<string>('Cervezas')
+  const [promoProductId, setPromoProductId] = useState<string>('')
+  const [promoDiscountType, setPromoDiscountType] = useState<'fixed_off' | 'percentage' | 'fixed_price'>('fixed_off')
+  const [promoDiscountValue, setPromoDiscountValue] = useState<number>(2000)
+  const [promoDays, setPromoDays] = useState<number[]>([4, 5, 6]) // Jue, Vie, Sáb por defecto
+  const [promoStartTime, setPromoStartTime] = useState<string>('16:00')
+  const [promoEndTime, setPromoEndTime] = useState<string>('22:00') // 10:00 PM
+
+  // Estado Descuento Manual a la Comanda
+  const [manualType, setManualType] = useState<'percentage' | 'fixed_off'>('percentage')
+  const [manualValue, setManualValue] = useState<number>(10)
+  const [manualTargetProd, setManualTargetProd] = useState<string>('')
 
   const categories = [
     { id: 'all', name: 'Todos' },
@@ -60,6 +99,57 @@ export default function VentasPage() {
 
   const currentTableObj = tables.find((t) => t.id === selectedTableId) || tables[0]
   const currentOrder: OrderItemState[] = currentTableObj ? currentTableObj.items : []
+
+  const activePromosNow = promotions.filter((pr) => isPromotionActiveNow(pr))
+
+  // Alternar día en el formulario de promo automática
+  const handleToggleDay = (dayId: number) => {
+    setPromoDays((prev) =>
+      prev.includes(dayId) ? prev.filter((d) => d !== dayId) : [...prev, dayId]
+    )
+  }
+
+  // Crear nueva promoción automática (ej. Cervezas hasta las 10 PM)
+  const handleCreatePromo = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!promoName.trim() || promoDiscountValue <= 0) return
+
+    addPromotionRule({
+      name: promoName.trim(),
+      category: promoCategory,
+      productId: promoProductId || undefined,
+      discountType: promoDiscountType,
+      discountValue: Number(promoDiscountValue),
+      daysOfWeek: promoDays,
+      startTime: promoStartTime || '00:00',
+      endTime: promoEndTime || '22:00',
+      active: true,
+    })
+
+    setNotification(`¡Descuento automático "${promoName.trim()}" guardado y activado!`)
+    setTimeout(() => setNotification(''), 4000)
+  }
+
+  // Aplicar descuento manual a la comanda actual
+  const handleApplyManualDiscount = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!currentTableObj || currentOrder.length === 0 || manualValue <= 0) return
+
+    applyManualDiscountToTable(
+      currentTableObj.id,
+      manualType,
+      Number(manualValue),
+      manualTargetProd || undefined
+    )
+
+    setShowDiscountsModal(false)
+    setNotification(
+      `¡Descuento de ${
+        manualType === 'percentage' ? `${manualValue}%` : `$ ${manualValue.toLocaleString('es-CO')}`
+      } aplicado a ${currentTableObj.name}!`
+    )
+    setTimeout(() => setNotification(''), 4000)
+  }
 
   // Agregar producto a la mesa activa
   const handleAddProduct = (prod: ProductState) => {
@@ -74,8 +164,13 @@ export default function VentasPage() {
       return
     }
 
+    const { finalPrice, appliedPromo } = getEffectiveProductPrice(prod, promotions)
     addItemToTable(selectedTableId, prod, 1)
-    setNotification(`¡"${prod.name}" agregado a ${currentTableObj?.name || 'Mesa'}!`)
+    setNotification(
+      appliedPromo
+        ? `🍺 ¡"${prod.name}" agregado con promo ($ ${finalPrice.toLocaleString('es-CO')}) a ${currentTableObj?.name || 'Mesa'}!`
+        : `¡"${prod.name}" agregado a ${currentTableObj?.name || 'Mesa'}!`
+    )
     setTimeout(() => setNotification(''), 3000)
   }
 
@@ -169,14 +264,60 @@ export default function VentasPage() {
           </p>
         </div>
 
-        {/* Notificación Toast reactiva */}
-        {notification && (
-          <div className="p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center space-x-1.5 animate-fadeIn">
-            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>{notification}</span>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Botón de Descuentos y Happy Hour Automático */}
+          <button
+            type="button"
+            onClick={() => {
+              setDiscountTab('auto')
+              setShowDiscountsModal(true)
+            }}
+            className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center space-x-2 border transition-all cursor-pointer active:scale-95 ${
+              activePromosNow.length > 0
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-lg shadow-emerald-950/50'
+                : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/40'
+            }`}
+          >
+            <Tag className="w-4 h-4" />
+            <span>
+              {activePromosNow.length > 0
+                ? `🍺 Descuento Activo (${activePromosNow.length})`
+                : 'Descuentos / Happy Hour'}
+            </span>
+          </button>
+
+          {/* Notificación Toast reactiva */}
+          {notification && (
+            <div className="p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center space-x-1.5 animate-fadeIn">
+              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{notification}</span>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Banner en vivo cuando hay un descuento automático activo (ej. Cervezas hasta las 10 PM) */}
+      {activePromosNow.length > 0 && (
+        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center space-x-2 text-emerald-300">
+            <Zap className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>
+              <strong>Promoción Automática Activa:</strong>{' '}
+              {activePromosNow.map((p) => `${p.name} (hasta ${p.endTime})`).join(' • ')}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setDiscountTab('auto')
+              setShowDiscountsModal(true)
+            }}
+            className="text-emerald-400 hover:text-white font-bold underline cursor-pointer"
+          >
+            Configurar →
+          </button>
+        </div>
+      )}
 
       {/* Selector de Mesas y Cuentas Activas */}
       <div className="space-y-2">
@@ -288,6 +429,8 @@ export default function VentasPage() {
               const isOutOfStock = p.stock <= 0
               const isInactive = p.active === false
               const isDisabled = isOutOfStock || isInactive
+              const { finalPrice, originalPrice, appliedPromo } = getEffectiveProductPrice(p, promotions)
+              const hasPromo = Boolean(appliedPromo && finalPrice < originalPrice)
 
               return (
                 <div
@@ -295,6 +438,8 @@ export default function VentasPage() {
                   className={`rock-card p-3.5 rounded-xl flex flex-col justify-between min-h-[156px] relative transition-all group ${
                     isDisabled
                       ? 'opacity-60 border-zinc-800/50'
+                      : hasPromo
+                      ? 'border-emerald-500/50 hover:border-emerald-400 hover:bg-zinc-900/90'
                       : 'hover:border-red-600 hover:bg-zinc-900/90'
                   }`}
                 >
@@ -338,7 +483,17 @@ export default function VentasPage() {
 
                   <div className="pt-2 border-t border-zinc-800/80">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-black text-white">{formatCOP(p.price)}</span>
+                      {hasPromo ? (
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-xs font-black text-emerald-400">{formatCOP(finalPrice)}</span>
+                          <span className="text-[10px] text-zinc-500 line-through">{formatCOP(originalPrice)}</span>
+                          <span className="text-[9px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                            PROMO
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs font-black text-white">{formatCOP(p.price)}</span>
+                      )}
                     </div>
 
                     <button
@@ -498,7 +653,22 @@ export default function VentasPage() {
           <div className="space-y-2 pt-3 border-t border-zinc-800">
             <div className="flex items-center justify-between text-xs text-zinc-400">
               <span>Unidades en Comanda ({totalItemsCount})</span>
-              <span>{formatCOP(totalAmount)}</span>
+              <div className="flex items-center space-x-2">
+                {currentOrder.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDiscountTab('manual')
+                      setShowDiscountsModal(true)
+                    }}
+                    className="text-[11px] font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-lg flex items-center space-x-1 cursor-pointer"
+                  >
+                    <Tag className="w-3 h-3" />
+                    <span>Aplicar Descuento</span>
+                  </button>
+                )}
+                <span>{formatCOP(totalAmount)}</span>
+              </div>
             </div>
             <div className="flex items-center justify-between text-base font-black text-white pt-2 border-t border-zinc-800/80">
               <span>Total a Cobrar</span>
@@ -677,6 +847,438 @@ export default function VentasPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: DESCUENTOS AUTOMÁTICOS (HAPPY HOUR HASTA 10 PM) Y DESCUENTO MANUAL */}
+      {/* ========================================================================= */}
+      {showDiscountsModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="rock-card w-full max-w-xl p-6 rounded-3xl border border-amber-500/40 shadow-2xl relative space-y-5 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400">
+                  <Tag className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-white text-lg">Descuentos & Promociones</h3>
+                  <p className="text-xs text-zinc-400">
+                    Programa cervezas más económicas ciertos días hasta las 10:00 PM o aplica un descuento directo
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDiscountsModal(false)}
+                className="text-zinc-500 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Pestañas: Automático (Días y Hora) vs Manual (Mesa Actual) */}
+            <div className="grid grid-cols-2 gap-2 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setDiscountTab('auto')}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  discountTab === 'auto'
+                    ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                🍺 Descuento Automático (Días / Hasta 10 PM)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDiscountTab('manual')}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  discountTab === 'manual'
+                    ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                🏷️ Descuento Manual a {currentTableObj?.name || 'Mesa'}
+              </button>
+            </div>
+
+            {discountTab === 'auto' ? (
+              <div className="space-y-4">
+                <form onSubmit={handleCreatePromo} className="space-y-3 bg-zinc-900/70 p-4 rounded-2xl border border-zinc-800">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-extrabold text-amber-400 uppercase tracking-wider">
+                      + Nueva Regla de Descuento Automático
+                    </h4>
+                    <span className="text-[11px] text-zinc-400 flex items-center space-x-1">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Se activa sola según día y hora</span>
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="sm:col-span-2">
+                      <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                        Nombre de la Promoción *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={promoName}
+                        onChange={(e) => setPromoName(e.target.value)}
+                        placeholder="Ej. Cervezas más económicas hasta las 10 PM"
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                        Categoría
+                      </label>
+                      <select
+                        value={promoCategory}
+                        onChange={(e) => {
+                          setPromoCategory(e.target.value)
+                          setPromoProductId('')
+                        }}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                      >
+                        <option value="Cervezas">🍺 Todas las Cervezas</option>
+                        <option value="Licores">🥃 Licores</option>
+                        <option value="Cócteles">🍸 Cócteles</option>
+                        <option value="Snacks">🍔 Snacks</option>
+                        <option value="Sin Alcohol">🥤 Sin Alcohol</option>
+                        <option value="all">🔥 Todo el Catálogo</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                        Producto Específico (Opcional)
+                      </label>
+                      <select
+                        value={promoProductId}
+                        onChange={(e) => setPromoProductId(e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                      >
+                        <option value="">Aplicar a toda la categoría ({promoCategory})</option>
+                        {productList
+                          .filter((p) => promoCategory === 'all' || p.category.toLowerCase() === promoCategory.toLowerCase())
+                          .map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({formatCOP(p.price)})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                        Tipo de Rebaja
+                      </label>
+                      <select
+                        value={promoDiscountType}
+                        onChange={(e) =>
+                          setPromoDiscountType(e.target.value as 'fixed_off' | 'percentage' | 'fixed_price')
+                        }
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                      >
+                        <option value="fixed_off">Rebajar valor en pesos ($ menos)</option>
+                        <option value="percentage">Porcentaje de descuento (%)</option>
+                        <option value="fixed_price">Dejar a precio fijo especial ($)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                        {promoDiscountType === 'percentage'
+                          ? 'Porcentaje (%) a descontar'
+                          : promoDiscountType === 'fixed_price'
+                          ? 'Precio fijo hasta las 10 PM ($)'
+                          : 'Pesos a descontar por unidad ($)'}
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        required
+                        value={promoDiscountValue}
+                        onChange={(e) => setPromoDiscountValue(Number(e.target.value))}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Selección de Días */}
+                  <div>
+                    <label className="text-[11px] font-semibold text-zinc-300 block mb-1.5">
+                      Días en que aplica el descuento:
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {DAYS_LIST.map((d) => {
+                        const selected = promoDays.includes(d.id)
+                        return (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() => handleToggleDay(d.id)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                              selected
+                                ? 'bg-amber-500 text-black border-amber-400'
+                                : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:text-white'
+                            }`}
+                          >
+                            {d.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Rango de Horas (Por defecto hasta las 22:00 / 10:00 PM) */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                        Hora de Inicio
+                      </label>
+                      <input
+                        type="time"
+                        value={promoStartTime}
+                        onChange={(e) => setPromoStartTime(e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                        Hora Límite (Ej. 22:00 = 10:00 PM)
+                      </label>
+                      <input
+                        type="time"
+                        value={promoEndTime}
+                        onChange={(e) => setPromoEndTime(e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 rounded-xl text-xs font-extrabold text-black bg-amber-400 hover:bg-amber-300 transition-colors cursor-pointer"
+                  >
+                    + Guardar y Activar Descuento Automático
+                  </button>
+                </form>
+
+                {/* Lista de Descuentos Programados */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                    Promociones Configuradas ({promotions.length})
+                  </h4>
+
+                  {promotions.length === 0 ? (
+                    <p className="text-xs text-zinc-500 bg-zinc-950/60 p-4 rounded-xl border border-zinc-800/80 text-center">
+                      No hay promociones automáticas creadas todavía. Usa el formulario de arriba para programar el descuento de cervezas hasta las 10:00 PM.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                      {promotions.map((pr) => {
+                        const isRunningNow = isPromotionActiveNow(pr)
+                        const dayNames = DAYS_LIST.filter((d) => pr.daysOfWeek.includes(d.id))
+                          .map((d) => d.label)
+                          .join(', ')
+
+                        return (
+                          <div
+                            key={pr.id}
+                            className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs ${
+                              isRunningNow
+                                ? 'bg-emerald-950/20 border-emerald-500/40'
+                                : 'bg-zinc-950/80 border-zinc-800'
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <span className="font-bold text-white">{pr.name}</span>
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    isRunningNow
+                                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                      : pr.active
+                                      ? 'bg-amber-500/15 text-amber-300'
+                                      : 'bg-zinc-800 text-zinc-500'
+                                  }`}
+                                >
+                                  {isRunningNow ? '🟢 Aplicando ahora' : pr.active ? '⏰ Programado' : 'Pausado'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-zinc-400 mt-0.5">
+                                {pr.category} •{' '}
+                                {pr.discountType === 'percentage'
+                                  ? `-${pr.discountValue}%`
+                                  : pr.discountType === 'fixed_price'
+                                  ? `Precio fijo ${formatCOP(pr.discountValue)}`
+                                  : `-${formatCOP(pr.discountValue)} por unidad`}{' '}
+                                • {dayNames || 'Todos los días'} ({pr.startTime} a {pr.endTime})
+                              </p>
+                            </div>
+
+                            <div className="flex items-center space-x-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => toggleForcePromotionNow(pr.id)}
+                                title="Forzar activación inmediata sin importar la hora actual"
+                                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border cursor-pointer transition-colors ${
+                                  pr.forceActiveNow
+                                    ? 'bg-emerald-500 text-black border-emerald-400'
+                                    : 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:border-emerald-500'
+                                }`}
+                              >
+                                <Zap className="w-3 h-3 inline mr-1" />
+                                {pr.forceActiveNow ? 'Forzado ON' : 'Activar Ya'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => togglePromotionRule(pr.id)}
+                                title={pr.active ? 'Pausar regla' : 'Habilitar regla'}
+                                className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 cursor-pointer"
+                              >
+                                <Power className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deletePromotionRule(pr.id)}
+                                title="Eliminar promoción"
+                                className="p-1.5 rounded-lg bg-zinc-900 hover:bg-red-950/50 text-zinc-400 hover:text-red-400 border border-zinc-800 cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Pestaña Descuento Manual a la Mesa Actual */
+              <form onSubmit={handleApplyManualDiscount} className="space-y-4 bg-zinc-900/70 p-4 rounded-2xl border border-zinc-800">
+                <div>
+                  <h4 className="text-xs font-extrabold text-amber-400 uppercase tracking-wider mb-1">
+                    Aplicar Descuento Inmediato a {currentTableObj?.name || 'Mesa Actual'}
+                  </h4>
+                  <p className="text-[11px] text-zinc-400">
+                    Rebaja los precios de los productos que ya están cargados en la comanda actual.
+                  </p>
+                </div>
+
+                {currentOrder.length === 0 ? (
+                  <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl">
+                    La comanda de {currentTableObj?.name || 'esta mesa'} está vacía. Primero agrega productos a la mesa para aplicar un descuento manual, o usa la pestaña de <strong>Descuento Automático</strong>.
+                  </p>
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                        ¿A qué ítems de la mesa aplicar?
+                      </label>
+                      <select
+                        value={manualTargetProd}
+                        onChange={(e) => setManualTargetProd(e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white"
+                      >
+                        <option value="">A todos los productos de la comanda ({currentOrder.length} ítems)</option>
+                        {currentOrder.map((it) => (
+                          <option key={it.productId} value={it.productId}>
+                            Solo a: {it.name} ({it.quantity} x {formatCOP(it.unitPrice)})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                          Tipo de Descuento
+                        </label>
+                        <select
+                          value={manualType}
+                          onChange={(e) => setManualType(e.target.value as 'percentage' | 'fixed_off')}
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white"
+                        >
+                          <option value="percentage">Porcentaje (%)</option>
+                          <option value="fixed_off">Valor por unidad ($)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                          {manualType === 'percentage' ? 'Porcentaje (%)' : 'Descuento por unidad ($)'}
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          required
+                          value={manualValue}
+                          onChange={(e) => setManualValue(Number(e.target.value))}
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Botones rápidos */}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManualType('percentage')
+                          setManualValue(10)
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 cursor-pointer"
+                      >
+                        -10%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManualType('percentage')
+                          setManualValue(15)
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 cursor-pointer"
+                      >
+                        -15%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManualType('fixed_off')
+                          setManualValue(1000)
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 cursor-pointer"
+                      >
+                        -$ 1.000 c/u
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManualType('fixed_off')
+                          setManualValue(2000)
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 cursor-pointer"
+                      >
+                        -$ 2.000 c/u
+                      </button>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 rounded-xl text-xs font-extrabold text-black bg-emerald-400 hover:bg-emerald-300 transition-colors cursor-pointer"
+                    >
+                      Aplicar Descuento a {currentTableObj?.name}
+                    </button>
+                  </>
+                )}
+              </form>
+            )}
           </div>
         </div>
       )}

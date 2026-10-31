@@ -159,6 +159,20 @@ export interface ProductState {
   description?: string
 }
 
+export interface PromotionRule {
+  id: string
+  name: string
+  category: string // 'Cervezas' | 'Licores' | 'Cócteles' | 'Snacks' | 'Sin Alcohol' | 'all'
+  productId?: string // Si se especifica, aplica solo a este producto; si no, a toda la categoría
+  discountType: 'percentage' | 'fixed_off' | 'fixed_price'
+  discountValue: number
+  daysOfWeek: number[] // 0 = Dom, 1 = Lun, ..., 6 = Sáb
+  startTime: string // '00:00'
+  endTime: string // '22:00' (10:00 PM)
+  active: boolean
+  forceActiveNow?: boolean // Permite activar/forzar manualmente fuera de horario con 1 clic
+}
+
 export interface BarData {
   operatorName: string
   activeTableId?: number
@@ -172,6 +186,7 @@ export interface BarData {
   inventoryMovements: InventoryMovementRecord[]
   closedSales?: SaleReceiptRecord[]
   settings?: BarSettings
+  promotions?: PromotionRule[]
 }
 
 export const DEFAULT_SETTINGS: BarSettings = {
@@ -919,15 +934,165 @@ export function setActiveTableId(id: number): void {
   saveBarData(data)
 }
 
+// Evaluar si una promoción está activa en este instante (por día + hora, o si tiene forceActiveNow)
+export function isPromotionActiveNow(promo: PromotionRule, now: Date = new Date()): boolean {
+  if (!promo.active) return false
+  if (promo.forceActiveNow) return true
+
+  const currentDay = now.getDay() // 0 = Dom ... 6 = Sáb
+  if (promo.daysOfWeek && promo.daysOfWeek.length > 0 && !promo.daysOfWeek.includes(currentDay)) {
+    return false
+  }
+
+  const hh = String(now.getHours()).padStart(2, '0')
+  const mm = String(now.getMinutes()).padStart(2, '0')
+  const currentTime = `${hh}:${mm}`
+
+  const start = promo.startTime || '00:00'
+  const end = promo.endTime || '22:00'
+
+  if (start <= end) {
+    return currentTime >= start && currentTime <= end
+  } else {
+    // Rango que cruza medianoche
+    return currentTime >= start || currentTime <= end
+  }
+}
+
+// Calcular el precio final de un producto considerando promociones / descuentos automáticos activos
+export function getEffectiveProductPrice(
+  product: ProductState,
+  promotions: PromotionRule[] = [],
+  now: Date = new Date()
+): { finalPrice: number; originalPrice: number; appliedPromo?: PromotionRule } {
+  const originalPrice = product.price
+  if (!promotions || promotions.length === 0) {
+    return { finalPrice: originalPrice, originalPrice }
+  }
+
+  let bestPrice = originalPrice
+  let bestPromo: PromotionRule | undefined
+
+  for (const promo of promotions) {
+    if (!isPromotionActiveNow(promo, now)) continue
+
+    const matchesProduct = promo.productId
+      ? promo.productId === product.id
+      : promo.category === 'all' || product.category.toLowerCase() === promo.category.toLowerCase()
+
+    if (!matchesProduct) continue
+
+    let candidatePrice = originalPrice
+    if (promo.discountType === 'percentage') {
+      candidatePrice = Math.round(originalPrice * (1 - Math.min(100, Math.max(0, promo.discountValue)) / 100))
+    } else if (promo.discountType === 'fixed_off') {
+      candidatePrice = Math.max(0, originalPrice - promo.discountValue)
+    } else if (promo.discountType === 'fixed_price') {
+      candidatePrice = Math.max(0, promo.discountValue)
+    }
+
+    if (candidatePrice < bestPrice) {
+      bestPrice = candidatePrice
+      bestPromo = promo
+    }
+  }
+
+  return {
+    finalPrice: bestPrice,
+    originalPrice,
+    appliedPromo: bestPromo,
+  }
+}
+
+export function addPromotionRule(rule: Omit<PromotionRule, 'id'>): PromotionRule {
+  const data = loadBarData()
+  const newRule: PromotionRule = {
+    ...rule,
+    id: 'promo-' + Date.now(),
+  }
+  data.promotions = [newRule, ...(data.promotions || [])]
+  saveBarData(data)
+  return newRule
+}
+
+export function togglePromotionRule(id: string): void {
+  const data = loadBarData()
+  data.promotions = (data.promotions || []).map((p) =>
+    p.id === id ? { ...p, active: !p.active } : p
+  )
+  saveBarData(data)
+}
+
+export function toggleForcePromotionNow(id: string): void {
+  const data = loadBarData()
+  data.promotions = (data.promotions || []).map((p) =>
+    p.id === id ? { ...p, active: true, forceActiveNow: !p.forceActiveNow } : p
+  )
+  saveBarData(data)
+}
+
+export function deletePromotionRule(id: string): void {
+  const data = loadBarData()
+  data.promotions = (data.promotions || []).filter((p) => p.id !== id)
+  saveBarData(data)
+}
+
+// Aplicar un descuento manual directo a los productos de una mesa (o a un producto específico)
+export function applyManualDiscountToTable(
+  tableId: number,
+  discountType: 'percentage' | 'fixed_off',
+  discountValue: number,
+  targetProductId?: string
+): void {
+  if (discountValue <= 0) return
+  const data = loadBarData()
+
+  data.tables = data.tables.map((t) => {
+    if (t.id !== tableId) return t
+
+    const updatedItems = (t.items || []).map((it) => {
+      if (targetProductId && it.productId !== targetProductId) return it
+
+      let newUnitPrice = it.unitPrice
+      if (discountType === 'percentage') {
+        newUnitPrice = Math.round(it.unitPrice * (1 - Math.min(100, discountValue) / 100))
+      } else {
+        newUnitPrice = Math.max(0, it.unitPrice - discountValue)
+      }
+
+      return {
+        ...it,
+        unitPrice: newUnitPrice,
+        subtotal: newUnitPrice * it.quantity,
+      }
+    })
+
+    const totalAmount = updatedItems.reduce((acc, it) => acc + it.subtotal, 0)
+    const paid = t.paid || 0
+    const pending = Math.max(0, totalAmount - paid)
+
+    return {
+      ...t,
+      items: updatedItems,
+      total: totalAmount,
+      paid,
+      pending,
+    }
+  })
+
+  saveBarData(data)
+}
+
 // Agregar producto a una mesa
 export function addItemToTable(tableId: number, product: ProductState, quantity: number = 1): void {
   const data = loadBarData()
   const timeNow = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  const { finalPrice, appliedPromo } = getEffectiveProductPrice(product, data.promotions || [])
 
   data.tables = data.tables.map((t) => {
     if (t.id === tableId) {
       const currentItems = [...(t.items || [])]
-      const existingIdx = currentItems.findIndex((it) => it.productId === product.id)
+      const existingIdx = currentItems.findIndex((it) => it.productId === product.id && it.unitPrice === finalPrice)
 
       if (existingIdx >= 0) {
         const item = currentItems[existingIdx]
@@ -940,10 +1105,10 @@ export function addItemToTable(tableId: number, product: ProductState, quantity:
       } else {
         currentItems.push({
           productId: product.id,
-          name: product.name,
+          name: appliedPromo ? `${product.name} (Promo)` : product.name,
           quantity,
-          unitPrice: product.price,
-          subtotal: quantity * product.price,
+          unitPrice: finalPrice,
+          subtotal: quantity * finalPrice,
         })
       }
 

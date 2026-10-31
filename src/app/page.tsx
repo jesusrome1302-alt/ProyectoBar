@@ -11,21 +11,22 @@ export default function DashboardPage() {
   const occupiedTables = tables.filter((t) => t.status === 'occupied')
   const occupiedCount = occupiedTables.length
 
+  const lowStockCount = (barData.products || []).filter((p) => p.active !== false && p.stock <= p.min_stock).length
   const formatCOP = (val: number) => '$ ' + val.toLocaleString('es-CO')
 
   const stats = [
     {
       name: 'Ventas en Turno',
       value: formatCOP(totalSales),
-      change: '+14% hoy',
+      change: totalSales > 0 ? 'Turno en curso' : '0% hoy',
       icon: DollarSign,
       color: 'text-amber-400',
       bg: 'bg-amber-500/10',
     },
     {
       name: 'Mesas Ocupadas',
-      value: `${occupiedCount} / ${tables.length || 9}`,
-      change: `${Math.round((occupiedCount / (tables.length || 9)) * 100)}% Capacidad`,
+      value: `${occupiedCount} / ${tables.length || 8}`,
+      change: `${Math.round((occupiedCount / (tables.length || 8)) * 100)}% Capacidad`,
       icon: UtensilsCrossed,
       color: 'text-red-500',
       bg: 'bg-red-500/10',
@@ -40,8 +41,8 @@ export default function DashboardPage() {
     },
     {
       name: 'Alertas Inventario',
-      value: '2',
-      change: 'Bajo inventario',
+      value: String(lowStockCount),
+      change: lowStockCount > 0 ? 'Bajo inventario' : 'Sin alertas',
       icon: AlertTriangle,
       color: 'text-amber-500',
       bg: 'bg-amber-500/10',

@@ -1,30 +1,152 @@
 "use client"
 
 import { DollarSign, BarChart3, Zap, Calendar } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { useBarStore } from '@/lib/barState'
 
 export default function ReportesPage() {
+  const barData = useBarStore()
   const [fechaInicio, setFechaInicio] = useState<string>('2026-10-01')
   const [fechaFin, setFechaFin] = useState<string>('2026-10-31')
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'ventas' | 'caja' | 'productos'>('todos')
+  const [filtroUsuario, setFiltroUsuario] = useState<string>('')
+
+  const formatCOP = (val: number) => '$ ' + Math.round(val).toLocaleString('es-CO')
+
+  // Cálculos reales a partir del estado del negocio (inicia en 0 para cuentas nuevas y crece con la operación)
+  const metrics = useMemo(() => {
+    const tables = barData.tables || []
+    const closedSales = barData.closedSales || []
+    const movements = barData.movements || []
+    const sessions = barData.sessions || []
+    const cash = barData.cash || {
+      initialCash: 0,
+      cashSales: 0,
+      electronicSales: 0,
+      expenses: 0,
+      expectedCash: 0,
+      status: 'closed',
+      openedAt: '',
+    }
+
+    // Filtrar por usuario si aplica
+    const matchUser = (operatorName?: string) => {
+      if (!filtroUsuario) return true
+      const op = (operatorName || '').toLowerCase()
+      if (filtroUsuario === 'admin') return op.includes('admin') || op.includes('propietario') || op === (barData.operatorName || '').toLowerCase()
+      if (filtroUsuario === 'staff') return !op.includes('admin')
+      return op === filtroUsuario.toLowerCase()
+    }
+
+    // 1. Ventas reales (movimientos de venta, recibos cerrados y ventas del turno actual)
+    const saleMovements = movements.filter((m) => m.type === 'sale' && matchUser(m.user))
+    const ventasPorMovimientos = saleMovements.reduce((acc, m) => acc + Math.abs(m.amount || 0), 0)
+
+    const filteredClosedSales = closedSales.filter((s) => matchUser(s.operator))
+    const ventasPorRecibos = filteredClosedSales.reduce((acc, s) => acc + (s.total || 0), 0)
+
+    const ventasTurnoActual = !filtroUsuario
+      ? (cash.cashSales || 0) + (cash.electronicSales || 0)
+      : 0
+
+    const ventasSesionesCerradas = !filtroUsuario
+      ? sessions
+          .filter((s) => s.status === 'closed')
+          .reduce((acc, s) => acc + (s.cashSales || 0) + (s.electronicSales || 0), 0)
+      : 0
+
+    const totalVentas = Math.max(
+      ventasPorMovimientos,
+      ventasPorRecibos,
+      cash.status === 'open' ? ventasSesionesCerradas + ventasTurnoActual : Math.max(ventasSesionesCerradas, ventasTurnoActual)
+    )
+
+    // 2. Ocupación de mesas en tiempo real
+    const totalMesas = tables.length || 8
+    const mesasOcupadas = tables.filter(
+      (t) => (t.status === 'occupied' || (t.items && t.items.length > 0) || (t.total || 0) > 0) && matchUser(t.operator)
+    ).length
+    const ocupacionPct = totalMesas > 0 ? Math.round((mesasOcupadas / totalMesas) * 100) : 0
+
+    // 3. Unidades de productos vendidos y ranking Top Productos
+    // Se suman los ítems de ventas cerradas + ítems en comandas activas (al cerrar mesa pasan de tables a closedSales sin duplicarse)
+    const productCountMap = new Map<string, { name: string; quantity: number; revenue: number }>()
+
+    for (const receipt of filteredClosedSales) {
+      for (const item of receipt.items || []) {
+        const key = item.productId || item.name
+        const prev = productCountMap.get(key) || { name: item.name, quantity: 0, revenue: 0 }
+        productCountMap.set(key, {
+          name: item.name,
+          quantity: prev.quantity + (item.quantity || 0),
+          revenue: prev.revenue + (item.subtotal || 0),
+        })
+      }
+    }
+
+    for (const table of tables) {
+      if (!matchUser(table.operator)) continue
+      for (const item of table.items || []) {
+        const key = item.productId || item.name
+        const prev = productCountMap.get(key) || { name: item.name, quantity: 0, revenue: 0 }
+        productCountMap.set(key, {
+          name: item.name,
+          quantity: prev.quantity + (item.quantity || 0),
+          revenue: prev.revenue + (item.subtotal || 0),
+        })
+      }
+    }
+
+    const topProductos = Array.from(productCountMap.values()).sort((a, b) => b.quantity - a.quantity)
+    const totalUnidadesVendidas = topProductos.reduce((acc, p) => acc + p.quantity, 0)
+
+    // 4. Caja y medios de pago
+    const efectivoTurno = cash.cashSales || 0
+    const tarjetasTurno = cash.electronicSales || 0
+    const saldoCaja = cash.expectedCash || 0
+
+    // Porcentajes de crecimiento / estado (0% cuando la cuenta está en 0)
+    const variacionVentas = totalVentas > 0 ? `+${saleMovements.length || filteredClosedSales.length || 1} venta(s)` : '0%'
+    const variacionMesas = ocupacionPct > 0 ? `${mesasOcupadas}/${totalMesas} activas` : '0%'
+    const variacionProductos = totalUnidadesVendidas > 0 ? `+${topProductos.length} prod.` : '0%'
+    const variacionCaja = saldoCaja > 0 ? (cash.status === 'open' ? 'Turno activo' : 'En caja') : '0%'
+
+    return {
+      totalVentas,
+      ocupacionPct,
+      mesasOcupadas,
+      totalMesas,
+      totalUnidadesVendidas,
+      topProductos,
+      saldoCaja,
+      efectivoTurno,
+      tarjetasTurno,
+      variacionVentas,
+      variacionMesas,
+      variacionProductos,
+      variacionCaja,
+    }
+  }, [barData, filtroUsuario])
 
   const reportesData = [
     {
       id: 1,
       tipo: 'venta',
+      filtro: 'ventas',
       titulo: 'Ventas del Mes',
-      valor: '$ 1,245,600',
-      variacion: '+12.5%',
+      valor: formatCOP(metrics.totalVentas),
+      variacion: metrics.variacionVentas,
       icon: DollarSign,
-      tiempo: 'Oct 2026',
-      subtitulo: 'Comparado con septiembre',
+      tiempo: 'Mes actual',
+      subtitulo: 'Total acumulado de ventas',
     },
     {
       id: 2,
       tipo: 'mesa',
+      filtro: 'ventas',
       titulo: 'Mesas Ocupadas',
-      valor: '67%',
-      variacion: '+8.3%',
+      valor: `${metrics.ocupacionPct}%`,
+      variacion: metrics.variacionMesas,
       icon: BarChart3,
       tiempo: 'Turno actual',
       subtitulo: 'Promedio de ocupación',
@@ -32,31 +154,68 @@ export default function ReportesPage() {
     {
       id: 3,
       tipo: 'producto',
+      filtro: 'productos',
       titulo: 'Productos Más Vendidos',
-      valor: '1.248 unidades',
-      variacion: '+24.1%',
+      valor: `${metrics.totalUnidadesVendidas.toLocaleString('es-CO')} unidades`,
+      variacion: metrics.variacionProductos,
       icon: BarChart3,
-      tiempo: 'Ultima semana',
-      subtitulo: 'Top 5 de productos',
+      tiempo: 'Acumulado',
+      subtitulo: 'Top de productos',
     },
     {
       id: 4,
       tipo: 'caja',
+      filtro: 'caja',
       titulo: 'Resumen de Caja',
-      valor: '$ 89,500',
-      variacion: '-3.2%',
+      valor: formatCOP(metrics.saldoCaja),
+      variacion: metrics.variacionCaja,
       icon: Zap,
-      tiempo: 'Ultimo turnover',
-      subtitulo: 'Efectivo vs. Tarjetas',
+      tiempo: 'Turno actual',
+      subtitulo: 'Efectivo en caja',
     },
   ]
 
+  const tarjetasVisibles = reportesData.filter(
+    (r) => filtroTipo === 'todos' || r.filtro === filtroTipo
+  )
+
   const ventasMensuales = [
-    { mes: 'Sep', ventas: 980000 },
-    { mes: 'Oct', ventas: 1245600 },
-    { mes: 'Nov', ventas: 1100000 },
-    { mes: 'Dic', ventas: 950000 },
+    { mes: 'Jul', ventas: 0 },
+    { mes: 'Ago', ventas: 0 },
+    { mes: 'Sep', ventas: 0 },
+    { mes: 'Oct', ventas: metrics.totalVentas },
   ]
+
+  const maxVentaMensual = Math.max(...ventasMensuales.map((v) => v.ventas), 1)
+
+  const handleDownloadCSV = () => {
+    const rows = [
+      ['Indicador', 'Valor', 'Detalle'],
+      ['Ventas Acumuladas', String(metrics.totalVentas), metrics.variacionVentas],
+      ['Ocupacion de Mesas (%)', `${metrics.ocupacionPct}%`, `${metrics.mesasOcupadas} de ${metrics.totalMesas} mesas`],
+      ['Unidades Vendidas', String(metrics.totalUnidadesVendidas), `${metrics.topProductos.length} productos distintos`],
+      ['Efectivo Esperado en Caja', String(metrics.saldoCaja), barData.cash?.status === 'open' ? 'Turno Abierto' : 'Turno Cerrado'],
+      ['Ventas en Efectivo (Turno)', String(metrics.efectivoTurno), 'Efectivo'],
+      ['Ventas en Tarjetas/Transf. (Turno)', String(metrics.tarjetasTurno), 'Electronico'],
+    ]
+
+    if (metrics.topProductos.length > 0) {
+      rows.push([])
+      rows.push(['Producto', 'Unidades Vendidas', 'Total Generado'])
+      for (const p of metrics.topProductos) {
+        rows.push([p.name, String(p.quantity), String(p.revenue)])
+      }
+    }
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + rows.map((e) => e.join(',')).join('\n')
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement('a')
+    link.setAttribute('href', encodedUri)
+    link.setAttribute('download', `reporte_bar_${fechaInicio}_a_${fechaFin}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   return (
     <div className="space-y-8">
@@ -66,20 +225,20 @@ export default function ReportesPage() {
           <div className="inline-flex items-center space-x-2 bg-red-600/30 border border-red-500/40 px-3 py-1 rounded-full text-amber-400 text-xs font-semibold mb-4">
             <span>📊 Reportes</span>
             <span>•</span>
-            <span>Rock Bar POS</span>
+            <span>{barData.settings?.barName || 'Rock Bar'} POS</span>
           </div>
           <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight mb-2">
             Módulo de Reportes
           </h2>
           <p className="text-zinc-300 text-sm sm:text-base">
-            Información operativa y financiera del negocio. Usa los filtros para narrowing down.
+            Información operativa y financiera del negocio en tiempo real.
           </p>
         </div>
       </div>
 
       {/* Tarjetas de resumen */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {reportesData.map((report) => {
+        {tarjetasVisibles.map((report) => {
           const Icon = report.icon
           return (
             <div key={report.id} className="rock-card p-6 rounded-2xl shadow-lg relative overflow-hidden group">
@@ -146,19 +305,19 @@ export default function ReportesPage() {
           <div>
             <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Usuario</label>
             <select
-              value=""
-              onChange={() => {}}
+              value={filtroUsuario}
+              onChange={(e) => setFiltroUsuario(e.target.value)}
               className="w-full pl-4 py-2 rounded border border-zinc-700 background-zinc-900 text-zinc-100"
             >
               <option value="">Todos</option>
-              <option value="admin">Administrador</option>
+              <option value="admin">Administrador / Propietario</option>
               <option value="staff">Empleado</option>
             </select>
           </div>
         </div>
         <button
-          onClick={() => alert('Generando reporte...')}
-          className="w-full py-2 rounded border border-amber-500 bg-amber-500/10 text-amber-400 font-medium uppercase tracking-wider hover:bg-amber-600/20 transition-colors"
+          onClick={handleDownloadCSV}
+          className="w-full py-2 rounded border border-amber-500 bg-amber-500/10 text-amber-400 font-medium uppercase tracking-wider hover:bg-amber-600/20 transition-colors cursor-pointer"
         >
           Generar Reporte CSV
         </button>
@@ -171,16 +330,24 @@ export default function ReportesPage() {
           <h3 className="text-lg font-bold text-white tracking-wide mb-4">Ventas Mensuales</h3>
           <div className="h-64 bg-zinc-950 rounded-xl p-4 flex flex-col justify-end space-y-2">
             <div className="flex items-end justify-between h-44 pt-4 px-2">
-              {ventasMensuales.map((vm) => (
-                <div key={vm.mes} className="flex flex-col items-center flex-1 space-y-1">
-                  <span className="text-[10px] text-zinc-400">${(vm.ventas / 1000).toFixed(0)}k</span>
-                  <div
-                    className="w-8 bg-gradient-to-t from-red-600 to-amber-500 rounded-t-md transition-all hover:brightness-125"
-                    style={{ height: `${(vm.ventas / 1300000) * 100}%` }}
-                  />
-                  <span className="text-xs font-semibold text-zinc-300">{vm.mes}</span>
-                </div>
-              ))}
+              {ventasMensuales.map((vm) => {
+                const heightPct = vm.ventas > 0 ? Math.max(8, Math.round((vm.ventas / maxVentaMensual) * 100)) : 2
+                const label = vm.ventas >= 1000 ? `$${(vm.ventas / 1000).toFixed(0)}k` : `$${vm.ventas}`
+                return (
+                  <div key={vm.mes} className="flex flex-col items-center flex-1 space-y-1 h-full justify-end">
+                    <span className="text-[10px] text-zinc-400">{label}</span>
+                    <div
+                      className={`w-8 rounded-t-md transition-all ${
+                        vm.ventas > 0
+                          ? 'bg-gradient-to-t from-red-600 to-amber-500 hover:brightness-125'
+                          : 'bg-zinc-800'
+                      }`}
+                      style={{ height: `${heightPct}%` }}
+                    />
+                    <span className="text-xs font-semibold text-zinc-300">{vm.mes}</span>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -188,12 +355,27 @@ export default function ReportesPage() {
         {/* Top Productos */}
         <div className="rock-card p-6 rounded-2xl shadow-lg">
           <h3 className="text-lg font-bold text-white tracking-wide mb-4">Top Productos</h3>
-          <ol className="space-y-3 text-zinc-300">
-            <li>Cerveza Premium - 342 unidades</li>
-            <li>Cóctel Especial - 189 unidades</li>
-            <li>Nachos - 234 unidades</li>
-            <li>Whisky Premium - 89 unidades</li>
-          </ol>
+          {metrics.topProductos.length > 0 ? (
+            <ol className="space-y-3 text-zinc-300">
+              {metrics.topProductos.slice(0, 5).map((prod, idx) => (
+                <li key={idx} className="flex items-center justify-between text-sm border-b border-zinc-800/60 pb-2">
+                  <span className="font-medium text-white truncate pr-2">
+                    {idx + 1}. {prod.name}
+                  </span>
+                  <span className="text-amber-400 font-bold shrink-0">
+                    {prod.quantity} {prod.quantity === 1 ? 'unidad' : 'unidades'}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <div className="h-48 flex flex-col items-center justify-center text-center text-zinc-500 text-sm">
+              <p className="font-semibold text-zinc-400">0 unidades vendidas</p>
+              <p className="text-xs mt-1">
+                Los productos más vendidos irán apareciendo aquí a medida que registres pedidos y ventas.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Cierre de Turno */}
@@ -201,12 +383,12 @@ export default function ReportesPage() {
           <h3 className="text-lg font-bold text-white tracking-wide mb-4">Cierre de Turno</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-zinc-500">Efectivo</p>
-              <p className="text-2xl font-black text-white">$ 45,200</p>
+              <p className="text-zinc-500 text-sm">Efectivo</p>
+              <p className="text-2xl font-black text-white mt-1">{formatCOP(metrics.efectivoTurno)}</p>
             </div>
             <div>
-              <p className="text-zinc-500">Tarjetas</p>
-              <p className="text-2xl font-black text-white">$ 38,900</p>
+              <p className="text-zinc-500 text-sm">Tarjetas</p>
+              <p className="text-2xl font-black text-white mt-1">{formatCOP(metrics.tarjetasTurno)}</p>
             </div>
           </div>
         </div>
