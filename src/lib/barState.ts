@@ -1085,7 +1085,7 @@ export function deletePromotionRule(id: string): void {
 // Aplicar un descuento manual directo a los productos de una mesa (o a un producto específico)
 export function applyManualDiscountToTable(
   tableId: number,
-  discountType: 'percentage' | 'fixed_off',
+  discountType: 'percentage' | 'fixed_off' | 'fixed_price',
   discountValue: number,
   targetProductId?: string
 ): void {
@@ -1098,11 +1098,17 @@ export function applyManualDiscountToTable(
     const updatedItems = (t.items || []).map((it) => {
       if (targetProductId && it.productId !== targetProductId) return it
 
-      let newUnitPrice = it.unitPrice
+      // Buscar el precio base original del catálogo para no descontar dos veces sobre un precio ya rebajado
+      const catalogProduct = (data.products || []).find((p) => p.id === it.productId)
+      const basePrice = catalogProduct ? catalogProduct.price : it.unitPrice
+
+      let newUnitPrice = basePrice
       if (discountType === 'percentage') {
-        newUnitPrice = Math.round(it.unitPrice * (1 - Math.min(100, discountValue) / 100))
+        newUnitPrice = Math.round(basePrice * (1 - Math.min(100, discountValue) / 100))
+      } else if (discountType === 'fixed_price') {
+        newUnitPrice = Math.max(0, discountValue)
       } else {
-        newUnitPrice = Math.max(0, it.unitPrice - discountValue)
+        newUnitPrice = Math.max(0, basePrice - discountValue)
       }
 
       return {
@@ -1142,12 +1148,15 @@ export function addItemToTable(tableId: number, product: ProductState, quantity:
       if (existingIdx >= 0) {
         const item = currentItems[existingIdx]
         const newQty = item.quantity + quantity
+        // Si el ítem en la mesa ya tenía un descuento aplicado (ej. $7.500 < $9.000), conservar su precio con descuento
+        const effectiveUnitPrice =
+          item.unitPrice > 0 && item.unitPrice < finalPrice ? item.unitPrice : finalPrice
         currentItems[existingIdx] = {
           ...item,
-          name: appliedPromo ? `${product.name} (Promo)` : product.name,
-          unitPrice: finalPrice,
+          name: appliedPromo ? `${product.name} (Promo)` : item.name,
+          unitPrice: effectiveUnitPrice,
           quantity: newQty,
-          subtotal: newQty * finalPrice,
+          subtotal: newQty * effectiveUnitPrice,
         }
       } else {
         currentItems.push({

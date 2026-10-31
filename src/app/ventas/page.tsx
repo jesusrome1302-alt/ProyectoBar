@@ -84,7 +84,7 @@ export default function VentasPage() {
   const [promoEndTime, setPromoEndTime] = useState<string>('22:00') // 10:00 PM
 
   // Estado Descuento Manual a la Comanda
-  const [manualType, setManualType] = useState<'percentage' | 'fixed_off'>('percentage')
+  const [manualType, setManualType] = useState<'percentage' | 'fixed_off' | 'fixed_price'>('percentage')
   const [manualValue, setManualValue] = useState<number>(10)
   const [manualTargetProd, setManualTargetProd] = useState<string>('')
 
@@ -144,9 +144,13 @@ export default function VentasPage() {
 
     setShowDiscountsModal(false)
     setNotification(
-      `¡Descuento de ${
-        manualType === 'percentage' ? `${manualValue}%` : `$ ${manualValue.toLocaleString('es-CO')}`
-      } aplicado a ${currentTableObj.name}!`
+      `¡Descuento (${
+        manualType === 'percentage'
+          ? `-${manualValue}%`
+          : manualType === 'fixed_price'
+          ? `Precio fijo $ ${manualValue.toLocaleString('es-CO')}`
+          : `-$ ${manualValue.toLocaleString('es-CO')}`
+      }) aplicado a ${currentTableObj.name}!`
     )
     setTimeout(() => setNotification(''), 4000)
   }
@@ -165,10 +169,16 @@ export default function VentasPage() {
     }
 
     const { finalPrice, appliedPromo } = getEffectiveProductPrice(prod, promotions)
+    const existingItem = currentOrder.find((it) => it.productId === prod.id)
+    const effectiveAddedPrice =
+      existingItem && existingItem.unitPrice > 0 && existingItem.unitPrice < finalPrice
+        ? existingItem.unitPrice
+        : finalPrice
+
     addItemToTable(selectedTableId, prod, 1)
     setNotification(
-      appliedPromo
-        ? `🍺 ¡"${prod.name}" agregado con promo ($ ${finalPrice.toLocaleString('es-CO')}) a ${currentTableObj?.name || 'Mesa'}!`
+      appliedPromo || effectiveAddedPrice < prod.price
+        ? `🍺 ¡"${prod.name}" agregado ($ ${effectiveAddedPrice.toLocaleString('es-CO')}) a ${currentTableObj?.name || 'Mesa'}!`
         : `¡"${prod.name}" agregado a ${currentTableObj?.name || 'Mesa'}!`
     )
     setTimeout(() => setNotification(''), 3000)
@@ -1210,16 +1220,21 @@ export default function VentasPage() {
                         </label>
                         <select
                           value={manualType}
-                          onChange={(e) => setManualType(e.target.value as 'percentage' | 'fixed_off')}
+                          onChange={(e) => setManualType(e.target.value as 'percentage' | 'fixed_off' | 'fixed_price')}
                           className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white"
                         >
                           <option value="percentage">Porcentaje (%)</option>
-                          <option value="fixed_off">Valor por unidad ($)</option>
+                          <option value="fixed_off">Rebajar por unidad ($ menos)</option>
+                          <option value="fixed_price">Precio fijo por unidad ($)</option>
                         </select>
                       </div>
                       <div>
                         <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
-                          {manualType === 'percentage' ? 'Porcentaje (%)' : 'Descuento por unidad ($)'}
+                          {manualType === 'percentage'
+                            ? 'Porcentaje (%)'
+                            : manualType === 'fixed_price'
+                            ? 'Nuevo precio unitario ($)'
+                            : 'Descuento por unidad ($)'}
                         </label>
                         <input
                           type="number"
@@ -1247,22 +1262,22 @@ export default function VentasPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          setManualType('percentage')
-                          setManualValue(15)
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 cursor-pointer"
-                      >
-                        -15%
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
                           setManualType('fixed_off')
                           setManualValue(1000)
                         }}
                         className="px-2.5 py-1 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 cursor-pointer"
                       >
                         -$ 1.000 c/u
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManualType('fixed_off')
+                          setManualValue(1500)
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 cursor-pointer"
+                      >
+                        -$ 1.500 c/u
                       </button>
                       <button
                         type="button"
