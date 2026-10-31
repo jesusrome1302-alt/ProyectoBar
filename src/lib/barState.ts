@@ -486,6 +486,50 @@ export function loadBarData(): BarData {
       }
     }
 
+    // Normalizar mesas para evitar ítems duplicados con el mismo productId o residuos al cerrar/abrir mesa
+    if (parsed.tables && Array.isArray(parsed.tables)) {
+      parsed.tables = parsed.tables.map((t: TableState) => {
+        if (t.status === 'available' && (!t.paid || t.paid === 0) && (!t.total || t.total === 0)) {
+          return {
+            ...t,
+            items: [],
+            payments: [],
+            total: 0,
+            paid: 0,
+            pending: 0,
+          }
+        }
+        // Consolidar cualquier ítem con productId repetido para evitar claves duplicadas en React
+        const mergedMap = new Map<string, OrderItemState>()
+        for (const it of t.items || []) {
+          const existing = mergedMap.get(it.productId)
+          if (existing) {
+            const newQty = existing.quantity + it.quantity
+            mergedMap.set(it.productId, {
+              ...existing,
+              quantity: newQty,
+              subtotal: newQty * existing.unitPrice,
+            })
+          } else {
+            mergedMap.set(it.productId, {
+              ...it,
+              subtotal: it.quantity * it.unitPrice,
+            })
+          }
+        }
+        const cleanItems = Array.from(mergedMap.values())
+        const cleanTotal = cleanItems.reduce((acc, it) => acc + it.subtotal, 0)
+        const cleanPaid = t.paid || 0
+        return {
+          ...t,
+          items: cleanItems,
+          total: cleanTotal,
+          paid: cleanPaid,
+          pending: Math.max(0, cleanTotal - cleanPaid),
+        }
+      })
+    }
+
     cachedData = parsed
     return cachedData
   } catch {
@@ -797,17 +841,18 @@ export function openTableWithCustomer(id: number, customerName?: string, notes?:
 
   data.tables = data.tables.map((t) => {
     if (t.id === id) {
+      const wasAvailable = t.status === 'available'
       return {
         ...t,
         status: 'occupied' as const,
         openedAt: timeNow,
-        customerName: customerName?.trim() || t.customerName,
-        notes: notes?.trim() || t.notes,
-        items: t.items || [],
-        payments: t.payments || [],
-        total: t.total || 0,
-        paid: t.paid || 0,
-        pending: t.pending || 0,
+        customerName: customerName?.trim() || (wasAvailable ? undefined : t.customerName),
+        notes: notes?.trim() || (wasAvailable ? undefined : t.notes),
+        items: wasAvailable ? [] : (t.items || []),
+        payments: wasAvailable ? [] : (t.payments || []),
+        total: wasAvailable ? 0 : (t.total || 0),
+        paid: wasAvailable ? 0 : (t.paid || 0),
+        pending: wasAvailable ? 0 : (t.pending || 0),
       }
     }
     return t
@@ -1092,15 +1137,17 @@ export function addItemToTable(tableId: number, product: ProductState, quantity:
   data.tables = data.tables.map((t) => {
     if (t.id === tableId) {
       const currentItems = [...(t.items || [])]
-      const existingIdx = currentItems.findIndex((it) => it.productId === product.id && it.unitPrice === finalPrice)
+      const existingIdx = currentItems.findIndex((it) => it.productId === product.id)
 
       if (existingIdx >= 0) {
         const item = currentItems[existingIdx]
         const newQty = item.quantity + quantity
         currentItems[existingIdx] = {
           ...item,
+          name: appliedPromo ? `${product.name} (Promo)` : product.name,
+          unitPrice: finalPrice,
           quantity: newQty,
-          subtotal: newQty * item.unitPrice,
+          subtotal: newQty * finalPrice,
         }
       } else {
         currentItems.push({

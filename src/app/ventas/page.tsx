@@ -587,7 +587,10 @@ export default function VentasPage() {
 
           {/* Lista de Ítems del Pedido */}
           {currentOrder.length === 0 ? (
-            <div className="text-center py-10 text-zinc-500 bg-zinc-950/40 rounded-xl border border-dashed border-zinc-800/80 p-4">
+            <div
+              key={`empty-order-${selectedTableId}`}
+              className="text-center py-10 text-zinc-500 bg-zinc-950/40 rounded-xl border border-dashed border-zinc-800/80 p-4"
+            >
               <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-50 text-zinc-400" />
               <p className="text-xs font-bold text-zinc-300">La comanda de {currentTableObj?.name || 'esta mesa'} está vacía</p>
               <p className="text-[11px] text-zinc-500 mt-1">
@@ -595,10 +598,14 @@ export default function VentasPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
-              {currentOrder.map((it: OrderItemState) => (
+            <div
+              key={`order-list-${selectedTableId}-${currentTableObj?.openedAt || 'open'}`}
+              translate="no"
+              className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1"
+            >
+              {currentOrder.map((it: OrderItemState, idx: number) => (
                 <div
-                  key={it.productId}
+                  key={`${selectedTableId}-${it.productId}-${idx}`}
                   className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800/80 flex items-center justify-between text-xs transition-all hover:border-zinc-700"
                 >
                   <div className="space-y-0.5 flex-1 pr-2">
