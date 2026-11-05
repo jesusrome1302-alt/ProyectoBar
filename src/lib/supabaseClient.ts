@@ -325,3 +325,103 @@ export async function saveCloudBarData(businessId: string, barData: BarData): Pr
     return false
   }
 }
+
+export interface DeletedCloudAccountRecord {
+  id: string
+  original_account_id?: string
+  business_id: string
+  email: string
+  full_name: string
+  bar_name: string
+  phone?: string
+  city?: string
+  deletion_reason: string
+  pin_verified: boolean
+  deleted_at: string
+}
+
+// 9. Archivar en base de datos de usuarios eliminados (deleted_bar_accounts) y eliminar cuenta activa en Supabase
+export async function archiveAndDeleteCloudAccount(params: {
+  user: AuthUser
+  reason: string
+  finalSnapshot?: BarData
+}): Promise<{ success: boolean; archivedInCloud: boolean; deletedFromActive: boolean; error?: string }> {
+  const businessId = params.user.businessId || `biz-local-${Date.now()}`
+  let archivedInCloud = false
+  let deletedFromActive = false
+
+  try {
+    // A. Insertar registro en la base de datos de cuentas eliminadas (deleted_bar_accounts)
+    const { error: archiveError } = await supabase.from('deleted_bar_accounts').insert({
+      original_account_id: params.user.id,
+      business_id: businessId.startsWith('biz-') ? undefined : businessId,
+      email: params.user.email,
+      full_name: params.user.name,
+      bar_name: params.user.barName || params.finalSnapshot?.settings?.barName || 'MI BAR',
+      phone: params.user.phone || params.finalSnapshot?.settings?.phone || '',
+      city: params.user.city || '',
+      deletion_reason: params.reason || 'Eliminación verificada con PIN por el propietario',
+      pin_verified: true,
+      final_snapshot: params.finalSnapshot || {},
+      deleted_at: new Date().toISOString(),
+    })
+
+    if (!archiveError) {
+      archivedInCloud = true
+    } else {
+      console.warn('Aviso al archivar en deleted_bar_accounts:', archiveError.message)
+    }
+
+    // B. Eliminar datos operativos, miembros y cuenta comercial activa en Supabase
+    if (params.user.businessId && !params.user.businessId.startsWith('biz-')) {
+      await supabase.from('bar_data').delete().eq('business_id', params.user.businessId)
+      await supabase.from('bar_team_members').delete().eq('business_id', params.user.businessId)
+      const { error: delAccErr } = await supabase
+        .from('bar_accounts')
+        .delete()
+        .eq('business_id', params.user.businessId)
+      if (!delAccErr) {
+        deletedFromActive = true
+      }
+    } else if (params.user.email) {
+      const { error: delByEmailErr } = await supabase
+        .from('bar_accounts')
+        .delete()
+        .ilike('email', params.user.email.trim())
+      if (!delByEmailErr) {
+        deletedFromActive = true
+      }
+    }
+
+    return {
+      success: true,
+      archivedInCloud,
+      deletedFromActive,
+    }
+  } catch (err: unknown) {
+    console.warn('Error en archiveAndDeleteCloudAccount:', err)
+    return {
+      success: true,
+      archivedInCloud,
+      deletedFromActive,
+      error: err instanceof Error ? err.message : 'Procesado localmente',
+    }
+  }
+}
+
+// 10. Consultar base de datos de usuarios / cuentas eliminadas
+export async function getDeletedCloudAccounts(): Promise<DeletedCloudAccountRecord[]> {
+  try {
+    const { data, error } = await supabase
+      .from('deleted_bar_accounts')
+      .select('id, original_account_id, business_id, email, full_name, bar_name, phone, city, deletion_reason, pin_verified, deleted_at')
+      .order('deleted_at', { ascending: false })
+      .limit(20)
+
+    if (error || !data) return []
+    return data as DeletedCloudAccountRecord[]
+  } catch {
+    return []
+  }
+}
+

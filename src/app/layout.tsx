@@ -25,6 +25,9 @@ export default function RootLayout({
   const isAuthorized = isAuthenticated && !isLoginPage
   const barDisplayName = user?.barName || barData.settings?.barName || 'MI BAR'
   const userPhoto = user?.photoUrl || barData.settings?.logoUrl
+  const themePreset = barData.settings?.themePreset || 'rock-red'
+  const brandIcon = barData.settings?.brandIcon || '🎸'
+  const businessType = barData.settings?.businessType || 'Bar & POS'
 
   // Sincronizar estado operativo del bar desde la nube si hay businessId
   useEffect(() => {
@@ -66,8 +69,8 @@ export default function RootLayout({
   }
 
   return (
-    <html lang="es" className="dark">
-      <body className="bg-[#121214] text-zinc-100 min-h-screen antialiased selection:bg-red-600 selection:text-white">
+    <html lang="es" className="dark" data-theme={themePreset}>
+      <body className="text-zinc-100 min-h-screen antialiased selection:bg-red-600 selection:text-white">
         <div className="flex min-h-screen">
           {/* Sidebar Escritorio (no se muestra en login) */}
           {isAuthorized && <Sidebar />}
@@ -79,12 +82,12 @@ export default function RootLayout({
               <header className="h-16 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40">
                 <div className="flex items-center space-x-3">
                   <Link href="/" className="flex items-center space-x-2">
-                    <span className="bg-gradient-to-r from-red-600 to-amber-500 bg-clip-text text-transparent font-black text-xl tracking-wider">
-                      ⚡ {barDisplayName} POS
+                    <span className="bg-gradient-to-r from-red-500 to-amber-400 bg-clip-text text-transparent font-black text-xl tracking-wider">
+                      {brandIcon} {barDisplayName} POS
                     </span>
                   </Link>
                   <span className="hidden sm:inline-block text-xs bg-zinc-800 text-zinc-300 px-2.5 py-1 rounded-full font-medium border border-zinc-700">
-                    Turno Activo
+                    {businessType} • Turno Activo
                   </span>
                 </div>
 

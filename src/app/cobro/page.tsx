@@ -21,6 +21,9 @@ import {
   loadBarData,
   saveBarData,
   closeTableAndSaveReceipt,
+  updateTable,
+  PRESET_DISCOUNTS,
+  calculateDiscountForOrder,
   TableState,
   PaymentRecord,
   SaleReceiptRecord,
@@ -55,7 +58,28 @@ export default function CobroPage() {
 
   const formatCOP = (val: number) => '$ ' + val.toLocaleString('es-CO')
 
-  const effectiveAmount = customAmount !== null ? customAmount : (currentAccount?.pending ?? 0)
+  const availableDiscounts = (barData.discounts && barData.discounts.length > 0 ? barData.discounts : PRESET_DISCOUNTS).filter(
+    (d) => d.active
+  )
+  const selectedDiscount = availableDiscounts.find((d) => d.id === currentAccount?.appliedDiscountId) || null
+  const discountAmount = calculateDiscountForOrder(
+    currentAccount?.items || [],
+    barData.products || [],
+    selectedDiscount
+  )
+  const netTotalWithDiscount = Math.max(0, (currentAccount?.total || 0) - discountAmount)
+  const netPendingAfterDiscount = Math.max(0, netTotalWithDiscount - (currentAccount?.paid || 0))
+
+  const effectiveAmount = customAmount !== null ? customAmount : netPendingAfterDiscount
+
+  const handleToggleAccountDiscount = (discountId: string) => {
+    if (!currentAccount) return
+    const nextId = currentAccount.appliedDiscountId === discountId ? undefined : discountId
+    updateTable(currentAccount.id, {
+      appliedDiscountId: nextId,
+    })
+    setCustomAmount(null)
+  }
 
   // Ver e imprimir pre-cuenta antes de cobrar
   const handleViewPreBill = () => {
@@ -68,7 +92,8 @@ export default function CobroPage() {
     const now = new Date()
     const timeStr = now.toLocaleDateString('es-CO') + ' ' + now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
     const subtotal = currentAccount.items.reduce((acc, it) => acc + it.subtotal, 0)
-    const tipAmount = addTip ? Math.round(subtotal * (tipPercent / 100)) : 0
+    const afterDiscount = Math.max(0, subtotal - discountAmount)
+    const tipAmount = addTip ? Math.round(afterDiscount * (tipPercent / 100)) : 0
 
     const preReceipt: SaleReceiptRecord = {
       id: 'PRE-CUENTA',
@@ -79,8 +104,10 @@ export default function CobroPage() {
       items: currentAccount.items,
       payments: currentAccount.payments || [],
       subtotal,
+      discountAmount: discountAmount > 0 ? discountAmount : undefined,
+      discountName: discountAmount > 0 && selectedDiscount ? selectedDiscount.name : undefined,
       tip: tipAmount,
-      total: subtotal + tipAmount,
+      total: afterDiscount + tipAmount,
     }
 
     setActiveReceipt(preReceipt)
@@ -155,12 +182,18 @@ export default function CobroPage() {
 
   // Cerrar cuenta y liberar mesa (cuando saldo = $0) y generar factura definitiva
   const handleCloseAndFreeTable = () => {
-    if (!currentAccount || currentAccount.pending > 0) return
+    if (!currentAccount || netPendingAfterDiscount > 0) return
 
     const subtotal = currentAccount.items?.reduce((acc, it) => acc + it.subtotal, 0) || 0
-    const tipAmount = addTip ? Math.round(subtotal * (tipPercent / 100)) : 0
+    const afterDiscount = Math.max(0, subtotal - discountAmount)
+    const tipAmount = addTip ? Math.round(afterDiscount * (tipPercent / 100)) : 0
 
-    const savedReceipt = closeTableAndSaveReceipt(selectedTableId, tipAmount)
+    const savedReceipt = closeTableAndSaveReceipt(
+      selectedTableId,
+      tipAmount,
+      discountAmount,
+      selectedDiscount?.name
+    )
     if (savedReceipt) {
       setActiveReceipt(savedReceipt)
       setIsPreBill(false)
@@ -357,8 +390,8 @@ export default function CobroPage() {
                   {/* Indicadores Financieros de la Cuenta */}
                   <div className="flex items-center space-x-4 bg-zinc-950/80 p-2.5 rounded-xl border border-zinc-800">
                     <div>
-                      <p className="text-[10px] text-zinc-500 uppercase font-bold">Total Cuenta</p>
-                      <p className="text-sm font-black text-white">{formatCOP(currentAccount.total)}</p>
+                      <p className="text-[10px] text-zinc-500 uppercase font-bold">Total Neto</p>
+                      <p className="text-sm font-black text-white">{formatCOP(netTotalWithDiscount)}</p>
                     </div>
                     <div className="border-l border-zinc-800 pl-3">
                       <p className="text-[10px] text-emerald-400 uppercase font-bold">Abonado</p>
@@ -366,7 +399,7 @@ export default function CobroPage() {
                     </div>
                     <div className="border-l border-zinc-800 pl-3">
                       <p className="text-[10px] text-amber-500 uppercase font-bold">Saldo</p>
-                      <p className="text-sm font-black text-amber-400">{formatCOP(currentAccount.pending)}</p>
+                      <p className="text-sm font-black text-amber-400">{formatCOP(netPendingAfterDiscount)}</p>
                     </div>
                   </div>
                 </div>
@@ -431,8 +464,58 @@ export default function CobroPage() {
                     <span>Registrar Pago / Abono</span>
                   </h4>
                   <span className="text-xs text-zinc-400">
-                    Saldo por Cobrar: <strong className="text-amber-400 font-bold">{formatCOP(currentAccount.pending)}</strong>
+                    Saldo por Cobrar: <strong className="text-amber-400 font-bold">{formatCOP(netPendingAfterDiscount)}</strong>
                   </span>
+                </div>
+
+                {/* Selector de Descuentos & Happy Hours (Predeterminados + Personalizados del Local) */}
+                <div className="bg-zinc-950/70 p-3.5 rounded-xl border border-zinc-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-400">
+                      🎉 Descuentos & Happy Hours (Predeterminados y del Local)
+                    </span>
+                    <Link
+                      href="/configuracion"
+                      className="text-[10px] text-zinc-400 hover:text-amber-400 underline font-semibold"
+                    >
+                      + Crear Happy Hour / Promo
+                    </Link>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableDiscounts.map((disc) => {
+                      const isSelected = currentAccount.appliedDiscountId === disc.id
+                      return (
+                        <button
+                          key={disc.id}
+                          type="button"
+                          onClick={() => handleToggleAccountDiscount(disc.id)}
+                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all border cursor-pointer flex items-center space-x-1 ${
+                            isSelected
+                              ? 'bg-amber-500 text-black border-amber-400 shadow-md shadow-amber-900/30'
+                              : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:border-amber-500/50 hover:text-white'
+                          }`}
+                        >
+                          <span>{disc.isHappyHour ? '🍹' : '🏷️'}</span>
+                          <span>{disc.name}</span>
+                          {disc.isPreset && (
+                            <span
+                              className={`text-[9px] px-1 rounded ${
+                                isSelected ? 'bg-black/20 text-black' : 'bg-zinc-800 text-zinc-400'
+                              }`}
+                            >
+                              Base
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {selectedDiscount && discountAmount > 0 && (
+                    <div className="flex items-center justify-between text-xs pt-1 text-emerald-400 font-bold">
+                      <span>✓ Aplicado: {selectedDiscount.name}</span>
+                      <span>Ahorro: - {formatCOP(discountAmount)}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Selector de Método de Pago */}
@@ -479,10 +562,10 @@ export default function CobroPage() {
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       <button
                         type="button"
-                        onClick={() => setCustomAmount(currentAccount.pending)}
+                        onClick={() => setCustomAmount(netPendingAfterDiscount)}
                         className="text-[10px] font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white px-2.5 py-1 rounded-md cursor-pointer"
                       >
-                        Pagar Saldo ({formatCOP(currentAccount.pending)})
+                        Pagar Saldo ({formatCOP(netPendingAfterDiscount)})
                       </button>
                       <button
                         type="button"
@@ -594,16 +677,16 @@ export default function CobroPage() {
                   <button
                     type="button"
                     onClick={handleCloseAndFreeTable}
-                    disabled={currentAccount.pending > 0}
+                    disabled={netPendingAfterDiscount > 0}
                     className={`flex items-center justify-center space-x-2 font-bold py-3 rounded-xl transition-all text-sm ${
-                      currentAccount.pending === 0
+                      netPendingAfterDiscount === 0
                         ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30 cursor-pointer active:scale-95'
                         : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700/40'
                     }`}
                   >
                     <Printer className="w-4 h-4" />
                     <span>
-                      {currentAccount.pending === 0
+                      {netPendingAfterDiscount === 0
                         ? 'Cerrar Cuenta y Emitir Factura'
                         : 'Pendiente saldo para cerrar'}
                     </span>
@@ -758,6 +841,12 @@ export default function CobroPage() {
                   <span>Subtotal:</span>
                   <span>{formatCOP(activeReceipt.subtotal)}</span>
                 </div>
+                {activeReceipt.discountAmount && activeReceipt.discountAmount > 0 && (
+                  <div className="flex justify-between text-zinc-800 font-bold">
+                    <span>Desc. ({activeReceipt.discountName || 'Promo'}):</span>
+                    <span>-{formatCOP(activeReceipt.discountAmount)}</span>
+                  </div>
+                )}
                 {activeReceipt.tip > 0 && (
                   <div className="flex justify-between text-zinc-700">
                     <span>Propina Voluntaria:</span>

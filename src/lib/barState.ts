@@ -32,6 +32,7 @@ export interface TableState {
   paid: number
   pending: number
   notes?: string
+  appliedDiscountId?: string
 }
 
 export interface CashSessionRecord {
@@ -128,9 +129,13 @@ export interface SaleReceiptRecord {
   items: OrderItemState[]
   payments: PaymentRecord[]
   subtotal: number
+  discountAmount?: number
+  discountName?: string
   tip: number
   total: number
 }
+
+export type ThemePreset = 'rock-red' | 'neon-purple' | 'craft-amber' | 'lounge-cyan' | 'emerald-billar'
 
 export interface BarSettings {
   barName: string
@@ -141,6 +146,34 @@ export interface BarSettings {
   tipPercentage: number
   taxPercentage: number
   logoUrl?: string
+  businessType?: string
+  themePreset?: ThemePreset
+  brandIcon?: string
+  slogan?: string
+}
+
+export interface CategoryState {
+  id: string
+  name: string
+  icon?: string
+  isDefault?: boolean
+}
+
+export interface DiscountRuleState {
+  id: string
+  name: string
+  description?: string
+  type: 'percentage' | 'fixed'
+  value: number // Porcentaje (0-100) o monto fijo en COP
+  scope: 'all' | 'category'
+  categoryName?: string
+  isHappyHour: boolean
+  startTime?: string
+  endTime?: string
+  days?: string[]
+  businessTypeTag?: string
+  isPreset: boolean
+  active: boolean
 }
 
 export interface ProductState {
@@ -180,6 +213,8 @@ export interface BarData {
   cash: CashState
   movements: CashMovementRecord[]
   products: ProductState[]
+  categories?: CategoryState[]
+  discounts?: DiscountRuleState[]
   sessions: CashSessionRecord[]
   suppliers: SupplierState[]
   purchases: PurchaseRecord[]
@@ -189,6 +224,85 @@ export interface BarData {
   promotions?: PromotionRule[]
 }
 
+export const DEFAULT_CATEGORIES: CategoryState[] = [
+  { id: 'Cervezas', name: 'Cervezas', icon: '🍺', isDefault: true },
+  { id: 'Licores', name: 'Licores', icon: '🥃', isDefault: true },
+  { id: 'Cócteles', name: 'Cócteles', icon: '🍸', isDefault: true },
+  { id: 'Snacks', name: 'Snacks', icon: '🍔', isDefault: true },
+  { id: 'Sin Alcohol', name: 'Sin Alcohol', icon: '🥤', isDefault: true },
+]
+
+export const PRESET_DISCOUNTS: DiscountRuleState[] = [
+  {
+    id: 'preset-hh-2x1',
+    name: 'Happy Hour 2x1 Cócteles (50%)',
+    description: '50% OFF en Cócteles durante horario de Happy Hour',
+    type: 'percentage',
+    value: 50,
+    scope: 'category',
+    categoryName: 'Cócteles',
+    isHappyHour: true,
+    startTime: '16:00',
+    endTime: '20:00',
+    days: ['Jue', 'Vie', 'Sáb'],
+    businessTypeTag: 'Predeterminado • Coctelería',
+    isPreset: true,
+    active: true,
+  },
+  {
+    id: 'preset-hh-cervezas',
+    name: 'Happy Hour Cervezas (-20%)',
+    description: '20% de descuento en toda la categoría de Cervezas',
+    type: 'percentage',
+    value: 20,
+    scope: 'category',
+    categoryName: 'Cervezas',
+    isHappyHour: true,
+    startTime: '17:00',
+    endTime: '21:00',
+    days: ['Mié', 'Jue', 'Vie'],
+    businessTypeTag: 'Predeterminado • Cervecería',
+    isPreset: true,
+    active: true,
+  },
+  {
+    id: 'preset-desc-10',
+    name: 'Cliente Frecuente / VIP (10%)',
+    description: '10% de descuento general sobre el total de la cuenta',
+    type: 'percentage',
+    value: 10,
+    scope: 'all',
+    isHappyHour: false,
+    businessTypeTag: 'Predeterminado • General',
+    isPreset: true,
+    active: true,
+  },
+  {
+    id: 'preset-desc-15',
+    name: 'Promo Cumpleañero / Grupo (15%)',
+    description: '15% de descuento especial para reservas y cumpleañeros',
+    type: 'percentage',
+    value: 15,
+    scope: 'all',
+    isHappyHour: false,
+    businessTypeTag: 'Predeterminado • Eventos',
+    isPreset: true,
+    active: true,
+  },
+  {
+    id: 'preset-cortesia',
+    name: 'Bono Cortesía de la Casa ($10.000)',
+    description: 'Descuento fijo de $10.000 COP autorizado por administración',
+    type: 'fixed',
+    value: 10000,
+    scope: 'all',
+    isHappyHour: false,
+    businessTypeTag: 'Predeterminado • Cortesía',
+    isPreset: true,
+    active: true,
+  },
+]
+
 export const DEFAULT_SETTINGS: BarSettings = {
   barName: 'ROCK BAR',
   nit: '900.123.456-7',
@@ -197,6 +311,10 @@ export const DEFAULT_SETTINGS: BarSettings = {
   footerText: '¡Gracias por tu visita a Rock Bar! El rock nunca muere.',
   tipPercentage: 10,
   taxPercentage: 8,
+  businessType: 'Rock Bar & Pub',
+  themePreset: 'rock-red',
+  brandIcon: '🎸',
+  slogan: 'Control en tiempo real de mesas, pedidos, cobros e inventario.',
 }
 
 const STORAGE_KEY = 'ROCK_BAR_APP_STATE_V1'
@@ -380,6 +498,8 @@ export const DEFAULT_BAR_DATA: BarData = {
   },
   movements: [],
   products: [],
+  categories: DEFAULT_CATEGORIES,
+  discounts: PRESET_DISCOUNTS,
   sessions: [],
   suppliers: [],
   purchases: [],
@@ -411,6 +531,21 @@ export function loadBarData(): BarData {
     if (!parsed.products) {
       parsed.products = []
     }
+    if (!parsed.categories || !Array.isArray(parsed.categories) || parsed.categories.length === 0) {
+      parsed.categories = [...DEFAULT_CATEGORIES]
+    }
+    // Asegurar que los descuentos predeterminados siempre se mantengan junto con los creados por el local
+    if (!parsed.discounts || !Array.isArray(parsed.discounts) || parsed.discounts.length === 0) {
+      parsed.discounts = [...PRESET_DISCOUNTS]
+    } else {
+      const existingMap = new Map(parsed.discounts.map((d) => [d.id, d]))
+      const mergedPresets = PRESET_DISCOUNTS.map((preset) => {
+        const saved = existingMap.get(preset.id)
+        return saved ? { ...preset, active: saved.active } : preset
+      })
+      const customDiscounts = parsed.discounts.filter((d) => !d.isPreset && !PRESET_DISCOUNTS.some((p) => p.id === d.id))
+      parsed.discounts = [...mergedPresets, ...customDiscounts]
+    }
     if (!parsed.sessions) {
       parsed.sessions = []
     }
@@ -428,6 +563,11 @@ export function loadBarData(): BarData {
     }
     if (!parsed.settings) {
       parsed.settings = DEFAULT_SETTINGS
+    } else {
+      parsed.settings = {
+        ...DEFAULT_SETTINGS,
+        ...parsed.settings,
+      }
     }
 
     // Normalizar inventario dual (nevera y bodega) si faltan propiedades
@@ -723,10 +863,12 @@ export function adjustProductStock(id: string, delta: number): void {
   saveBarData(data)
 }
 
-// Cierre de cuenta con archivado de recibo de venta
+// Cierre de cuenta con archivado de recibo de venta (soporta descuentos y Happy Hours)
 export function closeTableAndSaveReceipt(
   tableId: number,
-  tip: number = 0
+  tip: number = 0,
+  discountAmount: number = 0,
+  discountName?: string
 ): SaleReceiptRecord | null {
   const data = loadBarData()
   const table = data.tables.find((t) => t.id === tableId)
@@ -735,7 +877,8 @@ export function closeTableAndSaveReceipt(
   const now = new Date()
   const timeStr = now.toLocaleDateString('es-CO') + ' ' + now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
   const subtotal = table.items.reduce((acc, it) => acc + it.subtotal, 0)
-  const total = subtotal + tip
+  const cleanDiscount = Math.min(subtotal, Math.max(0, discountAmount))
+  const total = Math.max(0, subtotal - cleanDiscount) + tip
 
   const receipt: SaleReceiptRecord = {
     id: 'FAC-' + Date.now().toString().slice(-6),
@@ -747,6 +890,8 @@ export function closeTableAndSaveReceipt(
     items: [...table.items],
     payments: [...(table.payments || [])],
     subtotal,
+    discountAmount: cleanDiscount > 0 ? cleanDiscount : undefined,
+    discountName: cleanDiscount > 0 ? discountName : undefined,
     tip,
     total,
   }
@@ -767,6 +912,7 @@ export function closeTableAndSaveReceipt(
         openedAt: undefined,
         customerName: undefined,
         notes: undefined,
+        appliedDiscountId: undefined,
       }
     }
     return t
@@ -920,6 +1066,8 @@ export function registerNewBusinessBar(params: {
     },
     movements: [],
     products: [], // Catálogo en 0 para nuevo bar
+    categories: [...DEFAULT_CATEGORIES],
+    discounts: [...PRESET_DISCOUNTS],
     sessions: [],
     suppliers: [],
     purchases: [],
@@ -933,6 +1081,10 @@ export function registerNewBusinessBar(params: {
       footerText: `¡Gracias por tu visita a ${cleanName}! Vuelve pronto.`,
       tipPercentage: 10,
       taxPercentage: 8,
+      businessType: 'Bar / Gastrobar',
+      themePreset: 'rock-red',
+      brandIcon: '🎸',
+      slogan: `Control en tiempo real de mesas, pedidos, cobros e inventario de ${cleanName}.`,
     },
   }
 
@@ -950,10 +1102,43 @@ export function loadSuggestedProductsTemplate(): void {
   saveBarData(data)
 }
 
-// Limpiar datos de operaciones para empezar en blanco la prueba de la noche
-export function clearOperationalDataOnly(): void {
+// Reiniciar ÚNICAMENTE las mesas del salón (sin borrar productos, inventario, caja, configuración ni categorías)
+export function resetTablesOnly(): void {
   const data = loadBarData()
-  data.tables = DEFAULT_BAR_DATA.tables.map((t) => ({
+
+  // Si había productos en comandas abiertas sin pagar, devolverlos a nevera para no perder inventario
+  const returnMap = new Map<string, number>()
+  for (const t of data.tables || []) {
+    if (t.status === 'occupied' && (t.paid || 0) === 0) {
+      for (const it of t.items || []) {
+        returnMap.set(it.productId, (returnMap.get(it.productId) || 0) + it.quantity)
+      }
+    }
+  }
+
+  if (returnMap.size > 0 && Array.isArray(data.products)) {
+    data.products = data.products.map((p) => {
+      const qtyToReturn = returnMap.get(p.id)
+      if (qtyToReturn) {
+        const currentNevera = p.stock_nevera ?? p.stock
+        const currentBodega = p.stock_bodega ?? 0
+        const newNevera = currentNevera + qtyToReturn
+        return {
+          ...p,
+          stock_nevera: newNevera,
+          stock: newNevera + currentBodega,
+        }
+      }
+      return p
+    })
+  }
+
+  // Conservar las mesas configuradas por el bar (filtrando solo subcuentas temporales "- B") y liberarlas a $0
+  const baseTables = (data.tables && data.tables.length > 0 ? data.tables : DEFAULT_BAR_DATA.tables).filter(
+    (t) => !t.name.endsWith(' - B')
+  )
+
+  data.tables = (baseTables.length > 0 ? baseTables : DEFAULT_BAR_DATA.tables).map((t) => ({
     ...t,
     status: 'available' as const,
     items: [],
@@ -962,9 +1147,35 @@ export function clearOperationalDataOnly(): void {
     paid: 0,
     pending: 0,
     openedAt: undefined,
+    customerName: undefined,
+    notes: undefined,
+    appliedDiscountId: undefined,
+  }))
+  data.activeTableId = data.tables[0]?.id || 1
+  saveBarData(data)
+}
+
+// Limpiar datos de operaciones de prueba para empezar el turno de hoy (conservando mesas, productos, categorías, descuentos y configuración)
+export function clearOperationalDataOnly(): void {
+  const data = loadBarData()
+  const baseTables = (data.tables && data.tables.length > 0 ? data.tables : DEFAULT_BAR_DATA.tables).filter(
+    (t) => !t.name.endsWith(' - B')
+  )
+  data.tables = (baseTables.length > 0 ? baseTables : DEFAULT_BAR_DATA.tables).map((t) => ({
+    ...t,
+    status: 'available' as const,
+    items: [],
+    payments: [],
+    total: 0,
+    paid: 0,
+    pending: 0,
+    openedAt: undefined,
+    customerName: undefined,
+    notes: undefined,
+    appliedDiscountId: undefined,
   }))
   data.cash = {
-    ...DEFAULT_BAR_DATA.cash,
+    ...data.cash,
     cashSales: 0,
     electronicSales: 0,
     expenses: 0,
@@ -1682,9 +1893,118 @@ export function registerInventoryAdjustment(
   saveBarData(data)
 }
 
+// === GESTIÓN DE CATEGORÍAS PERSONALIZADAS POR NEGOCIO ===
+
+export function addCategory(name: string, icon: string = '🍸'): CategoryState {
+  const data = loadBarData()
+  const cleanName = name.trim()
+  const currentCategories = data.categories || [...DEFAULT_CATEGORIES]
+
+  const existing = currentCategories.find((c) => c.name.toLowerCase() === cleanName.toLowerCase())
+  if (existing) return existing
+
+  const newCat: CategoryState = {
+    id: cleanName,
+    name: cleanName,
+    icon: icon.trim() || '🍸',
+    isDefault: false,
+  }
+  data.categories = [...currentCategories, newCat]
+  saveBarData(data)
+  return newCat
+}
+
+export function deleteCategory(id: string): boolean {
+  const data = loadBarData()
+  const currentCategories = data.categories || [...DEFAULT_CATEGORIES]
+  const target = currentCategories.find((c) => c.id === id)
+  if (!target || target.isDefault) return false
+
+  data.categories = currentCategories.filter((c) => c.id !== id)
+  saveBarData(data)
+  return true
+}
+
+// === GESTIÓN DE DESCUENTOS Y HAPPY HOURS POR LOCAL ===
+
+export function addCustomDiscount(
+  params: Omit<DiscountRuleState, 'id' | 'isPreset'>
+): DiscountRuleState {
+  const data = loadBarData()
+  const currentDiscounts = data.discounts || [...PRESET_DISCOUNTS]
+
+  const newDiscount: DiscountRuleState = {
+    ...params,
+    id: 'disc-' + Date.now(),
+    isPreset: false,
+    active: params.active !== undefined ? params.active : true,
+  }
+
+  data.discounts = [...currentDiscounts, newDiscount]
+  saveBarData(data)
+  return newDiscount
+}
+
+export function toggleDiscountActive(id: string): void {
+  const data = loadBarData()
+  data.discounts = (data.discounts || [...PRESET_DISCOUNTS]).map((d) => {
+    if (d.id === id) {
+      return { ...d, active: !d.active }
+    }
+    return d
+  })
+  saveBarData(data)
+}
+
+export function deleteCustomDiscount(id: string): boolean {
+  const data = loadBarData()
+  const currentDiscounts = data.discounts || [...PRESET_DISCOUNTS]
+  const target = currentDiscounts.find((d) => d.id === id)
+  // Los descuentos predeterminados no se eliminan, siempre se mantienen en el sistema
+  if (!target || target.isPreset) return false
+
+  data.discounts = currentDiscounts.filter((d) => d.id !== id)
+  saveBarData(data)
+  return true
+}
+
+// Calcular el monto en COP de un descuento / Happy Hour sobre los ítems de una mesa
+export function calculateDiscountForOrder(
+  items: OrderItemState[],
+  products: ProductState[],
+  discount?: DiscountRuleState | null
+): number {
+  if (!discount || !discount.active || !items || items.length === 0) return 0
+
+  const subtotalAll = items.reduce((acc, it) => acc + it.subtotal, 0)
+  if (subtotalAll <= 0) return 0
+
+  let eligibleAmount = subtotalAll
+
+  if (discount.scope === 'category' && discount.categoryName) {
+    const targetCat = discount.categoryName.toLowerCase()
+    eligibleAmount = items.reduce((acc, it) => {
+      const prod = products.find((p) => p.id === it.productId)
+      const matchesCat =
+        (prod && prod.category.toLowerCase().includes(targetCat)) ||
+        it.name.toLowerCase().includes(targetCat)
+      return matchesCat ? acc + it.subtotal : acc
+    }, 0)
+  }
+
+  if (eligibleAmount <= 0) return 0
+
+  if (discount.type === 'percentage') {
+    const pct = Math.min(100, Math.max(0, discount.value))
+    return Math.round((eligibleAmount * pct) / 100)
+  } else {
+    return Math.min(eligibleAmount, Math.max(0, discount.value))
+  }
+}
+
 export function resetBarData(): BarData {
-  saveBarData(DEFAULT_BAR_DATA)
-  return DEFAULT_BAR_DATA
+  resetTablesOnly()
+  return loadBarData()
 }
 
 function subscribe(callback: () => void) {

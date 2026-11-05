@@ -13,6 +13,13 @@ export default function DashboardPage() {
 
   const lowStockCount = (barData.products || []).filter((p) => p.active !== false && p.stock <= p.min_stock).length
   const formatCOP = (val: number) => '$ ' + val.toLocaleString('es-CO')
+  const barName = barData.settings?.barName || 'ROCK BAR'
+  const businessType = barData.settings?.businessType || 'Rock & Metal Bar POS'
+  const brandIcon = barData.settings?.brandIcon || '🎸'
+  const slogan =
+    barData.settings?.slogan ||
+    'Control en tiempo real de mesas, pedidos, cobros e inventario. ¡Que suene la buena vibra!'
+  const activeDiscounts = (barData.discounts || []).filter((d) => d.active)
 
   const stats = [
     {
@@ -51,20 +58,47 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Banner de Bienvenida */}
+      {/* Banner de Bienvenida Personalizable por Negocio */}
       <div className="relative overflow-hidden rounded-3xl rock-gradient p-6 sm:p-8 border border-red-900/40 shadow-2xl">
-        <div className="relative z-10">
-          <div className="inline-flex items-center space-x-2 bg-red-600/30 border border-red-500/40 px-3 py-1 rounded-full text-amber-400 text-xs font-semibold mb-4">
-            <span>🔥 Operación en Vivo</span>
-            <span>•</span>
-            <span>Rock & Metal Bar POS</span>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center space-x-2 bg-black/30 border border-white/15 px-3 py-1 rounded-full text-amber-400 text-xs font-semibold mb-4">
+              <span>🔥 Operación en Vivo</span>
+              <span>•</span>
+              <span>{businessType}</span>
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight mb-2">
+              {brandIcon} {barName} — Panel de Operaciones
+            </h2>
+            <p className="text-zinc-200 text-sm sm:text-base max-w-xl">
+              {slogan}
+            </p>
           </div>
-          <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight mb-2">
-            Panel de Operaciones
-          </h2>
-          <p className="text-zinc-300 text-sm sm:text-base max-w-xl">
-            Control en tiempo real de mesas, pedidos, cobros e inventario. ¡Que suene el rock! 🎸
-          </p>
+
+          {activeDiscounts.length > 0 && (
+            <div className="bg-black/40 backdrop-blur-md border border-amber-500/30 rounded-2xl p-3.5 max-w-xs shrink-0 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] font-bold text-amber-400 uppercase tracking-wider">
+                <span>🎉 Happy Hours & Promos Activas</span>
+                <span className="bg-amber-500/20 px-1.5 py-0.5 rounded text-[10px]">{activeDiscounts.length}</span>
+              </div>
+              <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+                {activeDiscounts.slice(0, 3).map((d) => (
+                  <div key={d.id} className="text-xs text-zinc-200 flex items-center justify-between gap-2">
+                    <span className="truncate font-semibold">{d.name}</span>
+                    <span className="text-[10px] font-mono text-emerald-400 shrink-0 font-bold">
+                      {d.type === 'percentage' ? `-${d.value}%` : `-$${d.value.toLocaleString('es-CO')}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <Link
+                href="/configuracion"
+                className="text-[10px] text-amber-300 hover:text-white underline block pt-0.5 font-semibold"
+              >
+                Configurar promos o interfaz →
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 

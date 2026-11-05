@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   getBarUsers,
   saveBarUsers,
@@ -9,10 +10,12 @@ import {
   deleteBarMember,
   useAuthStore,
   setAuthState,
+  deleteAccountWithPinVerification,
+  getLocalDeletedAccounts,
   UserRole,
   AuthUser
 } from '@/lib/authStore'
-import { getCloudTeamMembers } from '@/lib/supabaseClient'
+import { getCloudTeamMembers, getDeletedCloudAccounts, DeletedCloudAccountRecord } from '@/lib/supabaseClient'
 import {
   ShieldAlert,
   UserCheck,
@@ -24,13 +27,24 @@ import {
   UserPlus,
   Trash2,
   X,
+  Database,
+  AlertTriangle,
 } from 'lucide-react'
 
 export default function UsuariosPage() {
+  const router = useRouter()
   const { user } = useAuthStore()
-  const [activeTab, setActiveTab] = useState<'roles' | 'permisos'>('roles')
+  const [activeTab, setActiveTab] = useState<'roles' | 'permisos' | 'eliminados'>('roles')
   const [usersList, setUsersList] = useState<AuthUser[]>(() => getBarUsers())
   const [showAddModal, setShowAddModal] = useState(false)
+
+  // Eliminación de cuenta con verificación PIN y base de datos de usuarios eliminados
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false)
+  const [deletePin, setDeletePin] = useState('')
+  const [deleteReason, setDeleteReason] = useState('Cierre o solicitud del propietario desde módulo Usuarios')
+  const [deleteError, setDeleteError] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deletedAccountsList, setDeletedAccountsList] = useState<DeletedCloudAccountRecord[]>([])
 
   // Formulario nuevo miembro del equipo
   const [newName, setNewName] = useState('')
@@ -126,6 +140,36 @@ export default function UsuariosPage() {
     })
   }
 
+  const loadDeletedAccountsHistory = async () => {
+    const local = getLocalDeletedAccounts()
+    const cloud = await getDeletedCloudAccounts().catch(() => [])
+    const mergedMap = new Map<string, DeletedCloudAccountRecord>()
+    local.forEach((acc) => mergedMap.set(acc.id || acc.email, acc))
+    cloud.forEach((acc) => mergedMap.set(acc.id || acc.email, acc))
+    setDeletedAccountsList(Array.from(mergedMap.values()))
+  }
+
+  const handleConfirmDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setDeleteError('')
+    if (!deletePin.trim()) {
+      setDeleteError('Debes ingresar el PIN de seguridad del propietario.')
+      return
+    }
+    setIsDeleting(true)
+    const result = await deleteAccountWithPinVerification({
+      pinInput: deletePin,
+      reason: deleteReason,
+    })
+    setIsDeleting(false)
+    if (!result.success) {
+      setDeleteError(result.message || 'PIN inválido. No se pudo eliminar la cuenta.')
+      return
+    }
+    setShowDeleteAccountModal(false)
+    router.push('/login')
+  }
+
   const permissionsMatrix = [
     { module: 'Panel Principal y Métricas Generales', staff: true, admin: true, owner: true },
     { module: 'Mapa de Mesas y Asignación de Clientes', staff: true, admin: true, owner: true },
@@ -179,10 +223,10 @@ export default function UsuariosPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-zinc-800 space-x-4">
+      <div className="flex flex-wrap border-b border-zinc-800 gap-4">
         <button
           onClick={() => setActiveTab('roles')}
-          className={`pb-3 text-sm font-bold flex items-center space-x-2 border-b-2 transition-all ${
+          className={`pb-3 text-sm font-bold flex items-center space-x-2 border-b-2 transition-all cursor-pointer ${
             activeTab === 'roles'
               ? 'border-red-500 text-white'
               : 'border-transparent text-zinc-500 hover:text-zinc-300'
@@ -194,7 +238,7 @@ export default function UsuariosPage() {
 
         <button
           onClick={() => setActiveTab('permisos')}
-          className={`pb-3 text-sm font-bold flex items-center space-x-2 border-b-2 transition-all ${
+          className={`pb-3 text-sm font-bold flex items-center space-x-2 border-b-2 transition-all cursor-pointer ${
             activeTab === 'permisos'
               ? 'border-red-500 text-white'
               : 'border-transparent text-zinc-500 hover:text-zinc-300'
@@ -202,6 +246,21 @@ export default function UsuariosPage() {
         >
           <Eye className="w-4 h-4" />
           <span>Matriz de Permisos por Rol</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('eliminados')
+            loadDeletedAccountsHistory()
+          }}
+          className={`pb-3 text-sm font-bold flex items-center space-x-2 border-b-2 transition-all cursor-pointer ${
+            activeTab === 'eliminados'
+              ? 'border-red-500 text-white'
+              : 'border-transparent text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          <Database className="w-4 h-4 text-red-400" />
+          <span>Seguridad & BD Usuarios Eliminados</span>
         </button>
       </div>
 
@@ -302,7 +361,7 @@ export default function UsuariosPage() {
             })}
           </div>
         </div>
-      ) : (
+      ) : activeTab === 'permisos' ? (
         /* Matriz de Permisos */
         <div className="bg-zinc-900/80 rounded-2xl border border-zinc-800 overflow-hidden shadow-xl">
           <div className="p-4 border-b border-zinc-800 bg-zinc-950/60">
@@ -361,6 +420,93 @@ export default function UsuariosPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      ) : (
+        /* Seguridad & Base de Datos de Usuarios Eliminados */
+        <div className="space-y-6">
+          <div className="rock-card rounded-2xl p-6 border border-red-500/30 bg-gradient-to-br from-zinc-900 via-zinc-900 to-red-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-bold text-white text-base flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 text-red-400" />
+                <span>Eliminación de Cuenta con Verificación de PIN</span>
+              </h3>
+              <p className="text-xs text-zinc-400 mt-1">
+                Si deseas dar de baja tu cuenta actual ({user?.barName || 'Establecimiento'}), se solicitará el PIN del Propietario y el registro pasará a la Base de Datos de Usuarios Eliminados (<code className="text-amber-300">deleted_bar_accounts</code>).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setDeletePin('')
+                setDeleteError('')
+                setShowDeleteAccountModal(true)
+              }}
+              className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider flex items-center space-x-2 transition-all shrink-0 cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Eliminar Mi Cuenta (Pedir PIN)</span>
+            </button>
+          </div>
+
+          <div className="bg-zinc-900/80 rounded-2xl border border-zinc-800 overflow-hidden shadow-xl">
+            <div className="p-4 border-b border-zinc-800 bg-zinc-950/60 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                  <Database className="w-4 h-4 text-amber-400" />
+                  <span>Base de Datos de Usuarios y Cuentas Eliminadas ({deletedAccountsList.length})</span>
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Auditoría histórica de cuentas eliminadas con verificación de PIN (sincronizada con Supabase y respaldo local)
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadDeletedAccountsHistory}
+                className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold cursor-pointer"
+              >
+                Actualizar
+              </button>
+            </div>
+
+            {deletedAccountsList.length === 0 ? (
+              <div className="p-8 text-center text-zinc-500 text-xs">
+                No hay cuentas registradas en la base de datos de usuarios eliminados.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-zinc-950 text-zinc-400 uppercase border-b border-zinc-800">
+                    <tr>
+                      <th className="p-3.5">Establecimiento</th>
+                      <th className="p-3.5">Propietario</th>
+                      <th className="p-3.5">Correo</th>
+                      <th className="p-3.5">Motivo</th>
+                      <th className="p-3.5">Verificación</th>
+                      <th className="p-3.5">Fecha Eliminación</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60">
+                    {deletedAccountsList.map((acc, idx) => (
+                      <tr key={acc.id || idx} className="hover:bg-zinc-800/30">
+                        <td className="p-3.5 font-bold text-white">{acc.bar_name}</td>
+                        <td className="p-3.5 text-zinc-300">{acc.full_name}</td>
+                        <td className="p-3.5 text-zinc-400">{acc.email}</td>
+                        <td className="p-3.5 text-amber-300">{acc.deletion_reason}</td>
+                        <td className="p-3.5">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                            PIN Verificado
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-zinc-500">
+                          {acc.deleted_at}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -456,6 +602,81 @@ export default function UsuariosPage() {
                   className="px-6 py-2 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-red-950/40 cursor-pointer"
                 >
                   Guardar Empleado
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Verificación de PIN para Eliminar Cuenta */}
+      {showDeleteAccountModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-zinc-950 border border-red-800/60 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 rounded-xl bg-red-600/20 text-red-400 border border-red-500/30">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">Verificar PIN para Eliminar Cuenta</h3>
+                  <p className="text-xs text-zinc-400">Se archivará en la base de datos de usuarios eliminados</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDeleteAccountModal(false)}
+                className="text-zinc-500 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {deleteError && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium">
+                {deleteError}
+              </div>
+            )}
+
+            <form onSubmit={handleConfirmDeleteAccount} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                  PIN o Contraseña del Propietario ({user?.name || 'Dueño'})
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={deletePin}
+                  onChange={(e) => setDeletePin(e.target.value)}
+                  placeholder="Ingresa tu PIN de seguridad"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-red-500 font-mono tracking-widest"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Motivo de eliminación</label>
+                <input
+                  type="text"
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-zinc-100 focus:outline-none focus:border-red-500"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteAccountModal(false)}
+                  className="px-4 py-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white text-xs font-semibold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isDeleting}
+                  className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg cursor-pointer"
+                >
+                  {isDeleting ? 'Verificando y Eliminando...' : 'Confirmar con PIN'}
                 </button>
               </div>
             </form>

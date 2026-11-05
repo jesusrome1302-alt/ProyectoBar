@@ -133,5 +133,41 @@ export interface Settings {
   business_id: string
   receipt_footer?: string
   tax_rate: number
+  business_type?: string
+  theme_preset?: string
+  brand_icon?: string
+  slogan?: string
 }
+
+export interface DiscountPresetOrCustom {
+  id: string
+  business_id?: string
+  name: string
+  description?: string
+  type: 'percentage' | 'fixed'
+  value: number // porcentaje (0-100) o monto en COP
+  scope: 'all' | 'category'
+  category_name?: string
+  is_happy_hour: boolean
+  start_time?: string
+  end_time?: string
+  days?: string[]
+  is_preset: boolean
+  active: boolean
+}
+
+export interface DeletedBarAccount {
+  id: string
+  original_account_id?: string
+  business_id: string
+  email: string
+  full_name: string
+  bar_name: string
+  phone?: string
+  city?: string
+  deletion_reason: string
+  pin_verified: boolean
+  deleted_at: string
+}
+
 

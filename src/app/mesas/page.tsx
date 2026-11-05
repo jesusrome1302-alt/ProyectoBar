@@ -21,7 +21,7 @@ import {
   useBarStore,
   loadBarData,
   saveBarData,
-  resetBarData,
+  resetTablesOnly,
   setActiveTableId,
   addTable,
   updateTable,
@@ -200,10 +200,16 @@ export default function MesasPage() {
   }
 
   const handleResetData = () => {
-    if (confirm('¿Deseas reiniciar las mesas de prueba al estado inicial?')) {
-      resetBarData()
-      setSuccessMsg('Mesas y datos restablecidos por defecto.')
-      setTimeout(() => setSuccessMsg(''), 3000)
+    if (
+      confirm(
+        '¿Deseas reiniciar ÚNICAMENTE las mesas a estado Disponible ($0)?\n\n✅ Tus productos, inventario, categorías, caja, descuentos y configuración de tu local se conservarán 100% intactos.'
+      )
+    ) {
+      resetTablesOnly()
+      setSuccessMsg(
+        '¡Mesas liberadas a $0 con éxito! Tus productos, inventario, caja y configuración permanecen intactos.'
+      )
+      setTimeout(() => setSuccessMsg(''), 4000)
     }
   }
 
@@ -258,10 +264,11 @@ export default function MesasPage() {
 
           <button
             onClick={handleResetData}
-            title="Restablecer datos de prueba"
-            className="p-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-500 hover:text-zinc-300 rounded-xl transition-colors cursor-pointer"
+            title="Reiniciar solo las mesas a Disponible ($0) sin borrar productos ni información del bar"
+            className="flex items-center space-x-1.5 px-3 py-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-amber-400 rounded-xl transition-colors cursor-pointer text-xs font-semibold"
           >
             <RefreshCw className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Reiniciar Solo Mesas</span>
           </button>
         </div>
       </div>

@@ -1,11 +1,13 @@
 import { useSyncExternalStore } from 'react'
-import { registerNewBusinessBar } from '@/lib/barState'
+import { registerNewBusinessBar, loadBarData, DEFAULT_BAR_DATA } from '@/lib/barState'
 import {
   checkCloudEmailExists,
   registerCloudAccount,
   loginCloudAccount,
   saveCloudTeamMember,
   deleteCloudTeamMember,
+  archiveAndDeleteCloudAccount,
+  DeletedCloudAccountRecord,
 } from '@/lib/supabaseClient'
 
 export type UserRole = 'owner' | 'admin' | 'staff'
@@ -414,6 +416,94 @@ export async function loginWithCredentials(
   }
 
   return { success: false, message: 'Usuario, correo o PIN incorrectos. Verifica tus credenciales.' }
+}
+
+const DELETED_ACCOUNTS_STORAGE_KEY = 'ROCK_BAR_DELETED_ACCOUNTS_V1'
+
+export function getLocalDeletedAccounts(): DeletedCloudAccountRecord[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(DELETED_ACCOUNTS_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+// Eliminar cuenta comercial o de usuario con verificación obligatoria de PIN y archivo en base de datos de usuarios eliminados
+export async function deleteAccountWithPinVerification(params: {
+  pinInput: string
+  reason: string
+}): Promise<{ success: boolean; message: string }> {
+  const current = getAuthState()
+  const activeUser = current.user
+
+  if (!activeUser) {
+    return {
+      success: false,
+      message: 'No hay una sesión activa para eliminar.',
+    }
+  }
+
+  const cleanPin = params.pinInput.trim()
+  if (!cleanPin) {
+    return {
+      success: false,
+      message: 'Debes ingresar tu PIN o contraseña para verificar la eliminación.',
+    }
+  }
+
+  // Verificar que el PIN ingresado coincida exactamente con el PIN del usuario/propietario activo
+  if (cleanPin !== activeUser.pin) {
+    return {
+      success: false,
+      message: 'PIN de seguridad incorrecto. No se autorizó la eliminación de la cuenta.',
+    }
+  }
+
+  const finalSnapshot = loadBarData()
+  const deletedRecord: DeletedCloudAccountRecord = {
+    id: 'del-' + Date.now(),
+    original_account_id: activeUser.id,
+    business_id: activeUser.businessId || 'local-business',
+    email: activeUser.email,
+    full_name: activeUser.name,
+    bar_name: activeUser.barName || finalSnapshot.settings?.barName || 'MI BAR',
+    phone: activeUser.phone || finalSnapshot.settings?.phone || '',
+    city: activeUser.city || '',
+    deletion_reason: params.reason.trim() || 'Eliminación solicitada y verificada con PIN por el titular',
+    pin_verified: true,
+    deleted_at: new Date().toLocaleString('es-CO'),
+  }
+
+  // 1. Guardar en el registro local de cuentas eliminadas (auditoría inmediata)
+  if (typeof window !== 'undefined') {
+    const prevDeleted = getLocalDeletedAccounts()
+    localStorage.setItem(DELETED_ACCOUNTS_STORAGE_KEY, JSON.stringify([deletedRecord, ...prevDeleted]))
+  }
+
+  // 2. Archivar en la base de datos de usuarios eliminados (deleted_bar_accounts) en Supabase y borrar de bar_accounts activa
+  await archiveAndDeleteCloudAccount({
+    user: activeUser,
+    reason: deletedRecord.deletion_reason,
+    finalSnapshot,
+  })
+
+  // 3. Limpiar datos locales de la cuenta eliminada y cerrar sesión
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(USERS_STORAGE_KEY)
+    localStorage.setItem('ROCK_BAR_APP_STATE_V1', JSON.stringify(DEFAULT_BAR_DATA))
+    window.dispatchEvent(new Event('rock_bar_state_updated'))
+  }
+
+  logout()
+
+  return {
+    success: true,
+    message: `La cuenta de "${deletedRecord.bar_name}" (${activeUser.email}) fue verificada con PIN, archivada en la base de datos de usuarios eliminados y eliminada del sistema activo.`,
+  }
 }
 
 export function logout(): void {

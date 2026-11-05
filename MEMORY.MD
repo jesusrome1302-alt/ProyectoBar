@@ -134,7 +134,10 @@ proyecto-bar/
 | ETAPA 6 | Caja, apertura/cierre turnos, gastos, retiros, arqueos | ✅ Completa |
 | ETAPA 7 | Inventario, compras, proveedores, ajustes, kardex | ✅ Completa |
 | ETAPA 8 | Reportes, filtros, exportaciones, permisos | ✅ Completa |
-| ETAPA 9 | Pruebas, seguridad, documentación, despliegue | ⏳ En progreso |
+| ETAPA 9 | Pruebas, seguridad, documentación, despliegue | ✅ Completa |
+| ETAPA 10 | Identidad visual del bar, foto/logo WebP en perfil y sidebar | ✅ Completa |
+| ETAPA 11 | Inventario Dual Nevera vs. Bodega y alerta de reposición | ✅ Completa |
+| ETAPA 12 | Reinicio seguro de mesas, Happy Hours/Descuentos, Eliminación con PIN (`deleted_bar_accounts`), Personalización de Interfaz y Categorías por local | ✅ Completa |
 
 ---
 
@@ -325,3 +328,20 @@ npm install -D <pkg> # Instalar devDependency
    13. **Módulo de Reportes en Cero (0) para Cuentas Nuevas y Crecimiento Dinámico + Sistema de Descuentos / Happy Hour:**
       - **Reportes en Vivo (`/reportes` y `/`):** Eliminados todos los valores estáticos de prueba. En cuentas nuevas todos los indicadores (Ventas, Mesas Ocupadas, Unidades Vendidas, Resumen de Caja, Gráfico Mensual, Top Productos y Cierre de Turno) inician estrictamente en `0` (`$ 0` y `0%`) y crecen automáticamente en tiempo real conforme el negocio registra pedidos, cobros y movimientos de caja. Exportación CSV conectada a los datos reales.
       - **Descuentos Automáticos Programables y Manuales (`/ventas` y `barState.ts`):** Botón y modal **"Descuentos / Happy Hour"** que permite programar descuentos automáticos por categoría (ej. Cervezas más económicas ciertos días de la semana hasta las 10:00 PM / `22:00`), por producto específico, por valor en pesos (`-$`), porcentaje (`%`) o precio fijo especial, además de activación forzada con 1 clic y descuentos manuales directos sobre la comanda activa.
+   14. **ETAPA 12 - Reinicio Seguro de Mesas, Descuentos/Happy Hours, Eliminación de Cuenta con PIN, Personalización de Interfaz y Categorías Dinámicas (04/11/2026):**
+      - **Corrección de Reinicio de Mesas (`resetTablesOnly` en `src/lib/barState.ts` y `/mesas`):**
+        - Solucionado el problema donde el botón de reiniciar en `/mesas` llamaba a `resetBarData()` y sobrescribía todo el estado con `DEFAULT_BAR_DATA`.
+        - Ahora `resetTablesOnly()` (y `resetBarData()` por seguridad) libera únicamente las mesas a estado disponible (`$0`), devuelve el stock no facturado a `stock_nevera` y **conserva el 100% de los productos, inventario, categorías, descuentos, proveedores, compras, historial de caja y configuración**.
+      - **Descuentos y Happy Hours por Tipo de Local (Conservando Predeterminados):**
+        - Se mantienen siempre los 5 descuentos/Happy Hours predeterminados (`PRESET_DISCOUNTS` con `isPreset: true`, protegidos contra borrado y fusionados automáticamente en `loadBarData`).
+        - Cada negocio puede crear sus propios descuentos o Happy Hours personalizados (porcentaje o valor fijo `$ COP`, aplicables a toda la cuenta o a una categoría específica, con horario sugerido y etiqueta de tipo de local) desde `/configuracion`.
+        - Integración en vivo en `/ventas` y `/cobro` con cálculo automático de descuento sobre el pedido y desglose en la Pre-Cuenta y Factura Térmica.
+      - **Eliminación de Cuenta con Verificación de PIN y Base de Datos de Usuarios Eliminados:**
+        - Nueva migración SQL `supabase/migrations/003_customization_discounts_deleted_accounts.sql` con la tabla `public.deleted_bar_accounts`.
+        - Funciones `archiveAndDeleteCloudAccount` y `getDeletedCloudAccounts` en `src/lib/supabaseClient.ts` y `deleteAccountWithPinVerification` en `src/lib/authStore.ts`.
+        - Al solicitar eliminar la cuenta desde `/configuracion` o `/usuarios`, el sistema exige verificar el PIN/contraseña del propietario. Si es válido, guarda el registro auditado en `deleted_bar_accounts` (y en el respaldo local `ROCK_BAR_DELETED_ACCOUNTS_V1`), elimina la cuenta activa y cierra la sesión. Incluye visor de la Base de Datos de Cuentas Eliminadas.
+      - **Personalización de Interfaz por Negocio:**
+        - Soporte para `businessType` (Bar / Pub Rock, Gastrobar, Discoteca / Club, Cervecería Artesanal, Licorera / Estanco, Café / Lounge), `themePreset` (`rock`, `emerald`, `amber`, `purple`, `sky`), `brandIcon` y `slogan`.
+        - Aplicación reactiva mediante el atributo `data-theme` en `layout.tsx` y estilos adaptativos en `globals.css`, `Sidebar.tsx` y `page.tsx`.
+      - **Creación y Gestión de Categorías de Productos por Negocio:**
+        - Cada local puede crear nuevas categorías con nombre e icono personalizado o eliminar categorías desde `/productos` (botón "+ Categorías") y `/configuracion`, reflejándose inmediatamente en los filtros del catálogo, formularios de productos, POS (`/ventas`) y reglas de descuentos.

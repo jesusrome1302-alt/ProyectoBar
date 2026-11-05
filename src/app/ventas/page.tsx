@@ -36,6 +36,9 @@ import {
   toggleForcePromotionNow,
   deletePromotionRule,
   applyManualDiscountToTable,
+  DEFAULT_CATEGORIES,
+  PRESET_DISCOUNTS,
+  calculateDiscountForOrder,
   TableState,
   OrderItemState,
   ProductState,
@@ -88,14 +91,14 @@ export default function VentasPage() {
   const [manualValue, setManualValue] = useState<number>(10)
   const [manualTargetProd, setManualTargetProd] = useState<string>('')
 
+  const barCategories = barData.categories && barData.categories.length > 0 ? barData.categories : DEFAULT_CATEGORIES
   const categories = [
     { id: 'all', name: 'Todos' },
-    { id: 'Cervezas', name: 'Cervezas' },
-    { id: 'Licores', name: 'Licores' },
-    { id: 'Cócteles', name: 'Cócteles' },
-    { id: 'Snacks', name: 'Snacks' },
-    { id: 'Sin Alcohol', name: 'Sin Alcohol' },
+    ...barCategories.map((c) => ({ id: c.name, name: `${c.icon ? c.icon + ' ' : ''}${c.name}` })),
   ]
+  const availableDiscounts = (barData.discounts && barData.discounts.length > 0 ? barData.discounts : PRESET_DISCOUNTS).filter(
+    (d) => d.active
+  )
 
   const currentTableObj = tables.find((t) => t.id === selectedTableId) || tables[0]
   const currentOrder: OrderItemState[] = currentTableObj ? currentTableObj.items : []
@@ -242,9 +245,21 @@ export default function VentasPage() {
   const formatCOP = (val: number) => '$ ' + val.toLocaleString('es-CO')
   const totalAmount = currentOrder.reduce((acc, it) => acc + it.subtotal, 0)
   const totalItemsCount = currentOrder.reduce((acc, it) => acc + it.quantity, 0)
+  const productList = barData.products || []
+
+  const selectedDiscount = availableDiscounts.find((d) => d.id === currentTableObj?.appliedDiscountId) || null
+  const discountAmount = calculateDiscountForOrder(currentOrder, productList, selectedDiscount)
+  const finalAmountAfterDiscount = Math.max(0, totalAmount - discountAmount)
+
+  const handleSelectTableDiscount = (discountId: string) => {
+    if (!currentTableObj) return
+    const nextDiscountId = currentTableObj.appliedDiscountId === discountId ? undefined : discountId
+    updateTable(currentTableObj.id, {
+      appliedDiscountId: nextDiscountId,
+    })
+  }
 
   // Filtrado de productos en vivo
-  const productList = barData.products || []
   const filteredProducts = productList.filter((p) => {
     const matchesCategory = activeCategory === 'all' || p.category.toLowerCase().includes(activeCategory.toLowerCase())
     const matchesQuery = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || (p.barcode && p.barcode.includes(searchQuery))
@@ -660,10 +675,48 @@ export default function VentasPage() {
             </div>
           )}
 
+          {/* Selector Rápido de Descuento / Happy Hour en la Comanda */}
+          {availableDiscounts.length > 0 && currentOrder.length > 0 && (
+            <div className="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800 space-y-2">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-bold text-amber-400">🎉 Aplicar Descuento / Happy Hour</span>
+                {selectedDiscount && (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTableDiscount(selectedDiscount.id)}
+                    className="text-[10px] text-zinc-400 hover:text-red-400 underline cursor-pointer"
+                  >
+                    Quitar promo
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+                {availableDiscounts.map((disc) => {
+                  const isApplied = currentTableObj?.appliedDiscountId === disc.id
+                  return (
+                    <button
+                      key={disc.id}
+                      type="button"
+                      onClick={() => handleSelectTableDiscount(disc.id)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap border transition-all cursor-pointer ${
+                        isApplied
+                          ? 'bg-amber-500 text-black border-amber-400 shadow-sm'
+                          : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:border-amber-500/40'
+                      }`}
+                    >
+                      {disc.isHappyHour ? '🍹 ' : '🏷️ '}
+                      {disc.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Resumen Financiero */}
           <div className="space-y-2 pt-3 border-t border-zinc-800">
             <div className="flex items-center justify-between text-xs text-zinc-400">
-              <span>Unidades en Comanda ({totalItemsCount})</span>
+              <span>Subtotal Comanda ({totalItemsCount} uds)</span>
               <div className="flex items-center space-x-2">
                 {currentOrder.length > 0 && (
                   <button
@@ -681,9 +734,15 @@ export default function VentasPage() {
                 <span>{formatCOP(totalAmount)}</span>
               </div>
             </div>
+            {discountAmount > 0 && selectedDiscount && (
+              <div className="flex items-center justify-between text-xs text-emerald-400 font-bold">
+                <span>Descuento ({selectedDiscount.name})</span>
+                <span>- {formatCOP(discountAmount)}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between text-base font-black text-white pt-2 border-t border-zinc-800/80">
               <span>Total a Cobrar</span>
-              <span className="text-xl font-black text-amber-400">{formatCOP(totalAmount)}</span>
+              <span className="text-xl font-black text-amber-400">{formatCOP(finalAmountAfterDiscount)}</span>
             </div>
           </div>
 

@@ -39,6 +39,9 @@ import {
   registerPurchase,
   registerInventoryAdjustment,
   loadSuggestedProductsTemplate,
+  addCategory,
+  deleteCategory,
+  DEFAULT_CATEGORIES,
   ProductState,
   SupplierState,
   PurchaseRecord,
@@ -68,6 +71,11 @@ export default function ProductosPage() {
   const [showSupplierModal, setShowSupplierModal] = useState<boolean>(false)
   const [showPurchaseModal, setShowPurchaseModal] = useState<boolean>(false)
   const [showAdjustmentModal, setShowAdjustmentModal] = useState<boolean>(false)
+  const [showCategoryModal, setShowCategoryModal] = useState<boolean>(false)
+
+  // Formulario Nueva Categoría
+  const [newCategoryName, setNewCategoryName] = useState<string>('')
+  const [newCategoryIcon, setNewCategoryIcon] = useState<string>('🍸')
 
   // Formulario Nuevo Producto
   const [formName, setFormName] = useState<string>('')
@@ -129,15 +137,34 @@ export default function ProductosPage() {
     return nev <= minNev
   }).length
 
+  const barCategories = barData.categories && barData.categories.length > 0 ? barData.categories : DEFAULT_CATEGORIES
+
   const categories = [
     { id: 'all', name: 'Todos' },
     { id: 'low_nevera', name: `❄️ Reponer Nevera (${lowNeveraCount})` },
-    { id: 'Cervezas', name: 'Cervezas' },
-    { id: 'Licores', name: 'Licores' },
-    { id: 'Cócteles', name: 'Cócteles' },
-    { id: 'Snacks', name: 'Snacks' },
-    { id: 'Sin Alcohol', name: 'Sin Alcohol' },
+    ...barCategories.map((c) => ({ id: c.name, name: `${c.icon ? c.icon + ' ' : ''}${c.name}` })),
   ]
+
+  // Crear nueva categoría personalizada del negocio
+  const handleCreateCategory = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newCategoryName.trim()) return
+    const created = addCategory(newCategoryName.trim(), newCategoryIcon)
+    setNewCategoryName('')
+    setFormCategory(created.name)
+    setNotification(`¡Categoría "${created.icon || ''} ${created.name}" creada para tu negocio!`)
+    setTimeout(() => setNotification(''), 4000)
+  }
+
+  const handleDeleteCategory = (id: string, name: string) => {
+    if (confirm(`¿Deseas eliminar la categoría "${name}"?`)) {
+      if (deleteCategory(id)) {
+        if (activeCategory === name) setActiveCategory('all')
+        setNotification(`Categoría "${name}" eliminada.`)
+        setTimeout(() => setNotification(''), 3500)
+      }
+    }
+  }
 
   const formatCOP = (val: number) => '$ ' + Math.abs(val).toLocaleString('es-CO')
 
@@ -408,16 +435,26 @@ export default function ProductosPage() {
         </div>
 
         {/* Acciones Rápidas */}
-        <div className="flex items-center space-x-2 flex-wrap">
+        <div className="flex items-center space-x-2 flex-wrap gap-y-2">
           {activeTab === 'catalogo' && (
-            <button
-              type="button"
-              onClick={() => setShowProductModal(true)}
-              className="flex items-center space-x-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-red-900/30 transition-all text-xs cursor-pointer active:scale-95"
-            >
-              <Plus className="w-4 h-4" />
-              <span>+ Nuevo Producto</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setShowCategoryModal(true)}
+                className="flex items-center space-x-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-amber-400 hover:text-amber-300 font-bold px-3.5 py-2.5 rounded-xl transition-all text-xs cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Categorías ({barCategories.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowProductModal(true)}
+                className="flex items-center space-x-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-red-900/30 transition-all text-xs cursor-pointer active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Nuevo Producto</span>
+              </button>
+            </>
           )}
 
           {activeTab === 'compras' && (
@@ -1162,17 +1199,26 @@ export default function ProductosPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Categoría *</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-zinc-300">Categoría *</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowCategoryModal(true)}
+                      className="text-[10px] font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                    >
+                      + Crear categoría
+                    </button>
+                  </div>
                   <select
                     value={formCategory}
                     onChange={(e) => setFormCategory(e.target.value)}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-red-500 cursor-pointer"
                   >
-                    <option value="Cervezas">Cervezas</option>
-                    <option value="Licores">Licores & Botellas</option>
-                    <option value="Cócteles">Cócteles</option>
-                    <option value="Snacks">Snacks & Comida</option>
-                    <option value="Sin Alcohol">Sin Alcohol</option>
+                    {barCategories.map((cat) => (
+                      <option key={cat.id} value={cat.name}>
+                        {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -1349,17 +1395,26 @@ export default function ProductosPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Categoría *</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-zinc-300">Categoría *</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowCategoryModal(true)}
+                      className="text-[10px] font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                    >
+                      + Crear categoría
+                    </button>
+                  </div>
                   <select
                     value={editCategory}
                     onChange={(e) => setEditCategory(e.target.value)}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 cursor-pointer"
                   >
-                    <option value="Cervezas">Cervezas</option>
-                    <option value="Licores">Licores & Botellas</option>
-                    <option value="Cócteles">Cócteles</option>
-                    <option value="Snacks">Snacks & Comida</option>
-                    <option value="Sin Alcohol">Sin Alcohol</option>
+                    {barCategories.map((cat) => (
+                      <option key={cat.id} value={cat.name}>
+                        {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -2063,6 +2118,116 @@ export default function ProductosPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: GESTIONAR Y CREAR CATEGORÍAS DE PRODUCTOS DEL NEGOCIO */}
+      {/* ========================================================================= */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="rock-card w-full max-w-md p-6 rounded-3xl border border-amber-500/40 shadow-2xl relative space-y-4 animate-scaleUp">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center space-x-2">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                  <Boxes className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">Categorías de Productos</h3>
+                  <p className="text-xs text-zinc-400">Personaliza las categorías según el menú de tu negocio</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCategoryModal(false)}
+                className="text-zinc-500 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCategory} className="space-y-3">
+              <div className="grid grid-cols-12 gap-2">
+                <div className="col-span-3">
+                  <label className="text-[11px] font-semibold text-zinc-400 block mb-1">Icono</label>
+                  <select
+                    value={newCategoryIcon}
+                    onChange={(e) => setNewCategoryIcon(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-2 py-2.5 text-base text-white focus:outline-none focus:border-amber-500 cursor-pointer"
+                  >
+                    {['🍺', '🥃', '🍸', '🍷', '🍔', '🍕', '🌮', '🥤', '☕', '💨', '🎱', '🍾', '🍰', '🔥'].map((ic) => (
+                      <option key={ic} value={ic}>
+                        {ic}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-9">
+                  <label className="text-[11px] font-semibold text-zinc-400 block mb-1">Nombre de la Nueva Categoría *</label>
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      required
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Ej. Vinos, Shots, Botellas VIP, Comida Rápida..."
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-xs whitespace-nowrap cursor-pointer"
+                    >
+                      + Crear
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </form>
+
+            <div className="space-y-2 pt-2 border-t border-zinc-800">
+              <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+                Categorías Activas ({barCategories.length})
+              </p>
+              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                {barCategories.map((cat) => (
+                  <div
+                    key={cat.id}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <span className="text-base">{cat.icon || '📦'}</span>
+                      <span className="font-bold text-white">{cat.name}</span>
+                      {cat.isDefault && (
+                        <span className="text-[9px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded border border-zinc-700">
+                          Base
+                        </span>
+                      )}
+                    </div>
+                    {!cat.isDefault && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                        className="text-zinc-500 hover:text-red-400 p-1 rounded cursor-pointer"
+                        title="Eliminar categoría personalizada"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setShowCategoryModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-white cursor-pointer"
+              >
+                Listo
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -43,6 +43,8 @@ export default function Sidebar() {
   const barData = useBarStore()
   const currentRole: UserRole = user?.role || 'owner'
   const barDisplayName = user?.barName || barData.settings?.barName || 'MI BAR'
+  const brandIcon = barData.settings?.brandIcon || '🎸'
+  const businessType = barData.settings?.businessType || 'Sistema POS & Bar'
 
   // Filtrar ítems autorizados para el rol actual
   const authorizedItems = NAV_ITEMS.filter((item) => item.roles.includes(currentRole))
@@ -66,12 +68,12 @@ export default function Sidebar() {
             />
           ) : (
             <div className="bg-red-600 p-2.5 rounded-xl text-white font-black text-xl tracking-wider shadow-lg shadow-red-900/50 flex items-center justify-center shrink-0">
-              🎸
+              {brandIcon}
             </div>
           )}
           <div className="truncate">
             <h1 className="font-bold text-base text-white tracking-wide truncate">{barDisplayName}</h1>
-            <p className="text-[10px] text-amber-500 font-semibold uppercase tracking-wider">Sistema POS & Bar</p>
+            <p className="text-[10px] text-amber-500 font-semibold uppercase tracking-wider truncate">{businessType}</p>
           </div>
         </Link>
 
