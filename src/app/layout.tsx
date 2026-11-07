@@ -6,12 +6,13 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import MobileNav from '@/components/MobileNav'
-import { Bell, UserCheck, LogOut, Camera } from 'lucide-react'
+import { UserCheck, LogOut, Camera } from 'lucide-react'
 import { useAuthStore, logout } from '@/lib/authStore'
 import { useBarStore, syncCloudBarData } from '@/lib/barState'
 import LoginPage from './login/page'
 import PhotoUploadModal from '@/components/PhotoUploadModal'
 import GlobalDialog from '@/components/GlobalDialog'
+import NotificationCenter from '@/components/NotificationCenter'
 
 export default function RootLayout({
   children,
@@ -94,13 +95,8 @@ export default function RootLayout({
                 </div>
 
                 <div className="flex items-center space-x-3 sm:space-x-4">
-                  <button
-                    aria-label="Notificaciones"
-                    className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-900 rounded-xl transition-colors relative"
-                  >
-                    <Bell className="w-5 h-5" />
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-600 rounded-full animate-ping"></span>
-                  </button>
+                  {/* Centro de Notificaciones & Alertas de Nevera/Inventario */}
+                  <NotificationCenter />
 
                   <div className="flex items-center space-x-2.5 pl-3 border-l border-zinc-800">
                     <button

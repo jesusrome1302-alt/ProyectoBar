@@ -19,6 +19,7 @@ Este documento detalla el plan de desarrollo incremental, los módulos del siste
 - **ETAPA 13:** Animación interactiva de borrado "The Bin Eats The Label" (Gulp Delete Button) inspirada en Code & Chill para la eliminación segura y con feedback visual de productos, mesas, categorías, promociones, empleados y cuentas. *(Completada)*
 - **ETAPA 14:** Animación interactiva Double Slider Sign In / Sign Up en `/login` con panel overlay deslizante con gradiente Rock Bar, efecto parallax y carrusel móvil táctil adaptativo. *(Completada)*
 - **ETAPA 15:** Sistema Global de Diálogos Modales Personalizados (`GlobalDialog` & `dialogService.ts`): Sustitución completa de las alertas y confirmaciones nativas del navegador (`confirm()`, `alert()`, `prompt()`) por una interfaz modal moderna, oscura y elegante acorde a la estética Rock Bar, con promesas asíncronas (`confirmAction`, `alertAction`, `promptAction`), animación de entrada con resplandor ambiental, desglose de garantías con viñetas esmeralda, badges temáticos y navegación accesible por teclado (`Enter`/`Escape`), evitando que los navegadores silencien o bloqueen las confirmaciones del sistema. *(Completada)*
+- **ETAPA 16:** Tarjetas Dinámicas de Inventario Temáticas & Centro de Notificaciones con Timbre de Barra (`NotificationCenter`): Ambientación interactiva de las tarjetas de inventario en `/productos` (Nevera con efecto congelado sub-zero y escarcha; Bodega con textura de almacén cervecero y madera; Nevera Baja con modo de emergencia y sirena estroboscópica `animate-siren` con franja `hazard-stripe` cuando el stock es crítico) + Centro de Notificaciones activo en la barra superior con contador en vivo, timbre de alerta sintetizado (Web Audio API) y transferencias rápidas (+6 a nevera con 1 clic). *(Completada)*
 
 ## 2. Decisiones Pendientes (Registro)
 | Decisión | Estado |
@@ -31,6 +32,7 @@ Este documento detalla el plan de desarrollo incremental, los módulos del siste
 | Animación de borrado interactiva (The Bin Eats The Label) | Resuelto (Implementado componente GulpDeleteButton en productos, mesas, usuarios, ventas y configuración) |
 | Animación de transición Login <-> Sign Up | Resuelto (Implementado Double Slider con overlay deslizante y carrusel responsive en /login) |
 | Cuadros de diálogo y confirmaciones del sistema | Resuelto (Reemplazo total de confirm/alert/prompt nativos por GlobalDialog y dialogService) |
+| Sistema de Notificaciones y Dinamismo de Nevera / Inventario | Resuelto (NotificationCenter en cabecera superior con timbre Web Audio API y tarjetas reactivas con alerta de reposición urgente) |
 | Catálogo inicial y precios reales | Pendiente |
 | Métodos de pago que utiliza el negocio | Pendiente |
 | Necesidades de facturación electrónica | Pendiente |

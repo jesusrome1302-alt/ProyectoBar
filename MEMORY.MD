@@ -378,3 +378,20 @@ npm install -D <pkg> # Instalar devDependency
          - `/productos`: Confirmación antes de eliminar categorías personalizadas tanto en el modal como en la animación de borrado del bote.
          - `/caja`: Confirmación previa antes de reiniciar balances de prueba de caja.
          - `layout.tsx`: Montado tanto en el layout principal autenticado como en el portal de acceso para disponibilidad universal.
+
+
+    18. **ETAPA 16 - Tarjetas Dinámicas de Inventario Temáticas & Centro de Notificaciones con Timbre de Barra (`NotificationCenter`) (07/11/2026):**
+       - **Problema abordado:** Los cuadros de métricas en `/productos` lucían estáticos e indiferenciados, y no existía un centro interactivo de alertas cuando la nevera de bebidas comenzaba a agotarse o cuando había stock crítico que requería reabastecimiento urgente de barra.
+       - **Ambientación Dinámica de las 5 Tarjetas de Inventario (`src/app/productos/page.tsx` & `src/app/globals.css`):**
+         - **❄️ En Nevera (Efecto Congelado Sub-Zero):** Gradiente frío glacial con resplandor cian, copo de nieve con destellos continuos (`animate-frost`), insignia *"🧊 Bajo Cero"* y brillo escarchado en las cifras.
+         - **📦 En Bodega (Almacén Cervecero):** Paleta cálida de estiba de madera y lúpulo, borde ámbar cálido, sello de almacén y marca de agua de cajas de reserva.
+         - **Total en Sistema:** Interfaz HUD digital con baliza radar verde pulsante (`animate-ping`) e indicador de salud del stock.
+         - **⚠️ Nevera Baja (Modo Sirena de Emergencia):**
+           - *Estado Abastecido (0 faltantes):* Verde esmeralda tranquilo *"✅ 100% Frías"*.
+           - *Estado Crítico (> 0 faltantes):* Transformación dramática a rojo/ámbar con bordes estroboscópicos (`animate-siren`), franja superior de peligro animada (`hazard-stripe`), badge pulsante *"🚨 ¡Reponer!"* y tipografía iluminada en alerta máxima.
+         - **💰 Valor a Venta:** Diseño de caja acorazada con cálculo automático del porcentaje de margen comercial en vivo (`+X% margen`).
+         - **Barra de Acción Rápida de Barra:** Banner flotante urgente visible cuando hay nevera baja con botón para transferir cajas de bodega a nevera en un solo toque sin abrir menús.
+       - **Centro de Notificaciones en la Cabecera Superior (`src/components/NotificationCenter.tsx` & `src/app/layout.tsx`):**
+         - Reemplazo del botón estático de la campana por un componente interactivo con campana oscilante (`animate-bellRing`), badge rojo con el conteo exacto de alertas de existencias y panel flotante desplegable.
+         - **Timbre de Alerta Sintetizado (Web Audio API):** Generación en tiempo real de un acorde armónico sutil de barra (587Hz -> 880Hz) sin archivos de audio externos, con interruptor de silenciar/activar persistente en `localStorage`.
+         - **Acciones Rápidas Directas:** Cada tarjeta de notificación permite transferir +6 unidades de bodega a nevera directamente con 1 clic (`transferStockToNevera`) o ir al módulo de compras si la bodega también está en cero.
