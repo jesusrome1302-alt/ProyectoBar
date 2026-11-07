@@ -1,13 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import GulpDeleteButton from '@/components/GulpDeleteButton'
 import {
   Package,
   Plus,
   Search,
   AlertTriangle,
   CheckCircle,
-  Trash2,
   X,
   PlusCircle,
   MinusCircle,
@@ -281,13 +281,11 @@ export default function ProductosPage() {
     setTimeout(() => setNotification(''), 3500)
   }
 
-  // Manejar eliminación de producto
+  // Manejar eliminación de producto (tras animación del bote comiéndose la etiqueta)
   const handleDeleteProduct = (p: ProductState) => {
-    if (confirm(`¿Estás seguro de que deseas eliminar "${p.name}" del catálogo?`)) {
-      deleteProductItem(p.id)
-      setNotification(`Producto "${p.name}" eliminado del catálogo.`)
-      setTimeout(() => setNotification(''), 4000)
-    }
+    deleteProductItem(p.id)
+    setNotification(`🗑️ Producto "${p.name}" eliminado del catálogo.`)
+    setTimeout(() => setNotification(''), 4000)
   }
 
   // Manejar ajuste rápido de stock
@@ -323,13 +321,11 @@ export default function ProductosPage() {
     setTimeout(() => setNotification(''), 4000)
   }
 
-  // Manejar eliminación de proveedor
+  // Manejar eliminación de proveedor (tras animación del bote comiéndose la etiqueta)
   const handleDeleteSupplier = (s: SupplierState) => {
-    if (confirm(`¿Deseas eliminar al proveedor "${s.name}"?`)) {
-      deleteSupplier(s.id)
-      setNotification(`Proveedor "${s.name}" eliminado.`)
-      setTimeout(() => setNotification(''), 3500)
-    }
+    deleteSupplier(s.id)
+    setNotification(`🗑️ Proveedor "${s.name}" eliminado.`)
+    setTimeout(() => setNotification(''), 3500)
   }
 
   // Manejar registro de orden de compra
@@ -785,15 +781,13 @@ export default function ProductosPage() {
                         <Power className="w-3.5 h-3.5" />
                       </button>
 
-                      {/* Botón Eliminar */}
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteProduct(p)}
+                      {/* Botón Eliminar con animación de bote comiéndose la etiqueta */}
+                      <GulpDeleteButton
+                        size="xs"
+                        label="Borrar"
                         title="Eliminar este producto del catálogo"
-                        className="p-1 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                        onDelete={() => handleDeleteProduct(p)}
+                      />
                     </div>
                   </div>
 
@@ -1014,14 +1008,12 @@ export default function ProductosPage() {
                       {sup.name}
                     </h4>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteSupplier(sup)}
-                    className="p-1 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors cursor-pointer"
+                  <GulpDeleteButton
+                    size="xs"
+                    label="Borrar"
                     title="Eliminar proveedor"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                    onDelete={() => handleDeleteSupplier(sup)}
+                  />
                 </div>
 
                 <div className="space-y-1.5 text-xs text-zinc-300">
@@ -1550,20 +1542,39 @@ export default function ProductosPage() {
                 </button>
               </div>
 
-              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-zinc-800">
-                <button
-                  type="button"
-                  onClick={() => setShowEditProductModal(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 shadow-lg shadow-amber-900/30 transition-all cursor-pointer"
-                >
-                  Guardar Cambios
-                </button>
+              <div className="flex items-center justify-between gap-2 pt-3 border-t border-zinc-800">
+                {editingProductId ? (
+                  <GulpDeleteButton
+                    size="sm"
+                    variant="danger"
+                    label="Eliminar Producto"
+                    onDelete={() => {
+                      const target = products.find((pr) => pr.id === editingProductId)
+                      setShowEditProductModal(false)
+                      if (target) {
+                        handleDeleteProduct(target)
+                      }
+                    }}
+                  />
+                ) : (
+                  <div />
+                )}
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditProductModal(false)}
+                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 shadow-lg shadow-amber-900/30 transition-all cursor-pointer"
+                  >
+                    Guardar Cambios
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -2205,14 +2216,12 @@ export default function ProductosPage() {
                       )}
                     </div>
                     {!cat.isDefault && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                        className="text-zinc-500 hover:text-red-400 p-1 rounded cursor-pointer"
+                      <GulpDeleteButton
+                        size="xs"
+                        label="Borrar"
                         title="Eliminar categoría personalizada"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                        onDelete={() => handleDeleteCategory(cat.id, cat.name)}
+                      />
                     )}
                   </div>
                 ))}

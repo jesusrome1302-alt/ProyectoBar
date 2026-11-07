@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import GulpDeleteButton from '@/components/GulpDeleteButton'
 import {
   Settings,
   Building2,
@@ -784,14 +785,14 @@ export default function ConfiguracionPage() {
               {cat.isDefault ? (
                 <span className="text-[9px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded">Predeterminada</span>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => deleteCategory(cat.id)}
-                  className="text-zinc-500 hover:text-red-400 ml-1 cursor-pointer"
+                <GulpDeleteButton
+                  size="xs"
+                  label="Borrar"
                   title="Eliminar categoría"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                  onDelete={() => {
+                    deleteCategory(cat.id)
+                  }}
+                />
               )}
             </div>
           ))}
@@ -870,14 +871,14 @@ export default function ConfiguracionPage() {
                       <Power className="w-3.5 h-3.5" />
                     </button>
                     {!disc.isPreset && (
-                      <button
-                        type="button"
-                        onClick={() => deleteCustomDiscount(disc.id)}
+                      <GulpDeleteButton
+                        size="xs"
+                        label="Borrar"
                         title="Eliminar descuento personalizado"
-                        className="p-1 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800 cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                        onDelete={() => {
+                          deleteCustomDiscount(disc.id)
+                        }}
+                      />
                     )}
                   </div>
                 </div>
@@ -939,18 +940,16 @@ export default function ConfiguracionPage() {
               <span>Ver BD Usuarios Eliminados ({deletedAccountsLog.length})</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
+            <GulpDeleteButton
+              size="md"
+              variant="danger"
+              label="Eliminar Mi Cuenta"
+              onDelete={() => {
                 setDeletePinInput('')
                 setDeleteError('')
                 setShowDeleteAccountModal(true)
               }}
-              className="flex items-center space-x-1.5 bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white border border-red-500/40 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Eliminar Mi Cuenta</span>
-            </button>
+            />
           </div>
         </div>
       </div>
@@ -1222,13 +1221,42 @@ export default function ConfiguracionPage() {
                 >
                   Cancelar
                 </button>
-                <button
-                  type="submit"
+                <GulpDeleteButton
+                  size="md"
+                  variant="danger"
                   disabled={isDeletingAccount}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-500 shadow-lg shadow-red-900/40 cursor-pointer disabled:opacity-50"
-                >
-                  {isDeletingAccount ? 'Verificando PIN y Eliminando...' : 'Verificar PIN y Eliminar Cuenta'}
-                </button>
+                  label={isDeletingAccount ? 'Eliminando...' : 'Eliminar Cuenta'}
+                  onBeforeEat={() => {
+                    setDeleteError('')
+                    if (!deletePinInput.trim()) {
+                      setDeleteError('Debes ingresar tu PIN de seguridad para autorizar la eliminación.')
+                      return false
+                    }
+                    if (user?.pin && deletePinInput.trim() !== user.pin) {
+                      setDeleteError('PIN de seguridad incorrecto. No se autorizó la eliminación de la cuenta.')
+                      return false
+                    }
+                    return true
+                  }}
+                  onDelete={async () => {
+                    setIsDeletingAccount(true)
+                    try {
+                      const res = await deleteAccountWithPinVerification({
+                        pinInput: deletePinInput,
+                        reason: deleteReason,
+                      })
+                      if (!res.success) {
+                        setDeleteError(res.message)
+                      } else {
+                        setShowDeleteAccountModal(false)
+                      }
+                    } catch {
+                      setDeleteError('Error al procesar la solicitud de eliminación.')
+                    } finally {
+                      setIsDeletingAccount(false)
+                    }
+                  }}
+                />
               </div>
             </form>
           </div>

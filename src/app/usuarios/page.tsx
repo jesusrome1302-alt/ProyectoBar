@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import GulpDeleteButton from '@/components/GulpDeleteButton'
 import {
   getBarUsers,
   saveBarUsers,
@@ -25,7 +26,6 @@ import {
   Eye,
   KeyRound,
   UserPlus,
-  Trash2,
   X,
   Database,
   AlertTriangle,
@@ -126,11 +126,9 @@ export default function UsuariosPage() {
     }
   }
 
-  const handleDelete = (userId: string, userName: string) => {
-    if (confirm(`¿Estás seguro de eliminar el acceso de "${userName}"?`)) {
-      deleteBarMember(userId)
-      setUsersList(getBarUsers())
-    }
+  const handleDelete = (userId: string) => {
+    deleteBarMember(userId)
+    setUsersList(getBarUsers())
   }
 
   const handleSwitchUser = (targetUser: AuthUser) => {
@@ -310,13 +308,14 @@ export default function UsuariosPage() {
                       <span>SESIÓN ACTIVA</span>
                     </div>
                   ) : member.role !== 'owner' ? (
-                    <button
-                      onClick={() => handleDelete(member.id, member.name)}
-                      title="Eliminar empleado"
-                      className="absolute top-3 right-3 text-zinc-500 hover:text-red-400 transition-colors p-1"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="absolute top-3 right-3">
+                      <GulpDeleteButton
+                        size="xs"
+                        label="Borrar"
+                        title="Eliminar empleado"
+                        onDelete={() => handleDelete(member.id)}
+                      />
+                    </div>
                   ) : null}
 
                   <div className="flex items-center space-x-3 mb-4">
@@ -435,18 +434,18 @@ export default function UsuariosPage() {
                 Si deseas dar de baja tu cuenta actual ({user?.barName || 'Establecimiento'}), se solicitará el PIN del Propietario y el registro pasará a la Base de Datos de Usuarios Eliminados (<code className="text-amber-300">deleted_bar_accounts</code>).
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setDeletePin('')
-                setDeleteError('')
-                setShowDeleteAccountModal(true)
-              }}
-              className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider flex items-center space-x-2 transition-all shrink-0 cursor-pointer"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>Eliminar Mi Cuenta (Pedir PIN)</span>
-            </button>
+            <div className="shrink-0">
+              <GulpDeleteButton
+                size="md"
+                variant="danger"
+                label="Eliminar Mi Cuenta"
+                onDelete={() => {
+                  setDeletePin('')
+                  setDeleteError('')
+                  setShowDeleteAccountModal(true)
+                }}
+              />
+            </div>
           </div>
 
           <div className="bg-zinc-900/80 rounded-2xl border border-zinc-800 overflow-hidden shadow-xl">
@@ -663,21 +662,46 @@ export default function UsuariosPage() {
                 />
               </div>
 
-              <div className="pt-2 flex justify-end space-x-3">
+              <div className="pt-2 flex items-center justify-end space-x-3">
                 <button
                   type="button"
                   onClick={() => setShowDeleteAccountModal(false)}
-                  className="px-4 py-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white text-xs font-semibold"
+                  className="px-4 py-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white text-xs font-semibold cursor-pointer"
                 >
                   Cancelar
                 </button>
-                <button
-                  type="submit"
+                <GulpDeleteButton
+                  size="md"
+                  variant="danger"
                   disabled={isDeleting}
-                  className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg cursor-pointer"
-                >
-                  {isDeleting ? 'Verificando y Eliminando...' : 'Confirmar con PIN'}
-                </button>
+                  label={isDeleting ? 'Eliminando...' : 'Eliminar Cuenta'}
+                  onBeforeEat={() => {
+                    setDeleteError('')
+                    if (!deletePin.trim()) {
+                      setDeleteError('Debes ingresar el PIN de seguridad del propietario.')
+                      return false
+                    }
+                    if (user?.pin && deletePin.trim() !== user.pin) {
+                      setDeleteError('PIN de seguridad incorrecto. No se autorizó la eliminación de la cuenta.')
+                      return false
+                    }
+                    return true
+                  }}
+                  onDelete={async () => {
+                    setIsDeleting(true)
+                    const result = await deleteAccountWithPinVerification({
+                      pinInput: deletePin,
+                      reason: deleteReason,
+                    })
+                    setIsDeleting(false)
+                    if (!result.success) {
+                      setDeleteError(result.message || 'PIN inválido. No se pudo eliminar la cuenta.')
+                      return
+                    }
+                    setShowDeleteAccountModal(false)
+                    router.push('/login')
+                  }}
+                />
               </div>
             </form>
           </div>

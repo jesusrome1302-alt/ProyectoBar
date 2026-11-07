@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import GulpDeleteButton from '@/components/GulpDeleteButton'
 import {
   UtensilsCrossed,
   Plus,
@@ -11,7 +12,6 @@ import {
   RefreshCw,
   User,
   Edit2,
-  Trash2,
   Search,
   X,
   Split,
@@ -159,18 +159,11 @@ export default function MesasPage() {
     setTimeout(() => setSuccessMsg(''), 5000)
   }
 
-  // Eliminar mesa
+  // Eliminar mesa (tras animación del bote comiéndose la etiqueta)
   const handleDeleteTable = (t: TableState) => {
-    if (t.total > 0 || (t.items && t.items.length > 0)) {
-      alert(`No puedes eliminar ${t.name} porque tiene consumos registrados (${formatCOP(t.total)}). Primero debes cerrar la comanda o cobrarla en /cobro.`)
-      return
-    }
-
-    if (confirm(`¿Estás seguro de que deseas eliminar "${t.name}" del salón?`)) {
-      deleteTable(t.id)
-      setSuccessMsg(`"${t.name}" eliminada del sistema.`)
-      setTimeout(() => setSuccessMsg(''), 4000)
-    }
+    deleteTable(t.id)
+    setSuccessMsg(`🗑️ "${t.name}" eliminada del sistema.`)
+    setTimeout(() => setSuccessMsg(''), 4000)
   }
 
   // Cambiar estado a reservada o disponible
@@ -425,18 +418,22 @@ export default function MesasPage() {
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
 
-                      {/* Botón Eliminar si no tiene consumos */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteTable(t)
-                        }}
+                      {/* Botón Eliminar si no tiene consumos con animación del bote */}
+                      <GulpDeleteButton
+                        size="xs"
+                        label="Borrar"
                         title="Eliminar mesa del salón"
-                        className="p-1 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                        onBeforeEat={() => {
+                          if (t.total > 0 || (t.items && t.items.length > 0)) {
+                            alert(
+                              `No puedes eliminar ${t.name} porque tiene consumos registrados (${formatCOP(t.total)}). Primero debes cerrar la comanda o cobrarla en /cobro.`
+                            )
+                            return false
+                          }
+                          return true
+                        }}
+                        onDelete={() => handleDeleteTable(t)}
+                      />
                     </div>
                   </div>
 

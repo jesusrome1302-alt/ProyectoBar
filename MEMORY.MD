@@ -138,6 +138,7 @@ proyecto-bar/
 | ETAPA 10 | Identidad visual del bar, foto/logo WebP en perfil y sidebar | ✅ Completa |
 | ETAPA 11 | Inventario Dual Nevera vs. Bodega y alerta de reposición | ✅ Completa |
 | ETAPA 12 | Reinicio seguro de mesas, Happy Hours/Descuentos, Eliminación con PIN (`deleted_bar_accounts`), Personalización de Interfaz y Categorías por local | ✅ Completa |
+| ETAPA 13 | Animación de borrado interactiva "The Bin Eats The Label" (Gulp Delete Button) para productos, cuentas, mesas, categorías y promociones | ✅ Completa |
 
 ---
 
@@ -345,3 +346,14 @@ npm install -D <pkg> # Instalar devDependency
         - Aplicación reactiva mediante el atributo `data-theme` en `layout.tsx` y estilos adaptativos en `globals.css`, `Sidebar.tsx` y `page.tsx`.
       - **Creación y Gestión de Categorías de Productos por Negocio:**
         - Cada local puede crear nuevas categorías con nombre e icono personalizado o eliminar categorías desde `/productos` (botón "+ Categorías") y `/configuracion`, reflejándose inmediatamente en los filtros del catálogo, formularios de productos, POS (`/ventas`) y reglas de descuentos.
+   15. **ETAPA 13 - Animación de Borrado Interactiva "The Bin Eats The Label" (07/11/2026):**
+      - **Componente Reutilizable `GulpDeleteButton` (`src/components/GulpDeleteButton.tsx`):**
+        - Inspirado en la interacción de Code & Chill ("Animación del botón de borrar con hambre 🗑️").
+        - Al presionar el botón de eliminar, la tapa del bote de basura se abre hacia atrás, el texto ("Borrar" / "Eliminar Cuenta" / "Vaciar Comanda") se separa letra por letra y cada carácter vuela en parábola hacia la boca del bote con reducción de escala y rotación.
+        - Conforme cada letra entra al bote, la propiedad CSS `@property --p` incrementa el nivel de llenado del líquido interior con animación de chapoteo (`gulp-slosh`) y vibración masticatoria (`gulp-chomp`).
+        - Una vez consumidas todas las letras, la tapa se cierra firmemente, el botón se ilumina en rojo/carmesí y muestra un check de confirmación sellado antes de invocar la acción de eliminación real.
+      - **Integración transversal en el sistema:**
+        - **Productos (`/productos`):** Eliminación en tarjetas del catálogo, modal de edición de productos, directorio de proveedores y modal de categorías.
+        - **Cuentas y Seguridad (`/configuracion` y `/usuarios`):** Botón de eliminar cuenta comercial con validación de PIN previa a la animación (con temblor de error si el PIN no coincide), eliminación de categorías y descuentos personalizados, y eliminación de empleados.
+        - **Mesas (`/mesas`):** Eliminación de mesas vacías con advertencia previa si la mesa contiene consumos sin pagar.
+        - **Ventas y Comandas (`/ventas`):** Botón animado de "Vaciar Comanda" y retiro de productos de la comanda activa.

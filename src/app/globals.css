@@ -57,3 +57,204 @@ body {
 .rock-card:hover {
   border-color: var(--theme-accent);
 }
+
+/* ============================================================================
+   ANIMACIÓN "THE BIN EATS THE LABEL" (GULP DELETE BUTTON)
+   ============================================================================ */
+@property --p {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+.gulp {
+  --p: 0;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  user-select: none;
+}
+
+.gulp__btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: #ffffff;
+  background: linear-gradient(145deg, #252538 0%, #141420 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.16),
+    0 6px 18px -4px rgba(0, 0, 0, 0.55);
+  transition:
+    background 0.28s ease,
+    border-color 0.25s ease,
+    box-shadow 0.28s ease,
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.gulp[data-variant="danger"] .gulp__btn {
+  background: linear-gradient(145deg, #3b121d 0%, #1c0910 100%);
+  border-color: rgba(244, 63, 94, 0.4);
+}
+
+.gulp[data-state="idle"] .gulp__btn:hover:not(:disabled) {
+  border-color: rgba(244, 63, 94, 0.75);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.25),
+    0 8px 22px -4px rgba(225, 29, 72, 0.45);
+  transform: translateY(-1px);
+}
+
+.gulp[data-state="eat"] .gulp__btn,
+.gulp[data-state="furl"] .gulp__btn,
+.gulp[data-state="done"] .gulp__btn {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 48%, #881337 100%);
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow:
+    inset 0 1.5px 2px rgba(255, 255, 255, 0.4),
+    0 10px 26px -4px rgba(225, 29, 72, 0.65);
+}
+
+.gulp__icon {
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.gulp__lid {
+  transform-origin: 5.5px 6.5px;
+  transition: transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.gulp[data-state="idle"] .gulp__btn:hover:not(:disabled) .gulp__lid {
+  transform: translateY(-0.5px) rotate(-16deg);
+}
+
+.gulp[data-state="eat"] .gulp__lid {
+  transform: translate(-1.5px, -2px) rotate(-55deg);
+}
+
+.gulp[data-state="furl"] .gulp__lid,
+.gulp[data-state="done"] .gulp__lid {
+  transform: rotate(0deg);
+}
+
+.gulp__can {
+  transform-origin: 12px 15px;
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.gulp[data-state="eat"] .gulp__can {
+  transform: rotate(-15deg) scale(1.08);
+}
+
+.gulp[data-chomp="true"] .gulp__can {
+  transform: rotate(-11deg) scale(1.18, 0.92);
+}
+
+.gulp[data-state="furl"] .gulp__can,
+.gulp[data-state="done"] .gulp__can {
+  transform: rotate(0deg) scale(1.05);
+}
+
+.gulp__fill {
+  transform: translateY(calc(13.5px - var(--p, 0) * 13px));
+  transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.gulp__liq {
+  transform-origin: 12px 15px;
+}
+
+.gulp[data-chomp="true"] .gulp__liq {
+  animation: gulp-slosh 0.28s ease-out;
+}
+
+.gulp__label {
+  display: inline-flex;
+  align-items: center;
+  white-space: pre;
+  position: relative;
+}
+
+.gulp__char {
+  display: inline-block;
+  white-space: pre;
+  will-change: transform, opacity;
+}
+
+.gulp[data-state="eat"] .gulp__char {
+  animation: gulp-fly 0.42s cubic-bezier(0.32, 0, 0.67, 0) forwards;
+  animation-delay: calc(var(--i, 0) * 38ms);
+}
+
+.gulp[data-state="furl"] .gulp__char,
+.gulp[data-state="done"] .gulp__char {
+  opacity: 0;
+}
+
+.gulp__check {
+  position: absolute;
+  right: 10px;
+  opacity: 0;
+  transform: scale(0.4);
+  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.gulp[data-state="furl"] .gulp__check,
+.gulp[data-state="done"] .gulp__check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+@keyframes gulp-fly {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  38% {
+    transform: translate(calc(var(--dx, -32px) * 0.44), -11px) scale(0.86) rotate(-18deg);
+    opacity: 1;
+  }
+  78% {
+    transform: translate(calc(var(--dx, -32px) * 0.96), -3px) scale(0.46) rotate(-38deg);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(var(--dx, -32px), 4px) scale(0.12) rotate(-52deg);
+    opacity: 0;
+  }
+}
+
+@keyframes gulp-slosh {
+  0% {
+    transform: rotate(0deg);
+  }
+  35% {
+    transform: rotate(10deg);
+  }
+  70% {
+    transform: rotate(-8deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes gulp-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  50% { transform: translateX(5px); }
+  75% { transform: translateX(-4px); }
+}
+
+.gulp--shake {
+  animation: gulp-shake 0.32s ease-in-out;
+}

@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import GulpDeleteButton from '@/components/GulpDeleteButton'
 import {
   ShoppingBag,
   Plus,
   Minus,
-  Trash2,
   CheckCircle,
   Search,
   CreditCard,
@@ -590,17 +590,15 @@ export default function VentasPage() {
               </p>
             </div>
 
-            {/* Botón Vaciar Comanda Superior */}
+            {/* Botón Vaciar Comanda Superior con animación del bote comiéndose la etiqueta */}
             {currentOrder.length > 0 && (
-              <button
-                type="button"
-                onClick={handleClearOrder}
-                className="text-red-400 hover:text-red-300 bg-red-950/40 hover:bg-red-900/60 border border-red-800/60 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm active:scale-95"
+              <GulpDeleteButton
+                size="sm"
+                variant="danger"
+                label="Vaciar Comanda"
                 title="Vaciar todos los productos de esta comanda"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                <span>Vaciar Comanda</span>
-              </button>
+                onDelete={handleClearOrder}
+              />
             )}
           </div>
 
@@ -660,15 +658,13 @@ export default function VentasPage() {
                       {formatCOP(it.subtotal)}
                     </span>
 
-                    {/* Botón Eliminar Ítem Individual */}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveItem(it.productId, it.name, it.unitPrice)}
-                      className="p-1 text-zinc-500 hover:text-red-400 hover:bg-zinc-900 rounded transition-colors cursor-pointer"
+                    {/* Botón Eliminar Ítem Individual con animación del bote */}
+                    <GulpDeleteButton
+                      size="xs"
+                      label="Borrar"
                       title="Eliminar de la comanda"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                      onDelete={() => handleRemoveItem(it.productId, it.name, it.unitPrice)}
+                    />
                   </div>
                 </div>
               ))}
@@ -764,14 +760,13 @@ export default function VentasPage() {
 
             {/* Botón inferior de vaciar comanda */}
             {currentOrder.length > 0 && (
-              <button
-                type="button"
-                onClick={handleClearOrder}
-                className="w-full flex items-center justify-center space-x-1.5 bg-zinc-900 hover:bg-red-950/40 border border-zinc-800 hover:border-red-800/60 text-zinc-400 hover:text-red-300 font-bold py-2 rounded-xl transition-all text-xs cursor-pointer active:scale-95"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Vaciar Comanda</span>
-              </button>
+              <GulpDeleteButton
+                size="md"
+                variant="danger"
+                fullWidth
+                label="Vaciar Comanda"
+                onDelete={handleClearOrder}
+              />
             )}
 
             <Link
@@ -1214,14 +1209,12 @@ export default function VentasPage() {
                               >
                                 <Power className="w-3.5 h-3.5" />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => deletePromotionRule(pr.id)}
+                              <GulpDeleteButton
+                                size="xs"
+                                label="Borrar"
                                 title="Eliminar promoción"
-                                className="p-1.5 rounded-lg bg-zinc-900 hover:bg-red-950/50 text-zinc-400 hover:text-red-400 border border-zinc-800 cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                                onDelete={() => deletePromotionRule(pr.id)}
+                              />
                             </div>
                           </div>
                         )
