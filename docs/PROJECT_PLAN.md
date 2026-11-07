@@ -17,6 +17,7 @@ Este documento detalla el plan de desarrollo incremental, los módulos del siste
 - **ETAPA 11:** Inventario Dual Nevera vs. Bodega: Desglose de existencias frías y almacén, alertas de nevera baja, modal de transferencia rápida de bodega a nevera y sincronización con el punto de venta. *(Completada)*
 - **ETAPA 12:** Reinicio Seguro Exclusivo de Mesas (`resetTablesOnly`), Descuentos y Happy Hours por Tipo de Local (conservando los predeterminados), Eliminación de Cuenta con Verificación de PIN y Base de Datos de Usuarios Eliminados (`deleted_bar_accounts`), Personalización de Interfaz por Negocio y Creación de Categorías de Productos Personalizadas. *(Completada)*
 - **ETAPA 13:** Animación interactiva de borrado "The Bin Eats The Label" (Gulp Delete Button) inspirada en Code & Chill para la eliminación segura y con feedback visual de productos, mesas, categorías, promociones, empleados y cuentas. *(Completada)*
+- **ETAPA 14:** Animación interactiva Double Slider Sign In / Sign Up en `/login` con panel overlay deslizante con gradiente Rock Bar, efecto parallax y carrusel móvil táctil adaptativo. *(Completada)*
 
 ## 2. Decisiones Pendientes (Registro)
 | Decisión | Estado |
@@ -27,6 +28,7 @@ Este documento detalla el plan de desarrollo incremental, los módulos del siste
 | Categorías de productos y Descuentos / Happy Hours | Resuelto (Categorías dinámicas creadas por cada local + Descuentos predeterminados conservados y Happy Hours personalizados por negocio) |
 | Eliminación de cuentas y auditoría de bajas | Resuelto (Verificación obligatoria con PIN del propietario y archivo en base de datos `deleted_bar_accounts`) |
 | Animación de borrado interactiva (The Bin Eats The Label) | Resuelto (Implementado componente GulpDeleteButton en productos, mesas, usuarios, ventas y configuración) |
+| Animación de transición Login <-> Sign Up | Resuelto (Implementado Double Slider con overlay deslizante y carrusel responsive en /login) |
 | Catálogo inicial y precios reales | Pendiente |
 | Métodos de pago que utiliza el negocio | Pendiente |
 | Necesidades de facturación electrónica | Pendiente |

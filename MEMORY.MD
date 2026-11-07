@@ -139,6 +139,7 @@ proyecto-bar/
 | ETAPA 11 | Inventario Dual Nevera vs. Bodega y alerta de reposición | ✅ Completa |
 | ETAPA 12 | Reinicio seguro de mesas, Happy Hours/Descuentos, Eliminación con PIN (`deleted_bar_accounts`), Personalización de Interfaz y Categorías por local | ✅ Completa |
 | ETAPA 13 | Animación de borrado interactiva "The Bin Eats The Label" (Gulp Delete Button) para productos, cuentas, mesas, categorías y promociones | ✅ Completa |
+| ETAPA 14 | Animación interactiva Double Slider Sign In / Sign Up en `/login` con panel overlay deslizante con gradiente, parallax y carrusel móvil | ✅ Completa |
 
 ---
 
@@ -357,3 +358,9 @@ npm install -D <pkg> # Instalar devDependency
         - **Cuentas y Seguridad (`/configuracion` y `/usuarios`):** Botón de eliminar cuenta comercial con validación de PIN previa a la animación (con temblor de error si el PIN no coincide), eliminación de categorías y descuentos personalizados, y eliminación de empleados.
         - **Mesas (`/mesas`):** Eliminación de mesas vacías con advertencia previa si la mesa contiene consumos sin pagar.
         - **Ventas y Comandas (`/ventas`):** Botón animado de "Vaciar Comanda" y retiro de productos de la comanda activa.
+   16. **ETAPA 14 - Animación Double Slider Sign In / Sign Up en `/login` (07/11/2026):**
+      - **Slider Dual con Overlay Deslizante (`src/app/login/page.tsx` y `src/app/globals.css`):**
+        - Inspirado en la interacción viral de transición Login <-> Sign Up (Double Slider Overlay).
+        - En pantallas de escritorio (`min-width: 1024px`), el contenedor `.auth-slider-box` aloja a la izquierda el formulario de Inicio de Sesión y a la derecha el formulario de Registro.
+        - Al alternar entre Login y Sign Up, un panel overlay con gradiente Rock Bar (`.auth-overlay-wrapper` y `.auth-overlay-bg`) se desliza suavemente de lado a lado con aceleración cúbica (`cubic-bezier(0.77, 0, 0.175, 1)`), mientras los paneles de texto internos y botones ghost se desplazan con efecto parallax (`translateX(20%)` / `translateX(-20%)`).
+        - En dispositivos móviles (`max-width: 1023px`), la interfaz se adapta automáticamente a un carrusel táctil interactivo (`.auth-mobile-track`) con un selector de píldora superior animado que desliza el indicador activo sin comprimir ni desbordar la pantalla.
