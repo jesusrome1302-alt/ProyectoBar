@@ -11,7 +11,7 @@ import {
   X,
   Plus,
 } from 'lucide-react'
-import { useBarStore, transferStockToNevera, ProductState } from '@/lib/barState'
+import { useBarStore, transferStockToNevera, adjustProductStock, ProductState } from '@/lib/barState'
 
 // Síntesis Web Audio API para timbre sutil de barra (sin archivos de audio externos)
 function playAlertChime() {
@@ -89,17 +89,18 @@ export default function NotificationCenter() {
     return stockNevera <= minNevera
   })
 
-  // Filtrar productos con stock crítico general (fuera de los que ya están en alerta de nevera)
-  const lowStockProducts = products.filter((p) => {
+  // Filtrar productos con bodega baja o sin existencias de reserva
+  const lowBodegaProducts = products.filter((p) => {
+    const stockBodega = p.stock_bodega ?? 0
+    const minNevera = p.min_stock_nevera ?? Math.max(2, Math.floor((p.min_stock || 10) / 2))
+    const minBodega = Math.max(1, (p.min_stock || 10) - minNevera)
     const total = p.stock ?? 0
-    const min = p.min_stock ?? 10
-    const alreadyInNeveraAlert = lowNeveraProducts.some((np) => np.id === p.id)
-    return total <= min && !alreadyInNeveraAlert
+    return stockBodega <= 0 || stockBodega <= minBodega || total <= (p.min_stock || 10)
   })
 
-  const totalAlerts = lowNeveraProducts.length + lowStockProducts.length
+  const totalAlerts = lowNeveraProducts.length + lowBodegaProducts.length
 
-  // Si la cantidad de alertas de nevera aumenta durante el servicio, reproducir el timbre
+  // Si la cantidad de alertas de nevera o bodega aumenta durante el servicio, reproducir el timbre
   useEffect(() => {
     if (totalAlerts > previousAlertCount.current) {
       if (soundEnabled) {
@@ -131,6 +132,13 @@ export default function NotificationCenter() {
       setActionFeedback(`❄️ +${amount} ${p.name} pasadas a nevera.`)
       setTimeout(() => setActionFeedback(''), 3000)
     }
+  }
+
+  // Agregar rápido +12 unidades a Bodega desde la notificación
+  const handleQuickAddBodega = (p: ProductState, qty = 12) => {
+    adjustProductStock(p.id, qty, 'bodega', `Reabastecimiento rápido de Bodega (+${qty} uds)`)
+    setActionFeedback(`📦 +${qty} ${p.name} agregadas a Bodega.`)
+    setTimeout(() => setActionFeedback(''), 3000)
   }
 
   return (
@@ -288,42 +296,66 @@ export default function NotificationCenter() {
                   )
                 })}
 
-                {/* 2. Alertas de Stock Crítico General */}
-                {lowStockProducts.map((p) => (
-                  <div
-                    key={'stock-' + p.id}
-                    className="p-3 rounded-xl bg-gradient-to-r from-amber-950/40 via-stone-900 to-zinc-900 border border-amber-500/30 hover:border-amber-400/60 transition-all space-y-1.5"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center space-x-2 min-w-0">
-                        <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center text-xs shrink-0">
-                          📦
-                        </span>
-                        <div className="truncate">
-                          <p className="text-xs font-black text-white truncate">{p.name}</p>
-                          <p className="text-[10px] text-amber-300">
-                            Solo quedan {p.stock} uds en total (Mín: {p.min_stock})
-                          </p>
+                {/* 2. Alertas de Bodega Baja o Sin Reserva */}
+                {lowBodegaProducts.map((p) => {
+                  const bodega = p.stock_bodega ?? 0
+                  const nevera = p.stock_nevera ?? p.stock ?? 0
+                  const minNevera = p.min_stock_nevera ?? Math.max(2, Math.floor((p.min_stock || 10) / 2))
+                  const minBodega = Math.max(1, (p.min_stock || 10) - minNevera)
+
+                  return (
+                    <div
+                      key={'bodega-' + p.id}
+                      className="p-3 rounded-xl bg-gradient-to-r from-amber-950/40 via-stone-900 to-zinc-900 border border-amber-500/30 hover:border-amber-400/60 transition-all space-y-2"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center text-xs shrink-0">
+                            📦
+                          </span>
+                          <div className="truncate">
+                            <p className="text-xs font-black text-white truncate">{p.name}</p>
+                            <p className="text-[10px] text-amber-300 font-medium">
+                              {bodega <= 0
+                                ? '¡BODEGA VACÍA! (0 uds en reserva)'
+                                : `Bodega baja: ${bodega} uds (Mín: ${minBodega})`}
+                            </p>
+                          </div>
                         </div>
+
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 shrink-0">
+                          {bodega <= 0 ? 'Sin Reserva' : 'Comprar'}
+                        </span>
                       </div>
 
-                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 shrink-0">
-                        Comprar
-                      </span>
-                    </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-amber-950/60 text-[10px]">
+                        <span className="text-zinc-400">
+                          En nevera: <strong className="text-cyan-300">{nevera} uds</strong>
+                        </span>
 
-                    <div className="flex justify-end pt-1">
-                      <Link
-                        href="/productos"
-                        onClick={() => setIsOpen(false)}
-                        className="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center space-x-1"
-                      >
-                        <span>Ir a Compras</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </Link>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => handleQuickAddBodega(p, 12)}
+                            className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-black font-extrabold text-[10px] flex items-center space-x-1 shadow transition-all cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>+12 a Bodega</span>
+                          </button>
+
+                          <Link
+                            href="/productos"
+                            onClick={() => setIsOpen(false)}
+                            className="text-amber-400 hover:text-amber-300 font-bold flex items-center space-x-0.5"
+                          >
+                            <span>Compras</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </>
             )}
           </div>

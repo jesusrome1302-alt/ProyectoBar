@@ -140,6 +140,8 @@ proyecto-bar/
 | ETAPA 12 | Reinicio seguro de mesas, Happy Hours/Descuentos, Eliminación con PIN (`deleted_bar_accounts`), Personalización de Interfaz y Categorías por local | ✅ Completa |
 | ETAPA 13 | Animación de borrado interactiva "The Bin Eats The Label" (Gulp Delete Button) para productos, cuentas, mesas, categorías y promociones | ✅ Completa |
 | ETAPA 14 | Animación interactiva Double Slider Sign In / Sign Up en `/login` con panel overlay deslizante con gradiente, parallax y carrusel móvil | ✅ Completa |
+| ETAPA 15 | Sistema Global de Diálogos Modales Personalizados (`GlobalDialog` & `dialogService.ts`) | ✅ Completa |
+| ETAPA 16 | Tarjetas KPI Simétricas, Alertas Duales (Nevera + Bodega), `NotificationCenter` y Ajuste Rápido con Destino Persistente | ✅ Completa |
 
 ---
 
@@ -380,18 +382,17 @@ npm install -D <pkg> # Instalar devDependency
          - `layout.tsx`: Montado tanto en el layout principal autenticado como en el portal de acceso para disponibilidad universal.
 
 
-    18. **ETAPA 16 - Tarjetas Dinámicas de Inventario Temáticas & Centro de Notificaciones con Timbre de Barra (`NotificationCenter`) (07/11/2026):**
-       - **Problema abordado:** Los cuadros de métricas en `/productos` lucían estáticos e indiferenciados, y no existía un centro interactivo de alertas cuando la nevera de bebidas comenzaba a agotarse o cuando había stock crítico que requería reabastecimiento urgente de barra.
-       - **Ambientación Dinámica de las 5 Tarjetas de Inventario (`src/app/productos/page.tsx` & `src/app/globals.css`):**
-         - **❄️ En Nevera (Efecto Congelado Sub-Zero):** Gradiente frío glacial con resplandor cian, copo de nieve con destellos continuos (`animate-frost`), insignia *"🧊 Bajo Cero"* y brillo escarchado en las cifras.
-         - **📦 En Bodega (Almacén Cervecero):** Paleta cálida de estiba de madera y lúpulo, borde ámbar cálido, sello de almacén y marca de agua de cajas de reserva.
-         - **Total en Sistema:** Interfaz HUD digital con baliza radar verde pulsante (`animate-ping`) e indicador de salud del stock.
-         - **⚠️ Nevera Baja (Modo Sirena de Emergencia):**
-           - *Estado Abastecido (0 faltantes):* Verde esmeralda tranquilo *"✅ 100% Frías"*.
-           - *Estado Crítico (> 0 faltantes):* Transformación dramática a rojo/ámbar con bordes estroboscópicos (`animate-siren`), franja superior de peligro animada (`hazard-stripe`), badge pulsante *"🚨 ¡Reponer!"* y tipografía iluminada en alerta máxima.
-         - **💰 Valor a Venta:** Diseño de caja acorazada con cálculo automático del porcentaje de margen comercial en vivo (`+X% margen`).
-         - **Barra de Acción Rápida de Barra:** Banner flotante urgente visible cuando hay nevera baja con botón para transferir cajas de bodega a nevera en un solo toque sin abrir menús.
-       - **Centro de Notificaciones en la Cabecera Superior (`src/components/NotificationCenter.tsx` & `src/app/layout.tsx`):**
-         - Reemplazo del botón estático de la campana por un componente interactivo con campana oscilante (`animate-bellRing`), badge rojo con el conteo exacto de alertas de existencias y panel flotante desplegable.
-         - **Timbre de Alerta Sintetizado (Web Audio API):** Generación en tiempo real de un acorde armónico sutil de barra (587Hz -> 880Hz) sin archivos de audio externos, con interruptor de silenciar/activar persistente en `localStorage`.
-         - **Acciones Rápidas Directas:** Cada tarjeta de notificación permite transferir +6 unidades de bodega a nevera directamente con 1 clic (`transferStockToNevera`) o ir al módulo de compras si la bodega también está en cero.
+    18. **ETAPA 16 - Tarjetas Dinámicas de Inventario Simétricas, Alertas Duales (Nevera + Bodega), `NotificationCenter` & Ajuste Rápido con Destino Persistente (07/11/2026):**
+       - **Problema abordado:**
+         1. Las tarjetas KPI *"En Nevera"* y *"En Bodega"* carecían de padding interno (`p-4`) y tenían marcas de agua que desalineaban el texto respecto a las otras 3 tarjetas.
+         2. Cuando la **Bodega** se quedaba en `0` unidades (ej. al pasar todo a Nevera) o caía por debajo del mínimo de reserva, el sistema no emitía alerta de bodega vacía.
+         3. Los botones de **Ajuste Rápido (`-`, `+`, `+10`)** modificaban únicamente `p.stock` sin actualizar `stock_nevera` ni `stock_bodega`, por lo que al recargar (`loadBarData()`) el stock se recalculaba como `stock_nevera + stock_bodega` y las unidades agregadas se perdían, además de no preguntar a dónde iban las unidades.
+       - **Simetría Visual en las 5 Cajas KPI (`src/app/productos/page.tsx`):**
+         - Todas las 5 tarjetas comparten ahora `p-4 flex flex-col justify-between min-h-[116px]` con estructura idéntica de 3 niveles (encabezado + badge a la misma altura, cifra principal centrada y pie de tarjeta alineado) y sin emojis flotantes que invadan el texto.
+       - **Alertas Duales en Vivo: Nevera Baja + Bodega Vacía/Baja (`src/app/productos/page.tsx` & `src/components/NotificationCenter.tsx`):**
+         - La tarjeta **📦 En Bodega** muta automáticamente a modo de alerta (`animate-siren` + `hazard-stripe` + badge *"🚨 ¡Vacía!"* / *"⚠️ X Baja(s)"*) cuando cualquier producto tiene `stock_bodega <= 0` o está por debajo de la reserva mínima, permitiendo filtrar con 1 clic (`📦 Reponer Bodega`).
+         - Las tarjetas de cada producto muestran insignias dedicadas (*"📦 Bodega Vacía"*, *"📦 Bodega Baja"*, *"❄️ Nevera Baja"*) y resaltan en rojo/ámbar la caja de Bodega cuando queda en `0 reserva`.
+         - El `NotificationCenter` de la cabecera superior vigila ambos frentes en tiempo real y ofrece botones de acción inmediata: **`+6 a Nevera`** (para enfriar desde bodega) y **`+12 a Bodega`** (para reabastecer bodega vacía al instante).
+       - **Modal de Ajuste Rápido con Selección de Destino y Persistencia Real (`adjustProductStock` en `src/lib/barState.ts`):**
+         - Al pulsar `-`, `+` o `+10` en cualquier producto, se abre un modal rápido que permite elegir la cantidad (`1`, `6`, `10`, `12`, `24`, `30`) y seleccionar explícitamente si las unidades van a **❄️ En Nevera** o a **📦 En Bodega**.
+         - `adjustProductStock(id, delta, target)` actualiza `stock_nevera` o `stock_bodega`, recalcula `stock = newNevera + newBodega`, guarda el movimiento en el Kardex (`data.inventoryMovements`) y sincroniza en Supabase/`localStorage`.

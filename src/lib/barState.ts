@@ -852,11 +852,61 @@ export function deleteProductItem(id: string): void {
   saveBarData(data)
 }
 
-export function adjustProductStock(id: string, delta: number): void {
+export function adjustProductStock(
+  id: string,
+  delta: number,
+  target: 'nevera' | 'bodega' = 'bodega',
+  customReason?: string
+): void {
+  if (delta === 0) return
   const data = loadBarData()
+  const timeNow = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  const dateStr = `Hoy, ${timeNow}`
+  const user = data.operatorName || 'Personal de Barra'
+
   data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
     if (p.id === id) {
-      return { ...p, stock: Math.max(0, p.stock + delta) }
+      const currentNevera = p.stock_nevera ?? p.stock ?? 0
+      const currentBodega = p.stock_bodega ?? 0
+
+      let newNevera = currentNevera
+      let newBodega = currentBodega
+
+      if (target === 'nevera') {
+        newNevera = Math.max(0, currentNevera + delta)
+      } else {
+        newBodega = Math.max(0, currentBodega + delta)
+      }
+
+      const newStock = newNevera + newBodega
+      const actualDelta = newStock - (currentNevera + currentBodega)
+
+      if (actualDelta !== 0) {
+        const targetLabel = target === 'nevera' ? 'Nevera (Frías)' : 'Bodega (Reserva)'
+        const invMov: InventoryMovementRecord = {
+          id: 'inv-' + Date.now() + '-' + p.id,
+          productId: p.id,
+          productName: p.name,
+          type: 'adjustment',
+          quantity: actualDelta,
+          reason:
+            customReason ||
+            `Ajuste rápido en ${targetLabel}: ${actualDelta > 0 ? '+' : ''}${actualDelta} uds`,
+          time: dateStr,
+          user,
+          resultingStock: newStock,
+          resultingNevera: newNevera,
+          resultingBodega: newBodega,
+        }
+        data.inventoryMovements = [invMov, ...(data.inventoryMovements || [])]
+      }
+
+      return {
+        ...p,
+        stock_nevera: newNevera,
+        stock_bodega: newBodega,
+        stock: newStock,
+      }
     }
     return p
   })
@@ -1858,7 +1908,8 @@ export function registerInventoryAdjustment(
   productId: string,
   type: 'loss' | 'adjustment',
   quantity: number,
-  reason: string
+  reason: string,
+  target: 'nevera' | 'bodega' = 'nevera'
 ): void {
   const data = loadBarData()
   const timeNow = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
@@ -1867,7 +1918,19 @@ export function registerInventoryAdjustment(
 
   data.products = (data.products || INITIAL_PRODUCTS).map((p) => {
     if (p.id === productId) {
-      const newStock = Math.max(0, p.stock + quantity)
+      const currentNevera = p.stock_nevera ?? p.stock ?? 0
+      const currentBodega = p.stock_bodega ?? 0
+
+      let newNevera = currentNevera
+      let newBodega = currentBodega
+
+      if (target === 'nevera') {
+        newNevera = Math.max(0, currentNevera + quantity)
+      } else {
+        newBodega = Math.max(0, currentBodega + quantity)
+      }
+
+      const newStock = newNevera + newBodega
 
       const invMov: InventoryMovementRecord = {
         id: 'inv-' + Date.now(),
@@ -1875,15 +1938,19 @@ export function registerInventoryAdjustment(
         productName: p.name,
         type,
         quantity,
-        reason,
+        reason: `${reason} (${target === 'nevera' ? 'Nevera' : 'Bodega'})`,
         time: dateStr,
         user,
         resultingStock: newStock,
+        resultingNevera: newNevera,
+        resultingBodega: newBodega,
       }
       data.inventoryMovements = [invMov, ...(data.inventoryMovements || [])]
 
       return {
         ...p,
+        stock_nevera: newNevera,
+        stock_bodega: newBodega,
         stock: newStock,
       }
     }

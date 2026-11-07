@@ -6,6 +6,7 @@ import { confirmAction } from '@/lib/dialogService'
 import {
   Package,
   Plus,
+  Minus,
   Search,
   AlertTriangle,
   CheckCircle,
@@ -109,6 +110,12 @@ export default function ProductosPage() {
   const [transferProduct, setTransferProduct] = useState<ProductState | null>(null)
   const [transferQty, setTransferQty] = useState<number>(12)
 
+  // Modal Ajuste Rápido de Stock (Selecciona hacia dónde va: Nevera o Bodega)
+  const [showQuickAdjustModal, setShowQuickAdjustModal] = useState<boolean>(false)
+  const [quickAdjustProduct, setQuickAdjustProduct] = useState<ProductState | null>(null)
+  const [quickAdjustQty, setQuickAdjustQty] = useState<number>(10)
+  const [quickAdjustSign, setQuickAdjustSign] = useState<1 | -1>(1)
+
   // Formulario Nuevo Proveedor
   const [supName, setSupName] = useState<string>('')
   const [supCategory, setSupCategory] = useState<string>('Cervezas & Maltas')
@@ -142,11 +149,21 @@ export default function ProductosPage() {
   const lowNeveraCount = lowNeveraList.length
   const firstLowNevera = lowNeveraList.find((p) => (p.stock_bodega ?? 0) > 0) || lowNeveraList[0] || null
 
+  const lowBodegaList = products.filter((p) => {
+    const bod = p.stock_bodega ?? 0
+    const minNev = p.min_stock_nevera ?? Math.max(2, Math.floor((p.min_stock || 10) / 2))
+    const minBod = Math.max(1, (p.min_stock || 10) - minNev)
+    return bod <= 0 || bod <= minBod || (p.stock ?? 0) <= (p.min_stock || 10)
+  })
+  const lowBodegaCount = lowBodegaList.length
+  const firstLowBodega = lowBodegaList[0] || null
+
   const barCategories = barData.categories && barData.categories.length > 0 ? barData.categories : DEFAULT_CATEGORIES
 
   const categories = [
     { id: 'all', name: 'Todos' },
     { id: 'low_nevera', name: `❄️ Reponer Nevera (${lowNeveraCount})` },
+    { id: 'low_bodega', name: `📦 Reponer Bodega (${lowBodegaCount})` },
     ...barCategories.map((c) => ({ id: c.name, name: `${c.icon ? c.icon + ' ' : ''}${c.name}` })),
   ]
 
@@ -302,11 +319,26 @@ export default function ProductosPage() {
     setTimeout(() => setNotification(''), 4000)
   }
 
-  // Manejar ajuste rápido de stock
-  const handleStockChange = (id: string, name: string, delta: number) => {
-    adjustProductStock(id, delta)
-    setNotification(`Stock de "${name}" ${delta > 0 ? 'incrementado' : 'reducido'} (${delta > 0 ? '+' : ''}${delta}).`)
-    setTimeout(() => setNotification(''), 3000)
+  // Abrir modal de ajuste rápido de stock (pregunta hacia dónde va: Nevera o Bodega)
+  const openQuickAdjustModal = (p: ProductState, initialDelta: number) => {
+    setQuickAdjustProduct(p)
+    setQuickAdjustSign(initialDelta >= 0 ? 1 : -1)
+    setQuickAdjustQty(Math.max(1, Math.abs(initialDelta)))
+    setShowQuickAdjustModal(true)
+  }
+
+  // Confirmar y guardar ajuste rápido en Nevera o Bodega
+  const handleConfirmQuickAdjust = (target: 'nevera' | 'bodega') => {
+    if (!quickAdjustProduct || quickAdjustQty <= 0) return
+    const signedDelta = quickAdjustSign * quickAdjustQty
+    adjustProductStock(quickAdjustProduct.id, signedDelta, target)
+    const targetName = target === 'nevera' ? '❄️ Nevera (Frías)' : '📦 Bodega (Reserva)'
+    setNotification(
+      `¡Ajuste guardado! ${signedDelta > 0 ? `+${signedDelta}` : signedDelta} uds de "${quickAdjustProduct.name}" aplicadas en ${targetName}.`
+    )
+    setShowQuickAdjustModal(false)
+    setQuickAdjustProduct(null)
+    setTimeout(() => setNotification(''), 4000)
   }
 
   // Manejar creación de proveedor
@@ -405,13 +437,18 @@ export default function ProductosPage() {
     setTimeout(() => setNotification(''), 4000)
   }
 
-  // Filtrado de productos (incluye filtro por alerta de nevera baja)
+  // Filtrado de productos (incluye filtro por alerta de nevera baja o bodega baja)
   const filteredProducts = products.filter((p) => {
     let matchesCat = true
     if (activeCategory === 'low_nevera') {
       const nev = p.stock_nevera ?? p.stock ?? 0
       const minNev = p.min_stock_nevera ?? Math.max(2, Math.floor((p.min_stock || 10) / 2))
       matchesCat = nev <= minNev
+    } else if (activeCategory === 'low_bodega') {
+      const bod = p.stock_bodega ?? 0
+      const minNev = p.min_stock_nevera ?? Math.max(2, Math.floor((p.min_stock || 10) / 2))
+      const minBod = Math.max(1, (p.min_stock || 10) - minNev)
+      matchesCat = bod <= 0 || bod <= minBod || (p.stock ?? 0) <= (p.min_stock || 10)
     } else if (activeCategory !== 'all') {
       matchesCat = p.category.toLowerCase().includes(activeCategory.toLowerCase())
     }
@@ -423,7 +460,6 @@ export default function ProductosPage() {
   const totalStockUnits = products.reduce((acc, p) => acc + (p.stock || 0), 0)
   const totalNeveraUnits = products.reduce((acc, p) => acc + (p.stock_nevera ?? p.stock ?? 0), 0)
   const totalBodegaUnits = products.reduce((acc, p) => acc + (p.stock_bodega ?? 0), 0)
-  const lowStockCount = products.filter((p) => p.stock <= p.min_stock).length
   const totalInventoryCost = products.reduce((acc, p) => acc + (p.stock || 0) * (p.cost || 0), 0)
   const totalInventoryRetail = products.reduce((acc, p) => acc + (p.stock || 0) * (p.price || 0), 0)
   const profitMargin = totalInventoryCost > 0
@@ -568,30 +604,34 @@ export default function ProductosPage() {
         </button>
       </div>
 
-      {/* Métricas Globales de Inventario con Estilo Temático Dinámico */}
+      {/* Métricas Globales de Inventario con Estilo Temático Dinámico y Alineación Simétrica */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
         {/* 1. TOTAL EN SISTEMA (Live Digital HUD) */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900/90 via-[#0e131f] to-zinc-950 border border-zinc-800 p-4 shadow-xl hover:border-zinc-700 transition-all group">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900/90 via-[#0e131f] to-zinc-950 border border-zinc-800 p-4 flex flex-col justify-between min-h-[116px] shadow-xl hover:border-zinc-700 transition-all group">
           <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between relative z-10">
             <span className="text-[10px] font-black tracking-wider uppercase text-zinc-400 flex items-center space-x-1.5">
-              <span className="relative flex h-2 w-2">
+              <span className="relative flex h-2 w-2 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span>Total Sistema</span>
+              <span className="truncate">Total Sistema</span>
             </span>
-            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700/80 text-zinc-300">
+            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700/80 text-zinc-300 shrink-0">
               {products.length} refs
             </span>
           </div>
-          <p className="text-xl sm:text-2xl lg:text-3xl font-black text-white mt-2 tracking-tight">
+
+          <p className="text-xl sm:text-2xl lg:text-3xl font-black text-white mt-2 tracking-tight relative z-10">
             {totalStockUnits} <span className="text-xs font-semibold text-zinc-400">uds</span>
           </p>
-          <div className="text-[11px] text-zinc-400 mt-1 flex items-center justify-between">
+
+          <div className="text-[11px] text-zinc-400 mt-1 flex items-center justify-between relative z-10">
             <span className="truncate">Stock físico</span>
-            {lowStockCount > 0 ? (
-              <span className="text-amber-400 font-bold text-[10px] shrink-0">⚠️ {lowStockCount} por comprar</span>
+            {lowNeveraCount + lowBodegaCount > 0 ? (
+              <span className="text-amber-400 font-bold text-[10px] shrink-0">
+                ⚠️ {lowNeveraCount + lowBodegaCount} alerta(s)
+              </span>
             ) : (
               <span className="text-emerald-400 font-bold text-[10px] shrink-0">✓ Abastecido</span>
             )}
@@ -599,23 +639,21 @@ export default function ProductosPage() {
         </div>
 
         {/* 2. EN NEVERA (Frosted Ice / Sub-Zero Chamber - ¡Efecto Congelado!) */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#062338]/90 via-[#071927]/90 to-[#020b12] border border-cyan-400/50 shadow-[0_0_22px_rgba(6,182,212,0.25)] hover:shadow-[0_0_32px_rgba(34,211,238,0.4)] hover:border-cyan-300 transition-all group">
+        <button
+          type="button"
+          onClick={() => setActiveCategory(activeCategory === 'low_nevera' ? 'all' : 'low_nevera')}
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#062338]/90 via-[#071927]/90 to-[#020b12] border border-cyan-400/50 shadow-[0_0_22px_rgba(6,182,212,0.25)] hover:shadow-[0_0_32px_rgba(34,211,238,0.4)] hover:border-cyan-300 p-4 flex flex-col justify-between min-h-[116px] text-left transition-all cursor-pointer group"
+        >
           {/* Luz ambiental fría y escarcha */}
           <div className="absolute -top-10 -right-10 w-28 h-28 bg-cyan-400/20 rounded-full blur-2xl pointer-events-none" />
           <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-blue-500/15 rounded-full blur-2xl pointer-events-none" />
-
-          {/* Marca de agua de copo de nieve con destello */}
-          <div className="absolute -right-2 -bottom-2 text-4xl select-none opacity-20 group-hover:opacity-35 transition-opacity animate-frost pointer-events-none">
-            ❄️
-          </div>
 
           <div className="flex items-center justify-between relative z-10">
             <span className="text-[10px] font-black tracking-wider uppercase text-cyan-300 flex items-center space-x-1">
               <span>❄️ En Nevera</span>
             </span>
-            <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 flex items-center space-x-1 shadow-sm">
-              <span className="text-[10px]">🧊</span>
-              <span>Bajo Cero</span>
+            <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 flex items-center space-x-1 shadow-sm shrink-0">
+              <span>🧊 Bajo Cero</span>
             </span>
           </div>
 
@@ -623,46 +661,68 @@ export default function ProductosPage() {
             {totalNeveraUnits} <span className="text-xs font-semibold text-cyan-300">uds</span>
           </p>
 
-          <p className="text-[11px] text-cyan-300/80 mt-1 flex items-center space-x-1 relative z-10">
-            <Snowflake className="w-3 h-3 text-cyan-400 shrink-0" />
-            <span className="truncate">Frías listas para servir</span>
-          </p>
-        </div>
+          <div className="text-[11px] text-cyan-300/90 mt-1 flex items-center justify-between relative z-10">
+            <span className="truncate">Listas para servir</span>
+            {lowNeveraCount > 0 ? (
+              <span className="text-amber-300 font-bold text-[10px] shrink-0">⚠️ {lowNeveraCount} baja(s)</span>
+            ) : (
+              <span className="text-cyan-200 font-bold text-[10px] shrink-0">✓ Frías</span>
+            )}
+          </div>
+        </button>
 
-        {/* 3. EN BODEGA (Craft Brewery Wooden Crate / Almacén de Cajas) */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#24170d]/90 via-[#18110b]/90 to-[#0e0a07] border border-amber-600/40 shadow-[0_0_18px_rgba(245,158,11,0.18)] hover:border-amber-500 hover:shadow-[0_0_28px_rgba(245,158,11,0.3)] transition-all group">
+        {/* 3. EN BODEGA (Almacén de Cajas + Alerta Dinámica cuando Bodega Baja o está en 0) */}
+        <button
+          type="button"
+          onClick={() => setActiveCategory(activeCategory === 'low_bodega' ? 'all' : 'low_bodega')}
+          className={`relative overflow-hidden rounded-2xl p-4 flex flex-col justify-between min-h-[116px] text-left transition-all cursor-pointer group ${
+            lowBodegaCount > 0
+              ? 'bg-gradient-to-br from-amber-950/95 via-[#291507] to-red-950/80 border-2 border-amber-500 animate-siren'
+              : 'bg-gradient-to-br from-[#24170d]/90 via-[#18110b]/90 to-[#0e0a07] border border-amber-600/40 shadow-[0_0_18px_rgba(245,158,11,0.18)] hover:border-amber-500 hover:shadow-[0_0_28px_rgba(245,158,11,0.3)]'
+          }`}
+        >
+          {/* Franja de peligro si hay productos sin reserva en bodega */}
+          {lowBodegaCount > 0 && (
+            <div className="hazard-stripe h-1.5 w-full absolute top-0 left-0 right-0" />
+          )}
+
           {/* Resplandor cálido de almacén */}
           <div className="absolute -bottom-8 -right-8 w-28 h-28 bg-amber-500/15 rounded-full blur-2xl pointer-events-none" />
 
-          {/* Marca de agua de cajas */}
-          <div className="absolute -right-1 -bottom-2 text-3xl select-none opacity-15 group-hover:opacity-30 transition-opacity pointer-events-none">
-            📦
-          </div>
-
           <div className="flex items-center justify-between relative z-10">
             <span className="text-[10px] font-black tracking-wider uppercase text-amber-300 flex items-center space-x-1">
-              <span>📦 En Bodega</span>
+              <span>{lowBodegaCount > 0 ? '🚨 En Bodega' : '📦 En Bodega'}</span>
             </span>
-            <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 shadow-sm">
-              Almacén
-            </span>
+            {lowBodegaCount > 0 ? (
+              <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-500 text-black uppercase tracking-wider flex items-center space-x-1 shadow-md animate-pulse shrink-0">
+                <span>{totalBodegaUnits === 0 ? '¡Vacía!' : `${lowBodegaCount} Baja(s)`}</span>
+              </span>
+            ) : (
+              <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 shadow-sm shrink-0">
+                Almacén
+              </span>
+            )}
           </div>
 
           <p className="text-xl sm:text-2xl lg:text-3xl font-black text-amber-200 mt-2 tracking-tight drop-shadow-[0_0_10px_rgba(245,158,11,0.4)] relative z-10">
             {totalBodegaUnits} <span className="text-xs font-semibold text-amber-400">uds</span>
           </p>
 
-          <p className="text-[11px] text-amber-400/80 mt-1 flex items-center space-x-1 relative z-10">
-            <Boxes className="w-3 h-3 text-amber-400 shrink-0" />
-            <span className="truncate">Cajas de respaldo</span>
-          </p>
-        </div>
+          <div className="text-[11px] text-amber-300/90 mt-1 flex items-center justify-between relative z-10">
+            <span className="truncate">
+              {lowBodegaCount > 0 ? `⚡ ${lowBodegaCount} por surtir` : 'Cajas de respaldo'}
+            </span>
+            <span className="text-[10px] font-bold underline decoration-dotted shrink-0">
+              {activeCategory === 'low_bodega' ? 'Activo' : lowBodegaCount > 0 ? 'Filtrar' : '✓ Reserva'}
+            </span>
+          </div>
+        </button>
 
         {/* 4. NEVERA BAJA (¡Alerta Dinámica & Sirena de Reposición Urgente!) */}
         <button
           type="button"
           onClick={() => setActiveCategory(activeCategory === 'low_nevera' ? 'all' : 'low_nevera')}
-          className={`relative overflow-hidden rounded-2xl text-left transition-all cursor-pointer p-4 group ${
+          className={`relative overflow-hidden rounded-2xl text-left transition-all cursor-pointer p-4 flex flex-col justify-between min-h-[116px] group ${
             lowNeveraCount > 0
               ? 'bg-gradient-to-br from-red-950/95 via-[#2b0c0c] to-amber-950/80 border-2 border-red-500 animate-siren'
               : 'bg-gradient-to-br from-emerald-950/30 via-zinc-950 to-[#0c1813] border border-emerald-500/40 hover:border-emerald-400 hover:shadow-[0_0_20px_rgba(16,185,129,0.2)]'
@@ -683,12 +743,12 @@ export default function ProductosPage() {
             </span>
 
             {lowNeveraCount > 0 ? (
-              <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-red-600 text-white uppercase tracking-wider flex items-center space-x-1 shadow-md shadow-red-950 animate-pulse">
+              <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-red-600 text-white uppercase tracking-wider flex items-center space-x-1 shadow-md shadow-red-950 animate-pulse shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
                 <span>¡Reponer!</span>
               </span>
             ) : (
-              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300">
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shrink-0">
                 Al 100%
               </span>
             )}
@@ -707,83 +767,145 @@ export default function ProductosPage() {
             </span>
           </p>
 
-          <p
+          <div
             className={`text-[11px] mt-1 flex items-center justify-between relative z-10 ${
               lowNeveraCount > 0 ? 'text-amber-300 font-bold' : 'text-zinc-400'
             }`}
           >
-            <span>{lowNeveraCount > 0 ? '⚡ Clic para reponer' : 'Sin faltantes en frío'}</span>
-            <span className="text-[10px] opacity-75 underline decoration-dotted">
-              {activeCategory === 'low_nevera' ? 'Filtro activo' : 'Filtrar'}
+            <span className="truncate">{lowNeveraCount > 0 ? '⚡ Clic para reponer' : 'Sin faltantes en frío'}</span>
+            <span className="text-[10px] opacity-75 underline decoration-dotted shrink-0">
+              {activeCategory === 'low_nevera' ? 'Activo' : 'Filtrar'}
             </span>
-          </p>
+          </div>
         </button>
 
         {/* 5. VALOR A VENTA (Cámara Acorazada & Margen Comercial) */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-950/40 via-zinc-950/90 to-[#0a1812] border border-emerald-500/40 p-4 shadow-xl hover:border-emerald-400 hover:shadow-[0_0_24px_rgba(16,185,129,0.22)] transition-all col-span-2 sm:col-span-1 group">
-          <div className="flex items-center justify-between">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-950/40 via-zinc-950/90 to-[#0a1812] border border-emerald-500/40 p-4 flex flex-col justify-between min-h-[116px] shadow-xl hover:border-emerald-400 hover:shadow-[0_0_24px_rgba(16,185,129,0.22)] transition-all col-span-2 sm:col-span-1 group">
+          <div className="flex items-center justify-between relative z-10">
             <span className="text-[10px] font-black tracking-wider uppercase text-emerald-400 flex items-center space-x-1">
               <DollarSign className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span>Valor Venta</span>
             </span>
-            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex items-center space-x-0.5">
+            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex items-center space-x-0.5 shrink-0">
               <TrendingUp className="w-2.5 h-2.5 shrink-0" />
               <span>{profitMargin > 0 ? `+${profitMargin}%` : 'Margen'}</span>
             </span>
           </div>
 
-          <p className="text-xl sm:text-2xl lg:text-3xl font-black text-emerald-300 mt-2 tracking-tight">
+          <p className="text-xl sm:text-2xl lg:text-3xl font-black text-emerald-300 mt-2 tracking-tight relative z-10">
             {formatCOP(totalInventoryRetail)}
           </p>
 
-          <p className="text-[11px] text-zinc-400 mt-1 truncate">
-            Costo: <span className="text-zinc-300 font-semibold">{formatCOP(totalInventoryCost)}</span>
-          </p>
+          <div className="text-[11px] text-zinc-400 mt-1 flex items-center justify-between relative z-10">
+            <span className="truncate">
+              Costo: <strong className="text-zinc-300 font-semibold">{formatCOP(totalInventoryCost)}</strong>
+            </span>
+            <span className="text-[10px] text-emerald-400 font-bold shrink-0">✓ Activo</span>
+          </div>
         </div>
       </div>
 
-      {/* Banner Urgente de Barra cuando hay Nevera Baja */}
-      {lowNeveraCount > 0 && (
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-red-950/80 via-rose-950/40 to-amber-950/60 border-2 border-red-500/60 shadow-xl shadow-red-950/50 flex flex-col md:flex-row md:items-center justify-between gap-3 animate-fadeIn">
-          <div className="flex items-start sm:items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 shrink-0 mt-0.5 sm:mt-0 animate-pulse">
-              <AlertTriangle className="w-5 h-5 text-red-400" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2 flex-wrap">
-                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-600 text-white uppercase tracking-wider">
-                  Alerta de Barra
-                </span>
-                <p className="text-xs sm:text-sm font-black text-white">
-                  {lowNeveraCount} {lowNeveraCount === 1 ? 'producto está' : 'productos están'} en nivel crítico de frío
-                </p>
+      {/* Banners Urgentes cuando hay Nevera Baja o Bodega Baja / Vacía */}
+      {(lowNeveraCount > 0 || lowBodegaCount > 0) && (
+        <div className="space-y-2.5 animate-fadeIn">
+          {lowNeveraCount > 0 && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-red-950/80 via-rose-950/40 to-amber-950/60 border-2 border-red-500/60 shadow-xl shadow-red-950/50 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-start sm:items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 shrink-0 mt-0.5 sm:mt-0 animate-pulse">
+                  <Snowflake className="w-5 h-5 text-cyan-300" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2 flex-wrap">
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-600 text-white uppercase tracking-wider">
+                      ❄️ Alerta de Nevera
+                    </span>
+                    <p className="text-xs sm:text-sm font-black text-white">
+                      {lowNeveraCount} {lowNeveraCount === 1 ? 'producto está' : 'productos están'} en nivel crítico de frío
+                    </p>
+                  </div>
+                  <p className="text-[11px] text-zinc-300 mt-0.5">
+                    Pasa unidades de bodega a la nevera o ingresa unidades frías para no quedarte sin bebidas heladas.
+                  </p>
+                </div>
               </div>
-              <p className="text-[11px] text-zinc-300 mt-0.5">
-                Pasa cajas de bodega a la nevera para asegurar que las cervezas estén bien frías antes de servir.
-              </p>
+
+              <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => setActiveCategory(activeCategory === 'low_nevera' ? 'all' : 'low_nevera')}
+                  className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-xs font-bold text-zinc-200 transition-all cursor-pointer"
+                >
+                  {activeCategory === 'low_nevera' ? 'Ver Todo' : 'Filtrar Nevera'}
+                </button>
+
+                {firstLowNevera && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      (firstLowNevera.stock_bodega ?? 0) > 0
+                        ? openTransferModal(firstLowNevera)
+                        : openQuickAdjustModal(firstLowNevera, 12)
+                    }
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-black shadow-lg shadow-cyan-950/50 flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95"
+                  >
+                    <Snowflake className="w-4 h-4" />
+                    <span>
+                      {(firstLowNevera.stock_bodega ?? 0) > 0
+                        ? `Pasar ${firstLowNevera.name.split(' ')[0]} a Nevera`
+                        : `Surtir ${firstLowNevera.name.split(' ')[0]}`}
+                    </span>
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
-            <button
-              type="button"
-              onClick={() => setActiveCategory(activeCategory === 'low_nevera' ? 'all' : 'low_nevera')}
-              className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-xs font-bold text-zinc-200 transition-all cursor-pointer"
-            >
-              {activeCategory === 'low_nevera' ? 'Ver Todo' : 'Filtrar Críticos'}
-            </button>
+          {lowBodegaCount > 0 && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/85 via-stone-900/80 to-orange-950/60 border-2 border-amber-500/60 shadow-xl shadow-amber-950/40 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-start sm:items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 mt-0.5 sm:mt-0 animate-pulse">
+                  <Boxes className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2 flex-wrap">
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500 text-black uppercase tracking-wider">
+                      📦 Alerta de Bodega
+                    </span>
+                    <p className="text-xs sm:text-sm font-black text-white">
+                      {lowBodegaCount}{' '}
+                      {lowBodegaCount === 1
+                        ? 'producto tiene la Bodega agotada o con reserva baja'
+                        : 'productos tienen la Bodega agotada o con reserva baja'}
+                    </p>
+                  </div>
+                  <p className="text-[11px] text-zinc-300 mt-0.5">
+                    Ingresa cajas de respaldo a Bodega o registra una compra a proveedor para mantener tu stock seguro.
+                  </p>
+                </div>
+              </div>
 
-            {firstLowNevera && (
-              <button
-                type="button"
-                onClick={() => openTransferModal(firstLowNevera)}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-black shadow-lg shadow-cyan-950/50 flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95"
-              >
-                <Snowflake className="w-4 h-4" />
-                <span>Pasar {firstLowNevera.name.split(' ')[0]} a Nevera</span>
-              </button>
-            )}
-          </div>
+              <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => setActiveCategory(activeCategory === 'low_bodega' ? 'all' : 'low_bodega')}
+                  className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-xs font-bold text-zinc-200 transition-all cursor-pointer"
+                >
+                  {activeCategory === 'low_bodega' ? 'Ver Todo' : 'Filtrar Bodega'}
+                </button>
+
+                {firstLowBodega && (
+                  <button
+                    type="button"
+                    onClick={() => openQuickAdjustModal(firstLowBodega, 12)}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-black text-xs font-black shadow-lg shadow-amber-950/50 flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95"
+                  >
+                    <Boxes className="w-4 h-4" />
+                    <span>Surtir Bodega ({firstLowBodega.name.split(' ')[0]})</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -880,14 +1002,20 @@ export default function ProductosPage() {
               const stockNev = p.stock_nevera ?? p.stock ?? 0
               const stockBod = p.stock_bodega ?? 0
               const minNev = p.min_stock_nevera ?? Math.max(2, Math.floor((p.min_stock || 10) / 2))
+              const minBod = Math.max(1, (p.min_stock || 10) - minNev)
               const isLowNevera = stockNev <= minNev
+              const isLowBodega = stockBod <= 0 || stockBod <= minBod || isLowStock
               const margin = p.price > 0 ? Math.round(((p.price - p.cost) / p.price) * 100) : 0
 
               return (
                 <div
                   key={p.id}
                   className={`rock-card p-5 rounded-2xl transition-all relative overflow-hidden group hover:border-red-600/70 ${
-                    isLowNevera ? 'border-amber-500/60 shadow-lg shadow-amber-950/20' : isLowStock ? 'border-red-500/50' : ''
+                    isLowNevera
+                      ? 'border-amber-500/60 shadow-lg shadow-amber-950/20'
+                      : isLowBodega
+                      ? 'border-orange-500/50 shadow-lg shadow-orange-950/20'
+                      : ''
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-3">
@@ -907,9 +1035,11 @@ export default function ProductosPage() {
                         className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center space-x-1 ${
                           p.stock <= 0
                             ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                            : isLowNevera && isLowBodega
+                            ? 'bg-red-500/20 text-red-300 border border-red-500/40 animate-pulse'
                             : isLowNevera
                             ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                            : isLowStock
+                            : isLowBodega
                             ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
                             : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         }`}
@@ -919,15 +1049,20 @@ export default function ProductosPage() {
                             <AlertCircle className="w-3 h-3 mr-1 inline" />
                             <span>Agotado</span>
                           </>
+                        ) : isLowNevera && isLowBodega ? (
+                          <>
+                            <AlertTriangle className="w-3 h-3 mr-1 inline text-red-400" />
+                            <span>Crítico Total</span>
+                          </>
                         ) : isLowNevera ? (
                           <>
                             <Snowflake className="w-3 h-3 mr-1 inline text-cyan-400" />
                             <span>Nevera Baja</span>
                           </>
-                        ) : isLowStock ? (
+                        ) : isLowBodega ? (
                           <>
-                            <AlertTriangle className="w-3 h-3 mr-1 inline" />
-                            <span>Stock Bajo</span>
+                            <AlertTriangle className="w-3 h-3 mr-1 inline text-amber-400" />
+                            <span>{stockBod <= 0 ? 'Bodega Vacía' : 'Bodega Baja'}</span>
                           </>
                         ) : (
                           <>
@@ -998,11 +1133,13 @@ export default function ProductosPage() {
 
                     <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-900">
                       {/* Nevera */}
-                      <div className={`p-2 rounded-lg border flex flex-col justify-between ${
-                        isLowNevera
-                          ? 'bg-amber-500/10 border-amber-500/40 text-amber-300'
-                          : 'bg-zinc-900 border-zinc-800 text-zinc-300'
-                      }`}>
+                      <div
+                        className={`p-2 rounded-lg border flex flex-col justify-between ${
+                          isLowNevera
+                            ? 'bg-amber-500/10 border-amber-500/40 text-amber-300'
+                            : 'bg-zinc-900 border-zinc-800 text-zinc-300'
+                        }`}
+                      >
                         <div className="flex items-center justify-between text-[10px] font-bold">
                           <span className="flex items-center space-x-1">
                             <span>❄️</span>
@@ -1010,7 +1147,7 @@ export default function ProductosPage() {
                           </span>
                           {isLowNevera && (
                             <span className="bg-amber-500/20 text-amber-400 px-1 rounded text-[9px] font-black animate-pulse">
-                              ¡Baja!
+                              {stockNev <= 0 ? '¡Vacía!' : '¡Baja!'}
                             </span>
                           )}
                         </div>
@@ -1021,21 +1158,32 @@ export default function ProductosPage() {
                       </div>
 
                       {/* Bodega */}
-                      <div className="p-2 rounded-lg border bg-zinc-900 border-zinc-800 text-zinc-300 flex flex-col justify-between">
+                      <div
+                        className={`p-2 rounded-lg border flex flex-col justify-between ${
+                          isLowBodega
+                            ? 'bg-orange-500/10 border-orange-500/40 text-orange-300'
+                            : 'bg-zinc-900 border-zinc-800 text-zinc-300'
+                        }`}
+                      >
                         <div className="flex items-center justify-between text-[10px] font-bold">
                           <span className="flex items-center space-x-1">
                             <span>📦</span>
                             <span>Bodega</span>
                           </span>
+                          {isLowBodega && (
+                            <span className="bg-orange-500/20 text-orange-400 px-1 rounded text-[9px] font-black animate-pulse">
+                              {stockBod <= 0 ? '¡Vacía!' : '¡Baja!'}
+                            </span>
+                          )}
                         </div>
-                        <p className="text-base font-black mt-1 text-zinc-200">
+                        <p className="text-base font-black mt-1">
                           {stockBod} <span className="text-[10px] font-normal text-zinc-400">reserva</span>
                         </p>
-                        <span className="text-[9px] text-zinc-500">en cajas</span>
+                        <span className="text-[9px] text-zinc-500">mínimo: {minBod}</span>
                       </div>
                     </div>
 
-                    {/* Botón rápido para transferir de Bodega a Nevera */}
+                    {/* Botones rápidos de transferencia o surtido */}
                     {stockBod > 0 ? (
                       <button
                         type="button"
@@ -1049,38 +1197,43 @@ export default function ProductosPage() {
                         <Snowflake className="w-3.5 h-3.5 text-cyan-300" />
                         <span>{isLowNevera ? '¡Pasar de Bodega a Nevera!' : 'Pasar a Nevera'}</span>
                       </button>
-                    ) : isLowNevera ? (
-                      <p className="text-[10px] text-red-400 font-semibold text-center pt-1">
-                        ⚠️ Bodega en 0. Requiere compra a proveedor.
-                      </p>
-                    ) : null}
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openQuickAdjustModal(p, 12)}
+                        className="w-full py-1.5 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 transition-all cursor-pointer"
+                      >
+                        <Boxes className="w-3.5 h-3.5 text-amber-400" />
+                        <span>⚠️ Bodega en 0 • Surtir Bodega / Nevera</span>
+                      </button>
+                    )}
                   </div>
 
-                  {/* Ajustador de Stock Manual */}
+                  {/* Ajustador de Stock Manual con selección de destino (Nevera o Bodega) */}
                   <div className="flex items-center justify-between text-xs pt-2 border-t border-zinc-800/80">
-                    <span className="text-[11px] text-zinc-500">Ajuste rápido:</span>
+                    <span className="text-[11px] text-zinc-400">Ajuste rápido (Nevera/Bodega):</span>
                     <div className="flex items-center space-x-1">
                       <button
                         type="button"
-                        onClick={() => handleStockChange(p.id, p.name, -1)}
-                        title="Restar 1 unidad"
+                        onClick={() => openQuickAdjustModal(p, -1)}
+                        title="Restar unidades de Nevera o Bodega"
                         className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white cursor-pointer"
                       >
                         <MinusCircle className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleStockChange(p.id, p.name, 1)}
-                        title="Sumar 1 unidad"
+                        onClick={() => openQuickAdjustModal(p, 1)}
+                        title="Sumar unidades a Nevera o Bodega"
                         className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white cursor-pointer"
                       >
                         <PlusCircle className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleStockChange(p.id, p.name, 10)}
-                        title="Sumar paquete (+10 uds)"
-                        className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] font-bold text-amber-400 cursor-pointer"
+                        onClick={() => openQuickAdjustModal(p, 10)}
+                        title="Sumar paquete (+10 uds) a Nevera o Bodega"
+                        className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-[10px] font-bold text-amber-300 cursor-pointer"
                       >
                         +10
                       </button>
@@ -1858,6 +2011,200 @@ export default function ProductosPage() {
               >
                 Confirmar y Enfriar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: AJUSTE RÁPIDO CON SELECCIÓN DE DESTINO (NEVERA VS BODEGA)          */}
+      {/* ========================================================================= */}
+      {showQuickAdjustModal && quickAdjustProduct && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowQuickAdjustModal(false)}
+        >
+          <div
+            className="rock-card w-full max-w-md p-6 rounded-3xl border border-zinc-700/80 shadow-2xl relative space-y-5 animate-scaleUp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cabecera */}
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center space-x-2.5">
+                <div
+                  className={`p-2.5 rounded-xl border ${
+                    quickAdjustSign === 1
+                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                      : 'bg-red-500/15 text-red-400 border-red-500/30'
+                  }`}
+                >
+                  {quickAdjustSign === 1 ? <Plus className="w-5 h-5" /> : <Minus className="w-5 h-5" />}
+                </div>
+                <div>
+                  <h3 className="font-black text-white text-base">
+                    {quickAdjustSign === 1 ? 'Ingreso Rápido de Unidades' : 'Descuento Rápido de Unidades'}
+                  </h3>
+                  <p className="text-xs text-zinc-400 font-medium truncate max-w-[260px]">
+                    {quickAdjustProduct.name} • Elige hacia dónde va el ajuste
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQuickAdjustModal(false)}
+                className="text-zinc-500 hover:text-white p-1.5 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Selector Sumar (+) vs Restar (-) */}
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-zinc-900/90 border border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setQuickAdjustSign(1)}
+                className={`py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center space-x-1.5 cursor-pointer ${
+                  quickAdjustSign === 1
+                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/30'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Sumar Stock (+)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuickAdjustSign(-1)}
+                className={`py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center space-x-1.5 cursor-pointer ${
+                  quickAdjustSign === -1
+                    ? 'bg-red-600 text-white shadow-lg shadow-red-900/30'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Minus className="w-3.5 h-3.5" />
+                <span>Restar Stock (-)</span>
+              </button>
+            </div>
+
+            {/* Cantidad a Ajustar */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                  Cantidad de Unidades
+                </label>
+                <span className="text-[11px] text-zinc-500 font-medium">
+                  Total actual: <strong className="text-white">{quickAdjustProduct.stock} uds</strong>
+                </span>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setQuickAdjustQty((q) => Math.max(1, q - 1))}
+                  className="w-11 h-11 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 flex items-center justify-center font-black text-lg cursor-pointer"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  min={1}
+                  value={quickAdjustQty}
+                  onChange={(e) => setQuickAdjustQty(Math.max(1, Number(e.target.value)))}
+                  className="flex-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2.5 text-center text-xl font-black text-white font-mono focus:outline-none focus:border-amber-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setQuickAdjustQty((q) => q + 1)}
+                  className="w-11 h-11 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 flex items-center justify-center font-black text-lg cursor-pointer"
+                >
+                  +
+                </button>
+              </div>
+
+              {/* Atajos rápidos de cantidad */}
+              <div className="grid grid-cols-6 gap-1.5 pt-1">
+                {[1, 6, 10, 12, 24, 30].map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setQuickAdjustQty(val)}
+                    className={`py-1.5 rounded-lg border text-xs font-black transition-all cursor-pointer ${
+                      quickAdjustQty === val
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                        : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    {quickAdjustSign === 1 ? `+${val}` : `-${val}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Selección de Destino: ¿Hacia dónde va? (Nevera vs Bodega) */}
+            <div className="space-y-2.5 pt-2 border-t border-zinc-800/80">
+              <p className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center space-x-1.5">
+                <span>¿En dónde deseas {quickAdjustSign === 1 ? 'guardar' : 'descontar'} estas {quickAdjustQty} uds?</span>
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Destino 1: NEVERA */}
+                <button
+                  type="button"
+                  onClick={() => handleConfirmQuickAdjust('nevera')}
+                  disabled={quickAdjustSign === -1 && (quickAdjustProduct.stock_nevera ?? 0) <= 0}
+                  className="group p-4 rounded-2xl border border-cyan-500/40 bg-gradient-to-br from-cyan-950/60 via-zinc-900 to-zinc-950 hover:from-cyan-900/60 hover:border-cyan-400 transition-all text-left flex flex-col justify-between space-y-3 shadow-lg shadow-cyan-950/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-black uppercase tracking-wider text-cyan-300 flex items-center space-x-1">
+                      <span>❄️ En Nevera</span>
+                    </span>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                      {quickAdjustSign === 1 ? `+${quickAdjustQty}` : `-${quickAdjustQty}`}
+                    </span>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] text-zinc-400">Stock frío actual: <strong className="text-white">{quickAdjustProduct.stock_nevera ?? 0}</strong></p>
+                    <p className="text-sm font-black text-cyan-300 mt-0.5">
+                      Quedará en:{' '}
+                      {Math.max(0, (quickAdjustProduct.stock_nevera ?? 0) + quickAdjustQty * quickAdjustSign)} frías
+                    </p>
+                  </div>
+
+                  <div className="w-full py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-black text-xs text-center transition-colors shadow-md shadow-cyan-950/50">
+                    {quickAdjustSign === 1 ? '❄️ Guardar en Nevera' : '❄️ Restar de Nevera'}
+                  </div>
+                </button>
+
+                {/* Destino 2: BODEGA */}
+                <button
+                  type="button"
+                  onClick={() => handleConfirmQuickAdjust('bodega')}
+                  disabled={quickAdjustSign === -1 && (quickAdjustProduct.stock_bodega ?? 0) <= 0}
+                  className="group p-4 rounded-2xl border border-amber-500/40 bg-gradient-to-br from-amber-950/60 via-zinc-900 to-zinc-950 hover:from-amber-900/60 hover:border-amber-400 transition-all text-left flex flex-col justify-between space-y-3 shadow-lg shadow-amber-950/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-black uppercase tracking-wider text-amber-300 flex items-center space-x-1">
+                      <span>📦 En Bodega</span>
+                    </span>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      {quickAdjustSign === 1 ? `+${quickAdjustQty}` : `-${quickAdjustQty}`}
+                    </span>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] text-zinc-400">Reserva actual: <strong className="text-white">{quickAdjustProduct.stock_bodega ?? 0}</strong></p>
+                    <p className="text-sm font-black text-amber-300 mt-0.5">
+                      Quedará en:{' '}
+                      {Math.max(0, (quickAdjustProduct.stock_bodega ?? 0) + quickAdjustQty * quickAdjustSign)} reserva
+                    </p>
+                  </div>
+
+                  <div className="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black text-xs text-center transition-colors shadow-md shadow-amber-950/50">
+                    {quickAdjustSign === 1 ? '📦 Guardar en Bodega' : '📦 Restar de Bodega'}
+                  </div>
+                </button>
+              </div>
             </div>
           </div>
         </div>
