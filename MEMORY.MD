@@ -364,3 +364,17 @@ npm install -D <pkg> # Instalar devDependency
         - En pantallas de escritorio (`min-width: 1024px`), el contenedor `.auth-slider-box` aloja a la izquierda el formulario de Inicio de Sesión y a la derecha el formulario de Registro.
         - Al alternar entre Login y Sign Up, un panel overlay con gradiente Rock Bar (`.auth-overlay-wrapper` y `.auth-overlay-bg`) se desliza suavemente de lado a lado con aceleración cúbica (`cubic-bezier(0.77, 0, 0.175, 1)`), mientras los paneles de texto internos y botones ghost se desplazan con efecto parallax (`translateX(20%)` / `translateX(-20%)`).
         - En dispositivos móviles (`max-width: 1023px`), la interfaz se adapta automáticamente a un carrusel táctil interactivo (`.auth-mobile-track`) con un selector de píldora superior animado que desliza el indicador activo sin comprimir ni desbordar la pantalla.
+    17. **ETAPA 15 - Sistema Global de Diálogos Modales Personalizados (`GlobalDialog` & `dialogService.ts`) (07/11/2026):**
+       - **Problema abordado:** Los cuadros de confirmación y alerta nativos del navegador (`confirm()`, `alert()`, `prompt()`) resultaban toscos, mostraban el dominio web (`bar-iota-peach.vercel.app`), no coincidían con la estética oscura del bar y presentaban la casilla de verificación *"Don't allow to prompt you again"*, lo que provocaba que los usuarios silenciaran accidentalmente las confirmaciones y bloquearan el flujo del sistema.
+       - **Servicio Event-Driven Asíncrono (`src/lib/dialogService.ts`):** Basado en `useSyncExternalStore` para permitir llamadas asíncronas con `await confirmAction(...)`, `await alertAction(...)` y `await promptAction(...)` desde cualquier punto de la aplicación sin acoplar estados locales.
+       - **Componente Modal Premium `GlobalDialog` (`src/components/GlobalDialog.tsx` & `src/app/globals.css`):**
+         - Fondo oscuro translúcido con desenfoque de fondo (`bg-black/80 backdrop-blur-md animate-fadeIn`).
+         - Tarjeta flotante `#0e131f` con borde `zinc-800`, resplandor ambiental superior, insignias temáticas de advertencia (`warning`), peligro (`danger`), información (`info`) y éxito (`success`).
+         - Bloque de garantías y detalles con viñetas esmeralda (`CheckCircle2`), ideal para confirmar reinicios seguros de mesas explicando qué datos permanecen intactos.
+         - Soporte para entrada de texto en modales tipo Prompt (`promptAction`) con autofoco y selección automática.
+         - Accesibilidad con teclado: cierre con tecla `Escape` y confirmación/envío con tecla `Enter`.
+       - **Reemplazo transversal en la aplicación:**
+         - `/mesas`: Reinicio seguro exclusivo de mesas con desglose de garantías (`handleResetData`), advertencia al intentar borrar mesas con consumo activo (`GulpDeleteButton.onBeforeEat`), y división de comanda (`handleSplitTable`).
+         - `/productos`: Confirmación antes de eliminar categorías personalizadas tanto en el modal como en la animación de borrado del bote.
+         - `/caja`: Confirmación previa antes de reiniciar balances de prueba de caja.
+         - `layout.tsx`: Montado tanto en el layout principal autenticado como en el portal de acceso para disponibilidad universal.

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import GulpDeleteButton from '@/components/GulpDeleteButton'
+import { confirmAction } from '@/lib/dialogService'
 import {
   Package,
   Plus,
@@ -156,13 +157,22 @@ export default function ProductosPage() {
     setTimeout(() => setNotification(''), 4000)
   }
 
+  const confirmDeleteCategory = async (name: string) => {
+    return await confirmAction({
+      title: `¿Eliminar la categoría "${name}"?`,
+      message: `Esta categoría se removerá de tu lista. Los productos existentes que pertenezcan a ella seguirán existiendo en tu inventario.`,
+      confirmText: 'Sí, eliminar categoría',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+      badgeText: 'Eliminación de Categoría',
+    })
+  }
+
   const handleDeleteCategory = (id: string, name: string) => {
-    if (confirm(`¿Deseas eliminar la categoría "${name}"?`)) {
-      if (deleteCategory(id)) {
-        if (activeCategory === name) setActiveCategory('all')
-        setNotification(`Categoría "${name}" eliminada.`)
-        setTimeout(() => setNotification(''), 3500)
-      }
+    if (deleteCategory(id)) {
+      if (activeCategory === name) setActiveCategory('all')
+      setNotification(`Categoría "${name}" eliminada.`)
+      setTimeout(() => setNotification(''), 3500)
     }
   }
 
@@ -2220,6 +2230,7 @@ export default function ProductosPage() {
                         size="xs"
                         label="Borrar"
                         title="Eliminar categoría personalizada"
+                        onBeforeEat={() => confirmDeleteCategory(cat.name)}
                         onDelete={() => handleDeleteCategory(cat.id, cat.name)}
                       />
                     )}

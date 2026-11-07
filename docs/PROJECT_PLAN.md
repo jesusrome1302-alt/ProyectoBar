@@ -18,6 +18,7 @@ Este documento detalla el plan de desarrollo incremental, los módulos del siste
 - **ETAPA 12:** Reinicio Seguro Exclusivo de Mesas (`resetTablesOnly`), Descuentos y Happy Hours por Tipo de Local (conservando los predeterminados), Eliminación de Cuenta con Verificación de PIN y Base de Datos de Usuarios Eliminados (`deleted_bar_accounts`), Personalización de Interfaz por Negocio y Creación de Categorías de Productos Personalizadas. *(Completada)*
 - **ETAPA 13:** Animación interactiva de borrado "The Bin Eats The Label" (Gulp Delete Button) inspirada en Code & Chill para la eliminación segura y con feedback visual de productos, mesas, categorías, promociones, empleados y cuentas. *(Completada)*
 - **ETAPA 14:** Animación interactiva Double Slider Sign In / Sign Up en `/login` con panel overlay deslizante con gradiente Rock Bar, efecto parallax y carrusel móvil táctil adaptativo. *(Completada)*
+- **ETAPA 15:** Sistema Global de Diálogos Modales Personalizados (`GlobalDialog` & `dialogService.ts`): Sustitución completa de las alertas y confirmaciones nativas del navegador (`confirm()`, `alert()`, `prompt()`) por una interfaz modal moderna, oscura y elegante acorde a la estética Rock Bar, con promesas asíncronas (`confirmAction`, `alertAction`, `promptAction`), animación de entrada con resplandor ambiental, desglose de garantías con viñetas esmeralda, badges temáticos y navegación accesible por teclado (`Enter`/`Escape`), evitando que los navegadores silencien o bloqueen las confirmaciones del sistema. *(Completada)*
 
 ## 2. Decisiones Pendientes (Registro)
 | Decisión | Estado |
@@ -29,6 +30,7 @@ Este documento detalla el plan de desarrollo incremental, los módulos del siste
 | Eliminación de cuentas y auditoría de bajas | Resuelto (Verificación obligatoria con PIN del propietario y archivo en base de datos `deleted_bar_accounts`) |
 | Animación de borrado interactiva (The Bin Eats The Label) | Resuelto (Implementado componente GulpDeleteButton en productos, mesas, usuarios, ventas y configuración) |
 | Animación de transición Login <-> Sign Up | Resuelto (Implementado Double Slider con overlay deslizante y carrusel responsive en /login) |
+| Cuadros de diálogo y confirmaciones del sistema | Resuelto (Reemplazo total de confirm/alert/prompt nativos por GlobalDialog y dialogService) |
 | Catálogo inicial y precios reales | Pendiente |
 | Métodos de pago que utiliza el negocio | Pendiente |
 | Necesidades de facturación electrónica | Pendiente |

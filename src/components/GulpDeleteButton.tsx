@@ -6,7 +6,7 @@ export type GulpState = 'idle' | 'eat' | 'furl' | 'done'
 
 export interface GulpDeleteButtonProps {
   onDelete: () => unknown | Promise<unknown>
-  onBeforeEat?: () => boolean
+  onBeforeEat?: () => boolean | Promise<boolean>
   label?: string
   size?: 'xs' | 'sm' | 'md' | 'lg'
   variant?: 'dark' | 'danger'
@@ -91,14 +91,17 @@ export default function GulpDeleteButton({
     }, 300)
   }
 
-  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation()
     if (disabled || state !== 'idle') return
 
-    if (onBeforeEat && !onBeforeEat()) {
-      setIsShaking(true)
-      setTimeout(() => setIsShaking(false), 360)
-      return
+    if (onBeforeEat) {
+      const allowed = await onBeforeEat()
+      if (!allowed) {
+        setIsShaking(true)
+        setTimeout(() => setIsShaking(false), 360)
+        return
+      }
     }
 
     // Measure exact distance from each character to the trash bin mouth

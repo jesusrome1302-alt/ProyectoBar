@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import GulpDeleteButton from '@/components/GulpDeleteButton'
+import { confirmAction, alertAction, promptAction } from '@/lib/dialogService'
 import {
   UtensilsCrossed,
   Plus,
@@ -139,11 +140,17 @@ export default function MesasPage() {
   }
 
   // Dividir cuenta / crear subcuenta en la misma mesa
-  const handleSplitTable = (parentTable: TableState) => {
-    const subName = prompt(
-      `Nombre del cliente o subtítulo para la cuenta separada en ${parentTable.name}:`,
-      `Cuenta 2 (${parentTable.name})`
-    )
+  const handleSplitTable = async (parentTable: TableState) => {
+    const subName = await promptAction({
+      title: `Dividir Cuenta en ${parentTable.name}`,
+      message: `Ingresa el nombre del cliente o un identificador para la nueva cuenta separada:`,
+      promptPlaceholder: `Ej: Juan Pérez / Cuenta 2`,
+      promptDefaultValue: `Cuenta 2 (${parentTable.name})`,
+      confirmText: 'Crear Cuenta',
+      cancelText: 'Cancelar',
+      badgeText: 'Subcuenta / Split',
+      variant: 'info',
+    })
     if (!subName || !subName.trim()) return
 
     const created = addTable({
@@ -192,12 +199,22 @@ export default function MesasPage() {
     setTimeout(() => setSuccessMsg(''), 4000)
   }
 
-  const handleResetData = () => {
-    if (
-      confirm(
-        '¿Deseas reiniciar ÚNICAMENTE las mesas a estado Disponible ($0)?\n\n✅ Tus productos, inventario, categorías, caja, descuentos y configuración de tu local se conservarán 100% intactos.'
-      )
-    ) {
+  const handleResetData = async () => {
+    const confirmed = await confirmAction({
+      title: '¿Reiniciar únicamente las mesas a estado Disponible ($0)?',
+      message: 'Las mesas ocupadas o reservadas se liberarán inmediatamente. Los productos de las cuentas no cobradas regresarán al stock de Nevera.',
+      details: [
+        'Tus productos e inventario (Nevera y Bodega) quedan 100% intactos.',
+        'Tus categorías personalizadas y descuentos se conservan.',
+        'Tu balance de caja y configuración de tu local no se tocan.',
+      ],
+      confirmText: 'Sí, reiniciar mesas',
+      cancelText: 'Cancelar',
+      variant: 'warning',
+      badgeText: 'Reinicio Seguro de Mesas',
+    })
+
+    if (confirmed) {
       resetTablesOnly()
       setSuccessMsg(
         '¡Mesas liberadas a $0 con éxito! Tus productos, inventario, caja y configuración permanecen intactos.'
@@ -423,11 +440,15 @@ export default function MesasPage() {
                         size="xs"
                         label="Borrar"
                         title="Eliminar mesa del salón"
-                        onBeforeEat={() => {
+                        onBeforeEat={async () => {
                           if (t.total > 0 || (t.items && t.items.length > 0)) {
-                            alert(
-                              `No puedes eliminar ${t.name} porque tiene consumos registrados (${formatCOP(t.total)}). Primero debes cerrar la comanda o cobrarla en /cobro.`
-                            )
+                            await alertAction({
+                              title: `No se puede eliminar ${t.name}`,
+                              message: `Esta mesa tiene consumos registrados por ${formatCOP(t.total)}. Primero debes cerrar la comanda o cobrarla en Cobro.`,
+                              variant: 'danger',
+                              badgeText: 'Mesa con Consumo Activo',
+                              confirmText: 'Entendido',
+                            })
                             return false
                           }
                           return true

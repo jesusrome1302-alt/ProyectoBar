@@ -11,6 +11,7 @@ import { useAuthStore, logout } from '@/lib/authStore'
 import { useBarStore, syncCloudBarData } from '@/lib/barState'
 import LoginPage from './login/page'
 import PhotoUploadModal from '@/components/PhotoUploadModal'
+import GlobalDialog from '@/components/GlobalDialog'
 
 export default function RootLayout({
   children,
@@ -63,6 +64,7 @@ export default function RootLayout({
           <main className="w-full flex items-center justify-center">
             <LoginPage />
           </main>
+          <GlobalDialog />
         </body>
       </html>
     )
@@ -162,6 +164,9 @@ export default function RootLayout({
           isOpen={showPhotoModal}
           onClose={() => setShowPhotoModal(false)}
         />
+
+        {/* Diálogo Modal Global de Confirmación, Avisos y Entradas (Reemplazo moderno de confirm/alert/prompt) */}
+        <GlobalDialog />
 
         {/* Navegación inferior móvil (no se muestra en login) */}
         {!isLoginPage && <MobileNav />}

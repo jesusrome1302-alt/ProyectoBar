@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { confirmAction } from '@/lib/dialogService'
 import {
   DollarSign,
   ArrowDownRight,
@@ -96,8 +97,17 @@ export default function CajaPage() {
     setTimeout(() => setNotification(''), 4000)
   }
 
-  const handleReset = () => {
-    if (confirm('¿Deseas reiniciar los datos de prueba de caja al estado por defecto?')) {
+  const handleReset = async () => {
+    const confirmed = await confirmAction({
+      title: '¿Reiniciar balance de prueba de caja?',
+      message: 'Se restablecerá la caja y los registros de prueba a sus valores iniciales.',
+      confirmText: 'Sí, reiniciar',
+      cancelText: 'Cancelar',
+      variant: 'warning',
+      badgeText: 'Módulo de Caja',
+    })
+
+    if (confirmed) {
       resetBarData()
       setNotification('Datos de prueba de caja reiniciados.')
       setTimeout(() => setNotification(''), 3000)
