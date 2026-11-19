@@ -202,23 +202,24 @@ export default function ProductosPage() {
   // Manejar creación de producto con inventario dual
   const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formName.trim() || formPrice <= 0) return
+    if (!formName.trim() || formPrice < 0) return
 
-    const stockNevera = Number(formStockNevera) || 0
-    const stockBodega = Number(formStockBodega) || 0
+    const stockNevera = Math.max(0, Number(formStockNevera) || 0)
+    const stockBodega = Math.max(0, Number(formStockBodega) || 0)
     const totalStock = stockNevera + stockBodega
-    const minNevera = Number(formMinStockNevera) || 6
+    const minNevera = Math.max(0, Number(formMinStockNevera) || 0)
+    const minTotal = Math.max(0, Number(formMinStock) || 0)
 
     const newProd = addProductItem({
       name: formName.trim(),
       category: formCategory,
-      price: formPrice,
-      cost: formCost,
+      price: Math.max(0, Number(formPrice) || 0),
+      cost: Math.max(0, Number(formCost) || 0),
       stock: totalStock,
       stock_nevera: stockNevera,
       stock_bodega: stockBodega,
       min_stock_nevera: minNevera,
-      min_stock: formMinStock,
+      min_stock: minTotal,
       barcode: formBarcode.trim() || 'SKU-' + Math.floor(100000 + Math.random() * 900000),
     })
 
@@ -245,11 +246,11 @@ export default function ProductosPage() {
     setEditCost(p.cost)
     const nev = p.stock_nevera !== undefined ? p.stock_nevera : p.stock
     const bod = p.stock_bodega !== undefined ? p.stock_bodega : 0
-    const minNev = p.min_stock_nevera !== undefined ? p.min_stock_nevera : Math.max(2, Math.floor(p.min_stock / 2))
+    const minNev = p.min_stock_nevera !== undefined ? p.min_stock_nevera : Math.max(0, Math.floor((p.min_stock || 0) / 2))
     setEditStockNevera(nev)
     setEditStockBodega(bod)
     setEditMinStockNevera(minNev)
-    setEditMinStock(p.min_stock)
+    setEditMinStock(p.min_stock ?? 0)
     setEditBarcode(p.barcode || '')
     setEditActive(p.active !== false)
     setShowEditProductModal(true)
@@ -258,26 +259,28 @@ export default function ProductosPage() {
   // Guardar cambios del producto editado
   const handleSaveEditProduct = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!editingProductId || !editName.trim() || editPrice <= 0) return
+    if (!editingProductId || !editName.trim() || editPrice < 0) return
 
-    const total = editStockNevera + editStockBodega
+    const safeNevera = Math.max(0, Number(editStockNevera) || 0)
+    const safeBodega = Math.max(0, Number(editStockBodega) || 0)
+    const total = safeNevera + safeBodega
 
     updateProductItem(editingProductId, {
       name: editName.trim(),
       category: editCategory,
-      price: editPrice,
-      cost: editCost,
+      price: Math.max(0, Number(editPrice) || 0),
+      cost: Math.max(0, Number(editCost) || 0),
       stock: total,
-      stock_nevera: editStockNevera,
-      stock_bodega: editStockBodega,
-      min_stock_nevera: editMinStockNevera,
-      min_stock: editMinStock,
+      stock_nevera: safeNevera,
+      stock_bodega: safeBodega,
+      min_stock_nevera: Math.max(0, Number(editMinStockNevera) || 0),
+      min_stock: Math.max(0, Number(editMinStock) || 0),
       barcode: editBarcode.trim(),
       active: editActive,
     })
 
     setShowEditProductModal(false)
-    setNotification(`¡"${editName.trim()}" actualizado! Nevera: ${editStockNevera} | Bodega: ${editStockBodega} | Total: ${total} uds`)
+    setNotification(`¡"${editName.trim()}" actualizado! Nevera: ${safeNevera} | Bodega: ${safeBodega} | Total: ${total} uds`)
     setTimeout(() => setNotification(''), 4000)
   }
 
@@ -1488,15 +1491,15 @@ export default function ProductosPage() {
       {/* MODAL: NUEVO PRODUCTO */}
       {/* ========================================================================= */}
       {showProductModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="rock-card w-full max-w-lg p-6 rounded-3xl border border-zinc-700 shadow-2xl relative space-y-4 animate-scaleUp">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="rock-card w-full max-w-lg max-h-[90vh] flex flex-col rounded-3xl border border-zinc-700 shadow-2xl relative animate-scaleUp my-auto overflow-hidden">
+            <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-zinc-800 shrink-0">
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 rounded-xl bg-red-600/20 text-red-500 flex items-center justify-center font-bold">
                   <Package className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-lg">Registrar Nuevo Producto</h3>
+                  <h3 className="font-bold text-white text-base sm:text-lg">Registrar Nuevo Producto</h3>
                   <p className="text-xs text-zinc-400">Se agregará al catálogo y al punto de venta</p>
                 </div>
               </div>
@@ -1509,168 +1512,170 @@ export default function ProductosPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateProduct} className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-zinc-300 block mb-1">Nombre del Producto *</label>
-                <input
-                  type="text"
-                  required
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  placeholder="Ej. Cerveza Artesanal IPA 330ml, Tequila Don Julio..."
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleCreateProduct} className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2.5">
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-zinc-300">Categoría *</label>
-                    <button
-                      type="button"
-                      onClick={() => setShowCategoryModal(true)}
-                      className="text-[10px] font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer"
-                    >
-                      + Crear categoría
-                    </button>
-                  </div>
-                  <select
-                    value={formCategory}
-                    onChange={(e) => setFormCategory(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-red-500 cursor-pointer"
-                  >
-                    {barCategories.map((cat) => (
-                      <option key={cat.id} value={cat.name}>
-                        {cat.icon ? `${cat.icon} ` : ''}{cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Código / SKU</label>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Nombre del Producto *</label>
                   <input
                     type="text"
-                    value={formBarcode}
-                    onChange={(e) => setFormBarcode(e.target.value)}
-                    placeholder="Ej. 7701239999"
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Precio Venta (COP) *</label>
-                  <input
-                    type="number"
                     required
-                    min={100}
-                    step={100}
-                    value={formPrice}
-                    onChange={(e) => setFormPrice(Number(e.target.value))}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-red-500 font-mono"
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    placeholder="Ej. Cerveza Artesanal IPA 330ml, Tequila Don Julio..."
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-500"
                   />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Costo Compra (COP) *</label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    step={100}
-                    value={formCost}
-                    onChange={(e) => setFormCost(Number(e.target.value))}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-red-500 font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Distribución Dual: Nevera y Bodega */}
-              <div className="p-3.5 bg-zinc-950/70 rounded-2xl border border-zinc-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white flex items-center space-x-1.5">
-                    <span>❄️📦</span>
-                    <span>Distribución de Inventario</span>
-                  </span>
-                  <span className="text-xs font-black text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                    Total: {formStockNevera + formStockBodega} unidades
-                  </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
-                      ❄️ Stock en Nevera (Frías / Barra) *
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={formStockNevera}
-                      onChange={(e) => setFormStockNevera(Math.max(0, Number(e.target.value)))}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500 font-bold"
-                    />
-                    <span className="text-[10px] text-zinc-500">Listas para servir</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-zinc-300">Categoría *</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowCategoryModal(true)}
+                        className="text-[10px] font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                      >
+                        + Crear categoría
+                      </button>
+                    </div>
+                    <select
+                      value={formCategory}
+                      onChange={(e) => setFormCategory(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500 cursor-pointer"
+                    >
+                      {barCategories.map((cat) => (
+                        <option key={cat.id} value={cat.name}>
+                          {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
-                      📦 Stock en Bodega (Almacén / Cajas) *
-                    </label>
+                    <label className="text-xs font-semibold text-zinc-300 block mb-1">Código / SKU</label>
                     <input
-                      type="number"
-                      min={0}
-                      value={formStockBodega}
-                      onChange={(e) => setFormStockBodega(Math.max(0, Number(e.target.value)))}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500 font-bold"
+                      type="text"
+                      value={formBarcode}
+                      onChange={(e) => setFormBarcode(e.target.value)}
+                      placeholder="Ej. 7701239999"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-500"
                     />
-                    <span className="text-[10px] text-zinc-500">Cajas de reserva</span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-zinc-900">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
-                      ⚠️ Mínimo en Nevera (Alerta)
-                    </label>
+                    <label className="text-xs font-semibold text-zinc-300 block mb-1">Precio Venta (COP) *</label>
                     <input
                       type="number"
-                      min={1}
-                      value={formMinStockNevera}
-                      onChange={(e) => setFormMinStockNevera(Math.max(1, Number(e.target.value)))}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-red-500"
+                      required
+                      min={0}
+                      step="any"
+                      value={formPrice}
+                      onChange={(e) => setFormPrice(Number(e.target.value))}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm font-bold text-white focus:outline-none focus:border-red-500 font-mono"
                     />
-                    <span className="text-[9px] text-zinc-500">Avisa para enfriar</span>
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
-                      🚨 Mínimo Total (Alerta Compra)
-                    </label>
+                    <label className="text-xs font-semibold text-zinc-300 block mb-1">Costo Compra (COP) *</label>
                     <input
                       type="number"
-                      min={1}
-                      value={formMinStock}
-                      onChange={(e) => setFormMinStock(Math.max(1, Number(e.target.value)))}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-red-500"
+                      required
+                      min={0}
+                      step="any"
+                      value={formCost}
+                      onChange={(e) => setFormCost(Number(e.target.value))}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm font-bold text-white focus:outline-none focus:border-red-500 font-mono"
                     />
-                    <span className="text-[9px] text-zinc-500">Avisa para pedir proveedor</span>
+                  </div>
+                </div>
+
+                {/* Distribución Dual: Nevera y Bodega */}
+                <div className="p-3 bg-zinc-950/70 rounded-2xl border border-zinc-800 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white flex items-center space-x-1.5">
+                      <span>❄️📦</span>
+                      <span>Distribución de Inventario</span>
+                    </span>
+                    <span className="text-xs font-black text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                      Total: {(Number(formStockNevera) || 0) + (Number(formStockBodega) || 0)} unidades
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                        ❄️ Stock en Nevera (Frías / Barra) *
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={formStockNevera}
+                        onChange={(e) => setFormStockNevera(Math.max(0, Number(e.target.value)))}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none focus:border-red-500 font-bold"
+                      />
+                      <span className="text-[10px] text-zinc-500">Listas para servir</span>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                        📦 Stock en Bodega (Almacén / Cajas) *
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={formStockBodega}
+                        onChange={(e) => setFormStockBodega(Math.max(0, Number(e.target.value)))}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none focus:border-red-500 font-bold"
+                      />
+                      <span className="text-[10px] text-zinc-500">Cajas de reserva</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-zinc-900">
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                        ⚠️ Mínimo en Nevera (Alerta)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={formMinStockNevera}
+                        onChange={(e) => setFormMinStockNevera(Math.max(0, Number(e.target.value)))}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-red-500"
+                      />
+                      <span className="text-[9px] text-zinc-500">Avisa para enfriar</span>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                        🚨 Mínimo Total (Alerta Compra)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={formMinStock}
+                        onChange={(e) => setFormMinStock(Math.max(0, Number(e.target.value)))}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-red-500"
+                      />
+                      <span className="text-[9px] text-zinc-500">Avisa para pedir proveedor</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-zinc-800">
+              <div className="flex items-center justify-end space-x-3 px-5 py-3 border-t border-zinc-800 bg-zinc-950/90 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowProductModal(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 shadow-lg shadow-red-900/30 transition-all cursor-pointer"
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 shadow-lg shadow-red-900/30 transition-all cursor-pointer"
                 >
                   Guardar Producto
                 </button>
@@ -1684,15 +1689,15 @@ export default function ProductosPage() {
       {/* MODAL: EDITAR PRODUCTO */}
       {/* ========================================================================= */}
       {showEditProductModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="rock-card w-full max-w-lg p-6 rounded-3xl border border-zinc-700 shadow-2xl relative space-y-4 animate-scaleUp">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="rock-card w-full max-w-lg max-h-[90vh] flex flex-col rounded-3xl border border-zinc-700 shadow-2xl relative animate-scaleUp my-auto overflow-hidden">
+            <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-zinc-800 shrink-0">
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 rounded-xl bg-amber-600/20 text-amber-500 flex items-center justify-center font-bold">
                   <Edit2 className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-lg">Editar Producto</h3>
+                  <h3 className="font-bold text-white text-base sm:text-lg">Editar Producto</h3>
                   <p className="text-xs text-zinc-400">Modifica precios, costos, categoría o stock físico</p>
                 </div>
               </div>
@@ -1705,177 +1710,179 @@ export default function ProductosPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditProduct} className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-zinc-300 block mb-1">Nombre del Producto *</label>
-                <input
-                  type="text"
-                  required
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder="Ej. Cerveza Corona Extra 355ml"
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleSaveEditProduct} className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2.5">
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-zinc-300">Categoría *</label>
-                    <button
-                      type="button"
-                      onClick={() => setShowCategoryModal(true)}
-                      className="text-[10px] font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer"
-                    >
-                      + Crear categoría
-                    </button>
-                  </div>
-                  <select
-                    value={editCategory}
-                    onChange={(e) => setEditCategory(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 cursor-pointer"
-                  >
-                    {barCategories.map((cat) => (
-                      <option key={cat.id} value={cat.name}>
-                        {cat.icon ? `${cat.icon} ` : ''}{cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Código / SKU</label>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Nombre del Producto *</label>
                   <input
                     type="text"
-                    value={editBarcode}
-                    onChange={(e) => setEditBarcode(e.target.value)}
-                    placeholder="Ej. 7701230001"
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Precio Venta (COP) *</label>
-                  <input
-                    type="number"
                     required
-                    min={100}
-                    step={100}
-                    value={editPrice}
-                    onChange={(e) => setEditPrice(Number(e.target.value))}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-amber-500 font-mono"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Ej. Cerveza Corona Extra 355ml"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
                   />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Costo Compra (COP) *</label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    step={100}
-                    value={editCost}
-                    onChange={(e) => setEditCost(Number(e.target.value))}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-amber-500 font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Distribución Dual: Nevera y Bodega */}
-              <div className="p-3.5 bg-zinc-950/70 rounded-2xl border border-zinc-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white flex items-center space-x-1.5">
-                    <span>❄️📦</span>
-                    <span>Distribución de Inventario</span>
-                  </span>
-                  <span className="text-xs font-black text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                    Total: {editStockNevera + editStockBodega} unidades
-                  </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
-                      ❄️ Stock en Nevera (Frías / Barra) *
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={editStockNevera}
-                      onChange={(e) => setEditStockNevera(Math.max(0, Number(e.target.value)))}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 font-bold"
-                    />
-                    <span className="text-[10px] text-zinc-500">Listas para servir</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-zinc-300">Categoría *</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowCategoryModal(true)}
+                        className="text-[10px] font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                      >
+                        + Crear categoría
+                      </button>
+                    </div>
+                    <select
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 cursor-pointer"
+                    >
+                      {barCategories.map((cat) => (
+                        <option key={cat.id} value={cat.name}>
+                          {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
-                      📦 Stock en Bodega (Almacén / Cajas) *
-                    </label>
+                    <label className="text-xs font-semibold text-zinc-300 block mb-1">Código / SKU</label>
                     <input
-                      type="number"
-                      min={0}
-                      value={editStockBodega}
-                      onChange={(e) => setEditStockBodega(Math.max(0, Number(e.target.value)))}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 font-bold"
+                      type="text"
+                      value={editBarcode}
+                      onChange={(e) => setEditBarcode(e.target.value)}
+                      placeholder="Ej. 7701230001"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
                     />
-                    <span className="text-[10px] text-zinc-500">Cajas de reserva</span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-zinc-900">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
-                      ⚠️ Mínimo en Nevera (Alerta)
-                    </label>
+                    <label className="text-xs font-semibold text-zinc-300 block mb-1">Precio Venta (COP) *</label>
                     <input
                       type="number"
-                      min={1}
-                      value={editMinStockNevera}
-                      onChange={(e) => setEditMinStockNevera(Math.max(1, Number(e.target.value)))}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
+                      required
+                      min={0}
+                      step="any"
+                      value={editPrice}
+                      onChange={(e) => setEditPrice(Number(e.target.value))}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm font-bold text-white focus:outline-none focus:border-amber-500 font-mono"
                     />
-                    <span className="text-[9px] text-zinc-500">Avisa para enfriar</span>
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
-                      🚨 Mínimo Total (Alerta Compra)
-                    </label>
+                    <label className="text-xs font-semibold text-zinc-300 block mb-1">Costo Compra (COP) *</label>
                     <input
                       type="number"
-                      min={1}
-                      value={editMinStock}
-                      onChange={(e) => setEditMinStock(Math.max(1, Number(e.target.value)))}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
+                      required
+                      min={0}
+                      step="any"
+                      value={editCost}
+                      onChange={(e) => setEditCost(Number(e.target.value))}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm font-bold text-white focus:outline-none focus:border-amber-500 font-mono"
                     />
-                    <span className="text-[9px] text-zinc-500">Avisa para pedir proveedor</span>
                   </div>
+                </div>
+
+                {/* Distribución Dual: Nevera y Bodega */}
+                <div className="p-3 bg-zinc-950/70 rounded-2xl border border-zinc-800 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white flex items-center space-x-1.5">
+                      <span>❄️📦</span>
+                      <span>Distribución de Inventario</span>
+                    </span>
+                    <span className="text-xs font-black text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                      Total: {(Number(editStockNevera) || 0) + (Number(editStockBodega) || 0)} unidades
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                        ❄️ Stock en Nevera (Frías / Barra) *
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={editStockNevera}
+                        onChange={(e) => setEditStockNevera(Math.max(0, Number(e.target.value)))}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500 font-bold"
+                      />
+                      <span className="text-[10px] text-zinc-500">Listas para servir</span>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                        📦 Stock en Bodega (Almacén / Cajas) *
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={editStockBodega}
+                        onChange={(e) => setEditStockBodega(Math.max(0, Number(e.target.value)))}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500 font-bold"
+                      />
+                      <span className="text-[10px] text-zinc-500">Cajas de reserva</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-zinc-900">
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                        ⚠️ Mínimo en Nevera (Alerta)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={editMinStockNevera}
+                        onChange={(e) => setEditMinStockNevera(Math.max(0, Number(e.target.value)))}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
+                      />
+                      <span className="text-[9px] text-zinc-500">Avisa para enfriar</span>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                        🚨 Mínimo Total (Alerta Compra)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={editMinStock}
+                        onChange={(e) => setEditMinStock(Math.max(0, Number(e.target.value)))}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
+                      />
+                      <span className="text-[9px] text-zinc-500">Avisa para pedir proveedor</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Estado de Venta Activo / Pausado */}
+                <div className="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-white">Disponibilidad en el POS</p>
+                    <p className="text-[11px] text-zinc-400">Si está inactivo, no se podrá agregar a las comandas</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditActive(!editActive)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      editActive
+                        ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/40'
+                        : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                    }`}
+                  >
+                    {editActive ? 'Activo (En Venta)' : 'Pausado (Oculto)'}
+                  </button>
                 </div>
               </div>
 
-              {/* Estado de Venta Activo / Pausado */}
-              <div className="bg-zinc-950/70 p-3.5 rounded-xl border border-zinc-800 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold text-white">Disponibilidad en el POS</p>
-                  <p className="text-[11px] text-zinc-400">Si está inactivo, no se podrá agregar a las comandas</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEditActive(!editActive)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    editActive
-                      ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/40'
-                      : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
-                  }`}
-                >
-                  {editActive ? 'Activo (En Venta)' : 'Pausado (Oculto)'}
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 pt-3 border-t border-zinc-800">
+              <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-zinc-800 bg-zinc-950/90 shrink-0">
                 {editingProductId ? (
                   <GulpDeleteButton
                     size="sm"
@@ -1897,13 +1904,13 @@ export default function ProductosPage() {
                   <button
                     type="button"
                     onClick={() => setShowEditProductModal(false)}
-                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 shadow-lg shadow-amber-900/30 transition-all cursor-pointer"
+                    className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 shadow-lg shadow-amber-900/30 transition-all cursor-pointer"
                   >
                     Guardar Cambios
                   </button>
@@ -1918,8 +1925,8 @@ export default function ProductosPage() {
       {/* MODAL: TRANSFERIR DE BODEGA A NEVERA (REABASTECER) */}
       {/* ========================================================================= */}
       {showTransferModal && transferProduct && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="rock-card w-full max-w-md p-6 rounded-3xl border border-zinc-700 shadow-2xl relative space-y-4 animate-scaleUp">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="rock-card w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6 rounded-3xl border border-zinc-700 shadow-2xl relative space-y-4 animate-scaleUp my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
               <div className="flex items-center space-x-2.5">
                 <div className="w-9 h-9 rounded-xl bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center font-bold">
@@ -2021,11 +2028,11 @@ export default function ProductosPage() {
       {/* ========================================================================= */}
       {showQuickAdjustModal && quickAdjustProduct && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
           onClick={() => setShowQuickAdjustModal(false)}
         >
           <div
-            className="rock-card w-full max-w-md p-6 rounded-3xl border border-zinc-700/80 shadow-2xl relative space-y-5 animate-scaleUp"
+            className="rock-card w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6 rounded-3xl border border-zinc-700/80 shadow-2xl relative space-y-5 animate-scaleUp my-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Cabecera */}
@@ -2214,8 +2221,8 @@ export default function ProductosPage() {
       {/* MODAL: NUEVA ORDEN DE COMPRA */}
       {/* ========================================================================= */}
       {showPurchaseModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="rock-card w-full max-w-xl p-6 rounded-3xl border border-zinc-700 shadow-2xl relative space-y-4 animate-scaleUp">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="rock-card w-full max-w-xl max-h-[90vh] overflow-y-auto p-5 sm:p-6 rounded-3xl border border-zinc-700 shadow-2xl relative space-y-4 animate-scaleUp my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
               <div className="flex items-center space-x-2">
                 <div className="p-2 rounded-xl bg-emerald-600/20 text-emerald-400">
@@ -2326,7 +2333,7 @@ export default function ProductosPage() {
                         <input
                           type="number"
                           min={0}
-                          step={100}
+                          step="any"
                           value={item.unitCost}
                           onChange={(e) => {
                             const updated = [...purchaseItems]
@@ -2416,8 +2423,8 @@ export default function ProductosPage() {
       {/* MODAL: NUEVO PROVEEDOR */}
       {/* ========================================================================= */}
       {showSupplierModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="rock-card w-full max-w-lg p-6 rounded-3xl border border-zinc-700 shadow-2xl relative space-y-4 animate-scaleUp">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="rock-card w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 sm:p-6 rounded-3xl border border-zinc-700 shadow-2xl relative space-y-4 animate-scaleUp my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
               <div className="flex items-center space-x-2">
                 <div className="p-2 rounded-xl bg-blue-600/20 text-blue-400">
@@ -2552,8 +2559,8 @@ export default function ProductosPage() {
       {/* MODAL: AJUSTE / MERMA DE INVENTARIO */}
       {/* ========================================================================= */}
       {showAdjustmentModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="rock-card w-full max-w-md p-6 rounded-3xl border border-zinc-700 shadow-2xl relative space-y-4 animate-scaleUp">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="rock-card w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6 rounded-3xl border border-zinc-700 shadow-2xl relative space-y-4 animate-scaleUp my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
               <div className="flex items-center space-x-2">
                 <div className="p-2 rounded-xl bg-amber-600/20 text-amber-400">
@@ -2664,8 +2671,8 @@ export default function ProductosPage() {
       {/* MODAL: GESTIONAR Y CREAR CATEGORÍAS DE PRODUCTOS DEL NEGOCIO */}
       {/* ========================================================================= */}
       {showCategoryModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="rock-card w-full max-w-md p-6 rounded-3xl border border-amber-500/40 shadow-2xl relative space-y-4 animate-scaleUp">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="rock-card w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6 rounded-3xl border border-amber-500/40 shadow-2xl relative space-y-4 animate-scaleUp my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
               <div className="flex items-center space-x-2">
                 <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
