@@ -25,6 +25,7 @@ import {
   Lock,
   Database,
   Power,
+  Edit2,
 } from 'lucide-react'
 import {
   useBarStore,
@@ -36,10 +37,12 @@ import {
   addCategory,
   deleteCategory,
   addCustomDiscount,
+  updateDiscountRule,
   toggleDiscountActive,
   deleteCustomDiscount,
   DEFAULT_CATEGORIES,
   PRESET_DISCOUNTS,
+  DiscountRuleState,
   ThemePreset,
 } from '@/lib/barState'
 import {
@@ -147,16 +150,19 @@ export default function ConfiguracionPage() {
 
   // Descuentos y Happy Hours (Predeterminados + Personalizados)
   const discountsList = barData.discounts && barData.discounts.length > 0 ? barData.discounts : PRESET_DISCOUNTS
+  const productsList = barData.products || []
   const [showDiscountModal, setShowDiscountModal] = useState<boolean>(false)
+  const [editingDiscountId, setEditingDiscountId] = useState<string | null>(null)
   const [discName, setDiscName] = useState<string>('')
   const [discDesc, setDiscDesc] = useState<string>('')
-  const [discType, setDiscType] = useState<'percentage' | 'fixed'>('percentage')
-  const [discValue, setDiscValue] = useState<number>(20)
-  const [discScope, setDiscScope] = useState<'all' | 'category'>('all')
+  const [discType, setDiscType] = useState<'percentage' | 'fixed' | 'fixed_off' | 'fixed_price'>('fixed_off')
+  const [discValue, setDiscValue] = useState<number>(1500)
+  const [discScope, setDiscScope] = useState<'all' | 'category' | 'product'>('category')
   const [discCategory, setDiscCategory] = useState<string>(barCategories[0]?.name || 'Cervezas')
+  const [discProductId, setDiscProductId] = useState<string>(productsList[0]?.id || '')
   const [discIsHappyHour, setDiscIsHappyHour] = useState<boolean>(true)
   const [discStartTime, setDiscStartTime] = useState<string>('17:00')
-  const [discEndTime, setDiscEndTime] = useState<string>('21:00')
+  const [discEndTime, setDiscEndTime] = useState<string>('22:00')
   const [discDays, setDiscDays] = useState<string[]>(['Jue', 'Vie', 'Sáb'])
 
   // Eliminación de cuenta con verificación de PIN y base de datos de usuarios eliminados
@@ -256,22 +262,91 @@ export default function ConfiguracionPage() {
     setTimeout(() => setNotification(''), 3500)
   }
 
-  // Crear descuento o Happy Hour personalizado para este local
+  // Abrir modal para crear un nuevo descuento / Happy Hour
+  const openCreateDiscountModal = () => {
+    setEditingDiscountId(null)
+    setDiscName('')
+    setDiscDesc('')
+    setDiscType('fixed_off')
+    setDiscValue(1500)
+    setDiscScope('category')
+    setDiscCategory(barCategories[0]?.name || 'Cervezas')
+    setDiscProductId(productsList[0]?.id || '')
+    setDiscIsHappyHour(true)
+    setDiscStartTime('17:00')
+    setDiscEndTime('22:00')
+    setDiscDays(['Jue', 'Vie', 'Sáb'])
+    setShowDiscountModal(true)
+  }
+
+  // Abrir modal para editar cualquier descuento existente (predeterminado o personalizado)
+  const openEditDiscountModal = (disc: DiscountRuleState) => {
+    setEditingDiscountId(disc.id)
+    setDiscName(disc.name)
+    setDiscDesc(disc.description || '')
+    setDiscType(disc.type)
+    setDiscValue(disc.value)
+    setDiscScope(disc.scope)
+    setDiscCategory(disc.categoryName || barCategories[0]?.name || 'Cervezas')
+    setDiscProductId(disc.productId || productsList[0]?.id || '')
+    setDiscIsHappyHour(Boolean(disc.isHappyHour))
+    setDiscStartTime(disc.startTime || '17:00')
+    setDiscEndTime(disc.endTime || '22:00')
+    setDiscDays(disc.days && disc.days.length > 0 ? disc.days : ['Jue', 'Vie', 'Sáb'])
+    setShowDiscountModal(true)
+  }
+
+  // Crear o actualizar descuento o Happy Hour para este local
   const handleCreateCustomDiscount = (e: React.FormEvent) => {
     e.preventDefault()
     if (!discName.trim() || discValue <= 0) return
 
+    const selectedProd = productsList.find((p) => p.id === discProductId)
+    const benefitLabel =
+      discType === 'percentage'
+        ? `${discValue}%`
+        : discType === 'fixed_off'
+        ? `-$ ${discValue.toLocaleString('es-CO')} por unidad`
+        : discType === 'fixed_price'
+        ? `Precio fijo $ ${discValue.toLocaleString('es-CO')} c/u`
+        : `$ ${discValue.toLocaleString('es-CO')} al total`
+
+    const autoDescription =
+      discDesc.trim() ||
+      `${discIsHappyHour ? 'Happy Hour' : 'Descuento'} de ${benefitLabel} (${businessType})`
+
+    if (editingDiscountId) {
+      updateDiscountRule(editingDiscountId, {
+        name: discName.trim(),
+        description: autoDescription,
+        type: discType,
+        value: Number(discValue),
+        scope: discScope,
+        categoryName: discScope === 'category' ? discCategory : undefined,
+        productId: discScope === 'product' ? discProductId : undefined,
+        productName: discScope === 'product' ? selectedProd?.name : undefined,
+        isHappyHour: discIsHappyHour,
+        startTime: discIsHappyHour ? discStartTime : undefined,
+        endTime: discIsHappyHour ? discEndTime : undefined,
+        days: discIsHappyHour ? discDays : undefined,
+        businessTypeTag: businessType,
+      })
+      setShowDiscountModal(false)
+      setEditingDiscountId(null)
+      setNotification(`¡Descuento "${discName.trim()}" actualizado correctamente!`)
+      setTimeout(() => setNotification(''), 4500)
+      return
+    }
+
     const created = addCustomDiscount({
       name: discName.trim(),
-      description:
-        discDesc.trim() ||
-        `${discIsHappyHour ? 'Happy Hour' : 'Descuento'} de ${
-          discType === 'percentage' ? `${discValue}%` : `$ ${discValue.toLocaleString('es-CO')}`
-        } (${businessType})`,
+      description: autoDescription,
       type: discType,
       value: Number(discValue),
       scope: discScope,
       categoryName: discScope === 'category' ? discCategory : undefined,
+      productId: discScope === 'product' ? discProductId : undefined,
+      productName: discScope === 'product' ? selectedProd?.name : undefined,
       isHappyHour: discIsHappyHour,
       startTime: discIsHappyHour ? discStartTime : undefined,
       endTime: discIsHappyHour ? discEndTime : undefined,
@@ -283,8 +358,8 @@ export default function ConfiguracionPage() {
     setShowDiscountModal(false)
     setDiscName('')
     setDiscDesc('')
-    setDiscValue(20)
-    setNotification(`¡"${created.name}" creado para tu local! Los descuentos predeterminados también se mantienen.`)
+    setDiscValue(1500)
+    setNotification(`¡"${created.name}" creado para tu local!`)
     setTimeout(() => setNotification(''), 4500)
   }
 
@@ -818,7 +893,7 @@ export default function ConfiguracionPage() {
 
           <button
             type="button"
-            onClick={() => setShowDiscountModal(true)}
+            onClick={openCreateDiscountModal}
             className="flex items-center space-x-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-lg shadow-emerald-900/30 cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
@@ -850,7 +925,7 @@ export default function ConfiguracionPage() {
                     </span>
                     {disc.isPreset ? (
                       <span className="text-[9px] font-bold bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded-full border border-zinc-700">
-                        Predeterminado (Fijo)
+                        Predeterminado
                       </span>
                     ) : (
                       <span className="text-[9px] font-bold bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30">
@@ -860,6 +935,15 @@ export default function ConfiguracionPage() {
                   </div>
 
                   <div className="flex items-center space-x-1">
+                    <button
+                      type="button"
+                      onClick={() => openEditDiscountModal(disc)}
+                      title="Editar este descuento o Happy Hour"
+                      className="px-2 py-1 rounded-lg bg-zinc-800 hover:bg-amber-500/20 text-zinc-300 hover:text-amber-300 border border-zinc-700 hover:border-amber-500/40 text-[10px] font-bold flex items-center space-x-1 transition-all cursor-pointer"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      <span>Editar</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => toggleDiscountActive(disc.id)}
@@ -889,7 +973,11 @@ export default function ConfiguracionPage() {
 
               <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between text-xs">
                 <div className="text-[11px] text-zinc-400">
-                  {disc.scope === 'category' ? (
+                  {disc.scope === 'product' ? (
+                    <span>
+                      Producto: <strong className="text-amber-400">{disc.productName || 'Unidad específica'}</strong>
+                    </span>
+                  ) : disc.scope === 'category' ? (
                     <span>
                       Categoría: <strong className="text-amber-400">{disc.categoryName}</strong>
                     </span>
@@ -905,7 +993,13 @@ export default function ConfiguracionPage() {
                 </div>
 
                 <span className="text-sm font-black text-emerald-400 font-mono">
-                  {disc.type === 'percentage' ? `-${disc.value}%` : `-$${disc.value.toLocaleString('es-CO')}`}
+                  {disc.type === 'percentage'
+                    ? `-${disc.value}%`
+                    : disc.type === 'fixed_off'
+                    ? `-$${disc.value.toLocaleString('es-CO')} c/u`
+                    : disc.type === 'fixed_price'
+                    ? `$${disc.value.toLocaleString('es-CO')} c/u`
+                    : `-$${disc.value.toLocaleString('es-CO')}`}
                 </span>
               </div>
             </div>
@@ -955,24 +1049,31 @@ export default function ConfiguracionPage() {
       </div>
 
       {/* ========================================================================= */}
-      {/* MODAL: CREAR DESCUENTO O HAPPY HOUR PERSONALIZADO                         */}
+      {/* MODAL: CREAR O EDITAR DESCUENTO O HAPPY HOUR                              */}
       {/* ========================================================================= */}
       {showDiscountModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="rock-card w-full max-w-md p-6 rounded-3xl border border-emerald-500/40 shadow-2xl relative space-y-4 animate-scaleUp">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="rock-card w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6 rounded-3xl border border-emerald-500/40 shadow-2xl relative space-y-4 animate-scaleUp my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
               <div className="flex items-center space-x-2">
                 <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
-                  <Tag className="w-5 h-5" />
+                  {editingDiscountId ? <Edit2 className="w-5 h-5" /> : <Tag className="w-5 h-5" />}
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-base">Nuevo Descuento / Happy Hour</h3>
-                  <p className="text-xs text-zinc-400">Adaptado a tu local ({businessType})</p>
+                  <h3 className="font-bold text-white text-base">
+                    {editingDiscountId ? 'Editar Descuento / Happy Hour' : 'Nuevo Descuento / Happy Hour'}
+                  </h3>
+                  <p className="text-xs text-zinc-400">
+                    Configura descuentos por unidad, precio fijo, porcentaje o bono ({businessType})
+                  </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setShowDiscountModal(false)}
+                onClick={() => {
+                  setShowDiscountModal(false)
+                  setEditingDiscountId(null)
+                }}
                 className="text-zinc-500 hover:text-white p-1 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -989,33 +1090,43 @@ export default function ConfiguracionPage() {
                   required
                   value={discName}
                   onChange={(e) => setDiscName(e.target.value)}
-                  placeholder="Ej. Jueves de Pola 25% OFF, Ladies Night, Balde Cervecero..."
+                  placeholder="Ej. Happy Hour Cervezas -$1.500 c/u, Pola a $7.500..."
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Tipo de Beneficio</label>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Modo de Descuento</label>
                   <select
                     value={discType}
-                    onChange={(e) => setDiscType(e.target.value as 'percentage' | 'fixed')}
+                    onChange={(e) =>
+                      setDiscType(e.target.value as 'percentage' | 'fixed' | 'fixed_off' | 'fixed_price')
+                    }
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
                   >
+                    <option value="fixed_off">Rebajar por Unidad ($ menos c/u)</option>
+                    <option value="fixed_price">Precio Fijo por Unidad ($ c/u)</option>
                     <option value="percentage">Porcentaje (%)</option>
-                    <option value="fixed">Valor Fijo ($ COP)</option>
+                    <option value="fixed">Bono Fijo al Total de la Cuenta ($)</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    {discType === 'percentage' ? 'Porcentaje (%)' : 'Descuento en COP ($)'} *
+                    {discType === 'percentage'
+                      ? 'Porcentaje (%) *'
+                      : discType === 'fixed_off'
+                      ? 'Rebaja por Unidad ($ c/u) *'
+                      : discType === 'fixed_price'
+                      ? 'Precio Final por Unidad ($) *'
+                      : 'Descuento al Total ($) *'}
                   </label>
                   <input
                     type="number"
                     required
                     min={1}
-                    max={discType === 'percentage' ? 100 : 500000}
+                    max={discType === 'percentage' ? 100 : 1000000}
                     value={discValue}
                     onChange={(e) => setDiscValue(Number(e.target.value))}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs font-bold text-white font-mono focus:outline-none focus:border-emerald-500"
@@ -1023,16 +1134,17 @@ export default function ConfiguracionPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">¿A qué aplica?</label>
                   <select
                     value={discScope}
-                    onChange={(e) => setDiscScope(e.target.value as 'all' | 'category')}
+                    onChange={(e) => setDiscScope(e.target.value as 'all' | 'category' | 'product')}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
                   >
-                    <option value="all">Toda la Cuenta</option>
-                    <option value="category">Categoría Específica</option>
+                    <option value="category">Categoría Específica (Por Unidades)</option>
+                    <option value="product">Producto / Unidad Específica</option>
+                    <option value="all">Toda la Cuenta / Todos los Ítems</option>
                   </select>
                 </div>
 
@@ -1047,6 +1159,23 @@ export default function ConfiguracionPage() {
                       {barCategories.map((c) => (
                         <option key={c.id} value={c.name}>
                           {c.icon} {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {discScope === 'product' && (
+                  <div>
+                    <label className="text-xs font-semibold text-zinc-300 block mb-1">Producto / Unidad</label>
+                    <select
+                      value={discProductId}
+                      onChange={(e) => setDiscProductId(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+                    >
+                      {productsList.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ($ {p.price.toLocaleString('es-CO')})
                         </option>
                       ))}
                     </select>
@@ -1125,7 +1254,10 @@ export default function ConfiguracionPage() {
               <div className="flex items-center justify-end space-x-2 pt-2 border-t border-zinc-800">
                 <button
                   type="button"
-                  onClick={() => setShowDiscountModal(false)}
+                  onClick={() => {
+                    setShowDiscountModal(false)
+                    setEditingDiscountId(null)
+                  }}
                   className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-800 cursor-pointer"
                 >
                   Cancelar
@@ -1134,7 +1266,7 @@ export default function ConfiguracionPage() {
                   type="submit"
                   className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-lg cursor-pointer"
                 >
-                  Guardar Promo / Happy Hour
+                  {editingDiscountId ? 'Guardar Cambios' : 'Guardar Promo / Happy Hour'}
                 </button>
               </div>
             </form>

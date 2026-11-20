@@ -163,10 +163,12 @@ export interface DiscountRuleState {
   id: string
   name: string
   description?: string
-  type: 'percentage' | 'fixed'
-  value: number // Porcentaje (0-100) o monto fijo en COP
-  scope: 'all' | 'category'
+  type: 'percentage' | 'fixed' | 'fixed_off' | 'fixed_price'
+  value: number // Porcentaje (0-100), rebaja por unidad ($ c/u), precio fijo por unidad ($ c/u) o bono fijo total ($)
+  scope: 'all' | 'category' | 'product'
   categoryName?: string
+  productId?: string
+  productName?: string
   isHappyHour: boolean
   startTime?: string
   endTime?: string
@@ -1323,6 +1325,14 @@ export function addPromotionRule(rule: Omit<PromotionRule, 'id'>): PromotionRule
   return newRule
 }
 
+export function updatePromotionRule(id: string, updates: Partial<PromotionRule>): void {
+  const data = loadBarData()
+  data.promotions = (data.promotions || []).map((p) =>
+    p.id === id ? { ...p, ...updates, id: p.id } : p
+  )
+  saveBarData(data)
+}
+
 export function togglePromotionRule(id: string): void {
   const data = loadBarData()
   data.promotions = (data.promotions || []).map((p) =>
@@ -1345,12 +1355,14 @@ export function deletePromotionRule(id: string): void {
   saveBarData(data)
 }
 
-// Aplicar un descuento manual directo a los productos de una mesa (o a un producto específico)
+// Aplicar un descuento manual directo a los productos/unidades de una mesa (permite descontar todas las unidades o solo N unidades de una fila)
 export function applyManualDiscountToTable(
   tableId: number,
   discountType: 'percentage' | 'fixed_off' | 'fixed_price',
   discountValue: number,
-  targetProductId?: string
+  targetProductId?: string,
+  unitsToDiscount?: number,
+  customLabel?: string
 ): void {
   if (discountValue <= 0) return
   const data = loadBarData()
@@ -1358,10 +1370,21 @@ export function applyManualDiscountToTable(
   data.tables = data.tables.map((t) => {
     if (t.id !== tableId) return t
 
-    const rawUpdated = (t.items || []).map((it) => {
+    const rawUpdated: OrderItemState[] = []
+
+    for (const it of t.items || []) {
       const itemKey = `${it.productId}__${it.unitPrice}`
-      if (targetProductId && it.productId !== targetProductId && itemKey !== targetProductId) {
-        return it
+      const matchesTarget =
+        !targetProductId ||
+        it.productId === targetProductId ||
+        itemKey === targetProductId ||
+        (targetProductId.startsWith('cat:') &&
+          ((data.products || []).find((p) => p.id === it.productId)?.category.toLowerCase() ===
+            targetProductId.slice(4).toLowerCase()))
+
+      if (!matchesTarget) {
+        rawUpdated.push(it)
+        continue
       }
 
       // Buscar el precio base original del catálogo para calcular el descuento
@@ -1377,16 +1400,36 @@ export function applyManualDiscountToTable(
         newUnitPrice = Math.max(0, basePrice - discountValue)
       }
 
-      const baseName = catalogProduct ? catalogProduct.name : it.name.replace(/\s*\(Desc\.\)|\s*\(Promo\)/g, '')
-      const discountedName = newUnitPrice < basePrice ? `${baseName} (Desc.)` : baseName
+      const baseName = catalogProduct
+        ? catalogProduct.name
+        : it.name.replace(/\s*\(Desc\.[^)]*\)|\s*\(Promo\)/g, '')
+      const tagLabel = customLabel ? `(${customLabel})` : '(Desc.)'
+      const discountedName = newUnitPrice < basePrice ? `${baseName} ${tagLabel}` : baseName
 
-      return {
+      const qtyToApply =
+        unitsToDiscount && unitsToDiscount > 0 && unitsToDiscount < it.quantity
+          ? Math.floor(unitsToDiscount)
+          : it.quantity
+      const remainingQty = it.quantity - qtyToApply
+
+      // Unidades con el descuento aplicado
+      rawUpdated.push({
         ...it,
         name: discountedName,
+        quantity: qtyToApply,
         unitPrice: newUnitPrice,
-        subtotal: newUnitPrice * it.quantity,
+        subtotal: newUnitPrice * qtyToApply,
+      })
+
+      // Si solo se aplicó a algunas unidades de la fila, conservar el resto a su precio anterior
+      if (remainingQty > 0) {
+        rawUpdated.push({
+          ...it,
+          quantity: remainingQty,
+          subtotal: it.unitPrice * remainingQty,
+        })
       }
-    })
+    }
 
     // Consolidar si dos filas quedaron al mismo precio tras el descuento
     const mergedMap = new Map<string, OrderItemState>()
@@ -1998,7 +2041,7 @@ export function addCustomDiscount(
   params: Omit<DiscountRuleState, 'id' | 'isPreset'>
 ): DiscountRuleState {
   const data = loadBarData()
-  const currentDiscounts = data.discounts || [...PRESET_DISCOUNTS]
+  const currentDiscounts = data.discounts && data.discounts.length > 0 ? data.discounts : [...PRESET_DISCOUNTS]
 
   const newDiscount: DiscountRuleState = {
     ...params,
@@ -2012,9 +2055,28 @@ export function addCustomDiscount(
   return newDiscount
 }
 
+export function updateDiscountRule(
+  id: string,
+  updates: Partial<Omit<DiscountRuleState, 'id'>>
+): void {
+  const data = loadBarData()
+  const currentDiscounts = data.discounts && data.discounts.length > 0 ? data.discounts : [...PRESET_DISCOUNTS]
+  data.discounts = currentDiscounts.map((d) => {
+    if (d.id === id) {
+      return {
+        ...d,
+        ...updates,
+        id: d.id,
+      }
+    }
+    return d
+  })
+  saveBarData(data)
+}
+
 export function toggleDiscountActive(id: string): void {
   const data = loadBarData()
-  data.discounts = (data.discounts || [...PRESET_DISCOUNTS]).map((d) => {
+  data.discounts = (data.discounts && data.discounts.length > 0 ? data.discounts : [...PRESET_DISCOUNTS]).map((d) => {
     if (d.id === id) {
       return { ...d, active: !d.active }
     }
@@ -2025,7 +2087,7 @@ export function toggleDiscountActive(id: string): void {
 
 export function deleteCustomDiscount(id: string): boolean {
   const data = loadBarData()
-  const currentDiscounts = data.discounts || [...PRESET_DISCOUNTS]
+  const currentDiscounts = data.discounts && data.discounts.length > 0 ? data.discounts : [...PRESET_DISCOUNTS]
   const target = currentDiscounts.find((d) => d.id === id)
   // Los descuentos predeterminados no se eliminan, siempre se mantienen en el sistema
   if (!target || target.isPreset) return false
@@ -2033,6 +2095,38 @@ export function deleteCustomDiscount(id: string): boolean {
   data.discounts = currentDiscounts.filter((d) => d.id !== id)
   saveBarData(data)
   return true
+}
+
+// Aplicar una regla de Descuento / Happy Hour del local directamente al precio unitario de las unidades en la comanda
+export function applyDiscountRuleToTableUnits(
+  tableId: number,
+  discount: DiscountRuleState,
+  targetProductId?: string,
+  unitsToDiscount?: number
+): void {
+  const unitMode: 'percentage' | 'fixed_off' | 'fixed_price' =
+    discount.type === 'percentage'
+      ? 'percentage'
+      : discount.type === 'fixed_price'
+      ? 'fixed_price'
+      : 'fixed_off'
+
+  const effectiveTarget =
+    targetProductId ||
+    (discount.scope === 'product' && discount.productId
+      ? discount.productId
+      : discount.scope === 'category' && discount.categoryName
+      ? `cat:${discount.categoryName}`
+      : undefined)
+
+  applyManualDiscountToTable(
+    tableId,
+    unitMode,
+    discount.value,
+    effectiveTarget,
+    unitsToDiscount,
+    discount.isHappyHour ? 'Happy Hour' : 'Desc.'
+  )
 }
 
 // Calcular el monto en COP de un descuento / Happy Hour sobre los ítems de una mesa
@@ -2046,25 +2140,48 @@ export function calculateDiscountForOrder(
   const subtotalAll = items.reduce((acc, it) => acc + it.subtotal, 0)
   if (subtotalAll <= 0) return 0
 
-  let eligibleAmount = subtotalAll
-
-  if (discount.scope === 'category' && discount.categoryName) {
-    const targetCat = discount.categoryName.toLowerCase()
-    eligibleAmount = items.reduce((acc, it) => {
+  // Filtrar los ítems elegibles según el alcance (toda la cuenta, categoría o producto específico)
+  const eligibleItems = items.filter((it) => {
+    if (discount.scope === 'product' && discount.productId) {
+      return it.productId === discount.productId
+    }
+    if (discount.scope === 'category' && discount.categoryName) {
+      const targetCat = discount.categoryName.toLowerCase()
       const prod = products.find((p) => p.id === it.productId)
-      const matchesCat =
+      return (
         (prod && prod.category.toLowerCase().includes(targetCat)) ||
         it.name.toLowerCase().includes(targetCat)
-      return matchesCat ? acc + it.subtotal : acc
-    }, 0)
-  }
+      )
+    }
+    return true
+  })
 
+  if (eligibleItems.length === 0) return 0
+
+  const eligibleAmount = eligibleItems.reduce((acc, it) => acc + it.subtotal, 0)
   if (eligibleAmount <= 0) return 0
 
   if (discount.type === 'percentage') {
     const pct = Math.min(100, Math.max(0, discount.value))
     return Math.round((eligibleAmount * pct) / 100)
+  } else if (discount.type === 'fixed_off') {
+    // Descuento por cada unidad elegible ($ menos c/u)
+    const perUnitOff = Math.max(0, discount.value)
+    const totalUnitDiscount = eligibleItems.reduce(
+      (acc, it) => acc + Math.min(it.unitPrice, perUnitOff) * it.quantity,
+      0
+    )
+    return Math.min(eligibleAmount, totalUnitDiscount)
+  } else if (discount.type === 'fixed_price') {
+    // Dejar cada unidad elegible a un precio fijo ($ c/u)
+    const targetUnitPrice = Math.max(0, discount.value)
+    const totalPriceDiff = eligibleItems.reduce(
+      (acc, it) => acc + Math.max(0, it.unitPrice - targetUnitPrice) * it.quantity,
+      0
+    )
+    return Math.min(eligibleAmount, totalPriceDiff)
   } else {
+    // Valor fijo al total ('fixed')
     return Math.min(eligibleAmount, Math.max(0, discount.value))
   }
 }

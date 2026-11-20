@@ -32,16 +32,20 @@ import {
   getEffectiveProductPrice,
   isPromotionActiveNow,
   addPromotionRule,
+  updatePromotionRule,
   togglePromotionRule,
   toggleForcePromotionNow,
   deletePromotionRule,
   applyManualDiscountToTable,
+  applyDiscountRuleToTableUnits,
   DEFAULT_CATEGORIES,
   PRESET_DISCOUNTS,
   calculateDiscountForOrder,
   TableState,
   OrderItemState,
   ProductState,
+  PromotionRule,
+  DiscountRuleState,
 } from '@/lib/barState'
 
 const DAYS_LIST = [
@@ -77,6 +81,7 @@ export default function VentasPage() {
 
   // Estado del Modal de Descuentos (Pestaña: 'auto' | 'manual')
   const [discountTab, setDiscountTab] = useState<'auto' | 'manual'>('auto')
+  const [editingPromoId, setEditingPromoId] = useState<string | null>(null)
   const [promoName, setPromoName] = useState<string>('Cervezas más económicas hasta las 10 PM')
   const [promoCategory, setPromoCategory] = useState<string>('Cervezas')
   const [promoProductId, setPromoProductId] = useState<string>('')
@@ -86,10 +91,11 @@ export default function VentasPage() {
   const [promoStartTime, setPromoStartTime] = useState<string>('16:00')
   const [promoEndTime, setPromoEndTime] = useState<string>('22:00') // 10:00 PM
 
-  // Estado Descuento Manual a la Comanda
-  const [manualType, setManualType] = useState<'percentage' | 'fixed_off' | 'fixed_price'>('percentage')
-  const [manualValue, setManualValue] = useState<number>(10)
+  // Estado Descuento Manual a la Comanda (y por cantidad de unidades)
+  const [manualType, setManualType] = useState<'percentage' | 'fixed_off' | 'fixed_price'>('fixed_off')
+  const [manualValue, setManualValue] = useState<number>(1500)
   const [manualTargetProd, setManualTargetProd] = useState<string>('')
+  const [manualUnitsCount, setManualUnitsCount] = useState<number>(0) // 0 = todas las unidades de la fila seleccionada
 
   const barCategories = barData.categories && barData.categories.length > 0 ? barData.categories : DEFAULT_CATEGORIES
   const categories = [
@@ -112,10 +118,52 @@ export default function VentasPage() {
     )
   }
 
-  // Crear nueva promoción automática (ej. Cervezas hasta las 10 PM)
+  // Cargar una promoción existente en el formulario para editarla
+  const handleStartEditPromo = (pr: PromotionRule) => {
+    setEditingPromoId(pr.id)
+    setPromoName(pr.name)
+    setPromoCategory(pr.category)
+    setPromoProductId(pr.productId || '')
+    setPromoDiscountType(pr.discountType)
+    setPromoDiscountValue(pr.discountValue)
+    setPromoDays(pr.daysOfWeek || [])
+    setPromoStartTime(pr.startTime || '16:00')
+    setPromoEndTime(pr.endTime || '22:00')
+  }
+
+  const handleCancelEditPromo = () => {
+    setEditingPromoId(null)
+    setPromoName('Cervezas más económicas hasta las 10 PM')
+    setPromoCategory('Cervezas')
+    setPromoProductId('')
+    setPromoDiscountType('fixed_off')
+    setPromoDiscountValue(2000)
+    setPromoDays([4, 5, 6])
+    setPromoStartTime('16:00')
+    setPromoEndTime('22:00')
+  }
+
+  // Crear o actualizar promoción automática (ej. Cervezas hasta las 10 PM)
   const handleCreatePromo = (e: React.FormEvent) => {
     e.preventDefault()
     if (!promoName.trim() || promoDiscountValue <= 0) return
+
+    if (editingPromoId) {
+      updatePromotionRule(editingPromoId, {
+        name: promoName.trim(),
+        category: promoCategory,
+        productId: promoProductId || undefined,
+        discountType: promoDiscountType,
+        discountValue: Number(promoDiscountValue),
+        daysOfWeek: promoDays,
+        startTime: promoStartTime || '00:00',
+        endTime: promoEndTime || '22:00',
+      })
+      setEditingPromoId(null)
+      setNotification(`¡Promoción "${promoName.trim()}" actualizada correctamente!`)
+      setTimeout(() => setNotification(''), 4000)
+      return
+    }
 
     addPromotionRule({
       name: promoName.trim(),
@@ -133,16 +181,42 @@ export default function VentasPage() {
     setTimeout(() => setNotification(''), 4000)
   }
 
-  // Aplicar descuento manual a la comanda actual
+  // Abrir modal de descuento manual apuntando directamente a una fila/unidad de la comanda
+  const openUnitDiscountForItem = (it: OrderItemState) => {
+    setManualTargetProd(`${it.productId}__${it.unitPrice}`)
+    setManualUnitsCount(it.quantity)
+    setDiscountTab('manual')
+    setShowDiscountsModal(true)
+  }
+
+  // Aplicar un descuento del local directamente a las unidades de la comanda
+  const handleApplySavedDiscountToUnits = (disc: DiscountRuleState) => {
+    if (!currentTableObj || currentOrder.length === 0) return
+    const unitsParam = manualTargetProd && manualUnitsCount > 0 ? manualUnitsCount : undefined
+    applyDiscountRuleToTableUnits(
+      currentTableObj.id,
+      disc,
+      manualTargetProd || undefined,
+      unitsParam
+    )
+    setShowDiscountsModal(false)
+    setNotification(`¡"${disc.name}" aplicado directamente a las unidades en ${currentTableObj.name}!`)
+    setTimeout(() => setNotification(''), 4000)
+  }
+
+  // Aplicar descuento manual a la comanda actual (a todas las unidades o a N unidades específicas)
   const handleApplyManualDiscount = (e: React.FormEvent) => {
     e.preventDefault()
     if (!currentTableObj || currentOrder.length === 0 || manualValue <= 0) return
+
+    const unitsParam = manualTargetProd && manualUnitsCount > 0 ? manualUnitsCount : undefined
 
     applyManualDiscountToTable(
       currentTableObj.id,
       manualType,
       Number(manualValue),
-      manualTargetProd || undefined
+      manualTargetProd || undefined,
+      unitsParam
     )
 
     setShowDiscountsModal(false)
@@ -151,9 +225,9 @@ export default function VentasPage() {
         manualType === 'percentage'
           ? `-${manualValue}%`
           : manualType === 'fixed_price'
-          ? `Precio fijo $ ${manualValue.toLocaleString('es-CO')}`
-          : `-$ ${manualValue.toLocaleString('es-CO')}`
-      }) aplicado a ${currentTableObj.name}!`
+          ? `Precio fijo $ ${manualValue.toLocaleString('es-CO')} c/u`
+          : `-$ ${manualValue.toLocaleString('es-CO')} c/u`
+      }${unitsParam ? ` en ${unitsParam} uds` : ''}) aplicado a ${currentTableObj.name}!`
     )
     setTimeout(() => setNotification(''), 4000)
   }
@@ -632,7 +706,17 @@ export default function VentasPage() {
                     </p>
                   </div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1.5">
+                    {/* Botón rápido de Descuento directo a las unidades de esta fila */}
+                    <button
+                      type="button"
+                      onClick={() => openUnitDiscountForItem(it)}
+                      title="Aplicar descuento a las unidades de este producto"
+                      className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 transition-colors cursor-pointer"
+                    >
+                      <Tag className="w-3 h-3" />
+                    </button>
+
                     {/* Botones de Cantidad (+ y -) */}
                     <div className="flex items-center space-x-1 bg-zinc-900 border border-zinc-800 rounded-lg p-0.5">
                       <button
@@ -676,19 +760,39 @@ export default function VentasPage() {
             <div className="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800 space-y-2">
               <div className="flex items-center justify-between text-[11px]">
                 <span className="font-bold text-amber-400">🎉 Aplicar Descuento / Happy Hour</span>
-                {selectedDiscount && (
-                  <button
-                    type="button"
-                    onClick={() => handleSelectTableDiscount(selectedDiscount.id)}
-                    className="text-[10px] text-zinc-400 hover:text-red-400 underline cursor-pointer"
-                  >
-                    Quitar promo
-                  </button>
-                )}
+                <div className="flex items-center space-x-2">
+                  {selectedDiscount && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleApplySavedDiscountToUnits(selectedDiscount)}
+                        title="Rebajar directamente el precio de las unidades actuales en la comanda (así las próximas unidades que agregues entrarán a precio normal)"
+                        className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded cursor-pointer"
+                      >
+                        ✓ Fijar en unidades actuales
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTableDiscount(selectedDiscount.id)}
+                        className="text-[10px] text-zinc-400 hover:text-red-400 underline cursor-pointer"
+                      >
+                        Quitar promo
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
                 {availableDiscounts.map((disc) => {
                   const isApplied = currentTableObj?.appliedDiscountId === disc.id
+                  const badgeVal =
+                    disc.type === 'percentage'
+                      ? `-${disc.value}%`
+                      : disc.type === 'fixed_off'
+                      ? `-$${disc.value.toLocaleString('es-CO')} c/u`
+                      : disc.type === 'fixed_price'
+                      ? `$${disc.value.toLocaleString('es-CO')} c/u`
+                      : `-$${disc.value.toLocaleString('es-CO')}`
                   return (
                     <button
                       key={disc.id}
@@ -701,7 +805,7 @@ export default function VentasPage() {
                       }`}
                     >
                       {disc.isHappyHour ? '🍹 ' : '🏷️ '}
-                      {disc.name}
+                      {disc.name} ({badgeVal})
                     </button>
                   )
                 })}
@@ -974,12 +1078,23 @@ export default function VentasPage() {
                 <form onSubmit={handleCreatePromo} className="space-y-3 bg-zinc-900/70 p-4 rounded-2xl border border-zinc-800">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-extrabold text-amber-400 uppercase tracking-wider">
-                      + Nueva Regla de Descuento Automático
+                      {editingPromoId ? '✏️ Editando Regla de Descuento Automático' : '+ Nueva Regla de Descuento Automático'}
                     </h4>
-                    <span className="text-[11px] text-zinc-400 flex items-center space-x-1">
-                      <Clock className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Se activa sola según día y hora</span>
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      {editingPromoId && (
+                        <button
+                          type="button"
+                          onClick={handleCancelEditPromo}
+                          className="text-[11px] font-bold text-zinc-400 hover:text-white underline cursor-pointer"
+                        >
+                          Cancelar edición
+                        </button>
+                      )}
+                      <span className="text-[11px] text-zinc-400 flex items-center space-x-1">
+                        <Clock className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Se activa sola según día y hora</span>
+                      </span>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1130,7 +1245,9 @@ export default function VentasPage() {
                     type="submit"
                     className="w-full py-2.5 rounded-xl text-xs font-extrabold text-black bg-amber-400 hover:bg-amber-300 transition-colors cursor-pointer"
                   >
-                    + Guardar y Activar Descuento Automático
+                    {editingPromoId
+                      ? 'Guardar Cambios en la Promoción'
+                      : '+ Guardar y Activar Descuento Automático'}
                   </button>
                 </form>
 
@@ -1190,6 +1307,15 @@ export default function VentasPage() {
                             <div className="flex items-center space-x-1.5 shrink-0">
                               <button
                                 type="button"
+                                onClick={() => handleStartEditPromo(pr)}
+                                title="Editar esta promoción"
+                                className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-zinc-900 hover:bg-amber-500/20 text-zinc-300 hover:text-amber-300 border border-zinc-700 hover:border-amber-500/40 flex items-center space-x-1 cursor-pointer transition-colors"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                                <span>Editar</span>
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => toggleForcePromotionNow(pr.id)}
                                 title="Forzar activación inmediata sin importar la hora actual"
                                 className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border cursor-pointer transition-colors ${
@@ -1224,54 +1350,136 @@ export default function VentasPage() {
                 </div>
               </div>
             ) : (
-              /* Pestaña Descuento Manual a la Mesa Actual */
+              /* Pestaña Descuento Manual a las Unidades de la Mesa Actual */
               <form onSubmit={handleApplyManualDiscount} className="space-y-4 bg-zinc-900/70 p-4 rounded-2xl border border-zinc-800">
                 <div>
                   <h4 className="text-xs font-extrabold text-amber-400 uppercase tracking-wider mb-1">
-                    Aplicar Descuento Inmediato a {currentTableObj?.name || 'Mesa Actual'}
+                    Aplicar Descuento a Unidades en {currentTableObj?.name || 'Mesa Actual'}
                   </h4>
                   <p className="text-[11px] text-zinc-400">
-                    Rebaja los precios de los productos que ya están cargados en la comanda actual.
+                    Rebaja el precio por unidad de todos los productos o elige exactamente a cuántas unidades aplicarles el descuento (las demás unidades o las que agregues después quedarán a precio normal).
                   </p>
                 </div>
 
                 {currentOrder.length === 0 ? (
                   <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl">
-                    La comanda de {currentTableObj?.name || 'esta mesa'} está vacía. Primero agrega productos a la mesa para aplicar un descuento manual, o usa la pestaña de <strong>Descuento Automático</strong>.
+                    La comanda de {currentTableObj?.name || 'esta mesa'} está vacía. Primero agrega productos a la mesa para aplicar un descuento a las unidades, o usa la pestaña de <strong>Descuento Automático</strong>.
                   </p>
                 ) : (
                   <>
-                    <div>
-                      <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
-                        ¿A qué ítems de la mesa aplicar?
-                      </label>
-                      <select
-                        value={manualTargetProd}
-                        onChange={(e) => setManualTargetProd(e.target.value)}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white"
-                      >
-                        <option value="">A todos los productos de la comanda ({currentOrder.length} ítems)</option>
-                        {currentOrder.map((it, idx) => (
-                          <option key={`${it.productId}-${it.unitPrice}-${idx}`} value={`${it.productId}__${it.unitPrice}`}>
-                            Solo a: {it.name} ({it.quantity} x {formatCOP(it.unitPrice)})
-                          </option>
-                        ))}
-                      </select>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className={manualTargetProd && !manualTargetProd.startsWith('cat:') ? '' : 'sm:col-span-2'}>
+                        <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
+                          ¿A qué producto o fila aplicar?
+                        </label>
+                        <select
+                          value={manualTargetProd}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setManualTargetProd(val)
+                            const matchedRow = currentOrder.find(
+                              (it) => `${it.productId}__${it.unitPrice}` === val
+                            )
+                            setManualUnitsCount(matchedRow ? matchedRow.quantity : 0)
+                          }}
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white"
+                        >
+                          <option value="">A todas las unidades de la comanda ({totalItemsCount} uds)</option>
+                          {currentOrder.map((it, idx) => (
+                            <option key={`${it.productId}-${it.unitPrice}-${idx}`} value={`${it.productId}__${it.unitPrice}`}>
+                              Solo a: {it.name} ({it.quantity} uds x {formatCOP(it.unitPrice)})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {manualTargetProd && !manualTargetProd.startsWith('cat:') && (() => {
+                        const targetRow = currentOrder.find(
+                          (it) => `${it.productId}__${it.unitPrice}` === manualTargetProd
+                        )
+                        const maxUnits = targetRow ? targetRow.quantity : 1
+                        return (
+                          <div>
+                            <label className="text-[11px] font-semibold text-amber-400 block mb-1">
+                              ¿A cuántas unidades aplicar? (Máx: {maxUnits})
+                            </label>
+                            <div className="flex items-center space-x-1.5">
+                              <input
+                                type="number"
+                                min={1}
+                                max={maxUnits}
+                                value={manualUnitsCount || maxUnits}
+                                onChange={(e) =>
+                                  setManualUnitsCount(
+                                    Math.max(1, Math.min(maxUnits, Number(e.target.value) || maxUnits))
+                                  )
+                                }
+                                className="w-full bg-zinc-950 border border-amber-500/40 rounded-xl px-3 py-2 text-xs font-bold text-white font-mono"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setManualUnitsCount(maxUnits)}
+                                className="px-2.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-[10px] font-bold text-amber-300 whitespace-nowrap cursor-pointer"
+                              >
+                                Todas ({maxUnits})
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })()}
                     </div>
+
+                    {/* Aplicar con 1 clic un Descuento / Happy Hour del Local directamente a las unidades */}
+                    {availableDiscounts.length > 0 && (
+                      <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-emerald-400">
+                            🍹 Aplicar Descuento / Happy Hour del Local a estas unidades:
+                          </span>
+                          <Link
+                            href="/configuracion"
+                            className="text-[10px] text-amber-400 hover:underline font-semibold"
+                          >
+                            Editar descuentos →
+                          </Link>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {availableDiscounts.map((disc) => {
+                            const labelVal =
+                              disc.type === 'percentage'
+                                ? `-${disc.value}%`
+                                : disc.type === 'fixed_price'
+                                ? `$${disc.value.toLocaleString('es-CO')} c/u`
+                                : `-$${disc.value.toLocaleString('es-CO')} c/u`
+                            return (
+                              <button
+                                key={disc.id}
+                                type="button"
+                                onClick={() => handleApplySavedDiscountToUnits(disc)}
+                                className="px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-emerald-500/20 text-zinc-200 hover:text-emerald-300 border border-zinc-700 hover:border-emerald-500/40 text-[11px] font-bold transition-all cursor-pointer"
+                              >
+                                {disc.isHappyHour ? '🍹 ' : '🏷️ '}
+                                {disc.name} ({labelVal})
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-[11px] font-semibold text-zinc-300 block mb-1">
-                          Tipo de Descuento
+                          Tipo de Descuento por Unidad
                         </label>
                         <select
                           value={manualType}
                           onChange={(e) => setManualType(e.target.value as 'percentage' | 'fixed_off' | 'fixed_price')}
                           className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white"
                         >
+                          <option value="fixed_off">Rebajar por unidad ($ menos c/u)</option>
+                          <option value="fixed_price">Precio fijo por unidad ($ c/u)</option>
                           <option value="percentage">Porcentaje (%)</option>
-                          <option value="fixed_off">Rebajar por unidad ($ menos)</option>
-                          <option value="fixed_price">Precio fijo por unidad ($)</option>
                         </select>
                       </div>
                       <div>
@@ -1341,7 +1549,7 @@ export default function VentasPage() {
                       type="submit"
                       className="w-full py-2.5 rounded-xl text-xs font-extrabold text-black bg-emerald-400 hover:bg-emerald-300 transition-colors cursor-pointer"
                     >
-                      Aplicar Descuento a {currentTableObj?.name}
+                      Aplicar Descuento a Unidades en {currentTableObj?.name}
                     </button>
                   </>
                 )}
