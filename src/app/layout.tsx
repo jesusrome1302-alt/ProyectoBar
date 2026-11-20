@@ -6,9 +6,9 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import MobileNav from '@/components/MobileNav'
-import { UserCheck, LogOut, Camera, Cloud, RefreshCw, CheckCircle2 } from 'lucide-react'
+import { UserCheck, LogOut, Camera, Cloud, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react'
 import { useAuthStore, logout } from '@/lib/authStore'
-import { useBarStore, smartSyncWithCloud, applyCloudBarDataLocally, applyFullCloudSnapshotLocally, BarData } from '@/lib/barState'
+import { useBarStore, smartSyncWithCloud, applyCloudBarDataLocally, applyFullCloudSnapshotLocally, exportAllRegisteredAccountsBackup, BarData } from '@/lib/barState'
 import { supabase, isValidUuid, CLOUD_RELAY_MASTER_TOPIC, parseNtfyEventSnapshot, calculateBarDataRichness } from '@/lib/supabaseClient'
 import LoginPage from './login/page'
 import PhotoUploadModal from '@/components/PhotoUploadModal'
@@ -96,12 +96,12 @@ export default function RootLayout({
     window.addEventListener('focus', handleVisibilityOrFocus)
     document.addEventListener('visibilitychange', handleVisibilityOrFocus)
 
-    // Polling ligero cada 12 segundos para mantener Portátil y PC de Mesa sincronizados
+    // Polling ligero cada 60 segundos para mantener Portátil y PC de Mesa sincronizados sin saturar ntfy.sh (evita HTTP 429)
     const pollInterval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         runCloudSync('auto')
       }
-    }, 12000)
+    }, 60000)
 
     return () => {
       clearTimeout(initTimer)
@@ -126,8 +126,17 @@ export default function RootLayout({
             if (incomingSnap && incomingSnap.barData) {
               const localProdCount = barData.products?.length || 0
               const incomingProdCount = incomingSnap.barData.products?.length || 0
-              // Protección crítica: nunca permitir que un evento SSE con 0 productos borre un catálogo local con productos
-              if (localProdCount > 0 && incomingProdCount === 0) {
+              const localSalesCount = barData.closedSales?.length || 0
+              const incomingSalesCount = incomingSnap.barData.closedSales?.length || 0
+              const incomingHasPlaceholders = (incomingSnap.barData.products || []).some((p) =>
+                String(p.id || '').startsWith('yisus-prod-')
+              )
+              // Protección crítica: nunca permitir que un evento SSE con 0 productos o 0 ventas borre un estado local con ventas/productos reales
+              if (
+                (localProdCount > 0 && incomingProdCount === 0) ||
+                (localSalesCount > 0 && incomingSalesCount === 0) ||
+                (localSalesCount > 0 && incomingHasPlaceholders)
+              ) {
                 return
               }
 
@@ -314,6 +323,25 @@ export default function RootLayout({
                           🔽 Traer TODO de la Nube a este PC
                           <span className="block text-[10px] text-zinc-300 font-normal mt-0.5">
                             Haz clic aquí en tu <strong>PC de Mesa</strong> para recibir todo tu bar completo al instante
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await exportAllRegisteredAccountsBackup('Copia de Seguridad Pre-Cambio Manual')
+                            setCloudBanner('🛡️ Copia de seguridad de todas las cuentas descargada (.JSON) y guardada en Bóveda.')
+                            setTimeout(() => setCloudBanner(''), 5000)
+                            setShowCloudMenu(false)
+                          }}
+                          className="w-full text-left px-3 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          <span className="flex items-center space-x-1.5">
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span>🛡️ Copia de Seguridad (Todas las Cuentas)</span>
+                          </span>
+                          <span className="block text-[10px] text-zinc-300 font-normal mt-0.5">
+                            Ejecuta primero este respaldo antes de hacer cambios: descarga el .JSON maestro y crea un punto de restauración
                           </span>
                         </button>
                       </div>

@@ -1,0 +1,1170 @@
+{
+  "version": 3,
+  "updatedAt": "2026-11-20T20:24:44.086Z",
+  "richnessScore": 2795,
+  "businessId": "2151228e-d35e-470a-930f-59ca9b79f8bd",
+  "ownerUser": {
+    "id": "76ea144e-071b-4f40-b4b5-2e1e5ee47c23",
+    "name": "Jesus Arias",
+    "email": "jesusrome1302@gmail.com",
+    "role": "owner",
+    "roleTitle": "Propietario (Yisus Bar)",
+    "avatar": "JA",
+    "pin": "1323",
+    "barName": "ROCK BAR",
+    "phone": "3028333402",
+    "city": "Cucuta",
+    "businessId": "2151228e-d35e-470a-930f-59ca9b79f8bd",
+    "photoUrl": "data:image/webp;base64,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"
+  },
+  "barUsers": [
+    {
+      "id": "76ea144e-071b-4f40-b4b5-2e1e5ee47c23",
+      "name": "Jesus Arias",
+      "email": "jesusrome1302@gmail.com",
+      "role": "owner",
+      "roleTitle": "Propietario (Yisus Bar)",
+      "avatar": "JA",
+      "pin": "1323",
+      "barName": "ROCK BAR",
+      "phone": "3028333402",
+      "city": "Cucuta",
+      "businessId": "2151228e-d35e-470a-930f-59ca9b79f8bd"
+    }
+  ],
+  "barData": {
+    "cash": {
+      "initialCash": 0,
+      "cashSales": 122500,
+      "electronicSales": 362500,
+      "expenses": 0,
+      "expectedCash": 122500,
+      "status": "open",
+      "openedAt": "07:13 p. m.",
+      "currentSessionId": "ses-1795133628449"
+    },
+    "tables": [
+      {
+        "id": 2,
+        "name": "Mesa 2",
+        "paid": 0,
+        "items": [],
+        "total": 0,
+        "status": "available",
+        "pending": 0,
+        "capacity": 4,
+        "operator": "Administrador",
+        "payments": []
+      },
+      {
+        "id": 3,
+        "name": "Mesa 3",
+        "paid": 0,
+        "items": [],
+        "total": 0,
+        "status": "available",
+        "pending": 0,
+        "capacity": 4,
+        "operator": "Administrador",
+        "payments": []
+      },
+      {
+        "id": 4,
+        "name": "Mesa 4",
+        "paid": 0,
+        "items": [],
+        "total": 0,
+        "status": "available",
+        "pending": 0,
+        "capacity": 4,
+        "operator": "Administrador",
+        "payments": [],
+        "customerName": "FELIPE"
+      },
+      {
+        "id": 5,
+        "name": "Mesa 5",
+        "paid": 0,
+        "items": [],
+        "total": 0,
+        "status": "available",
+        "pending": 0,
+        "capacity": 4,
+        "operator": "Administrador",
+        "payments": []
+      },
+      {
+        "id": 6,
+        "name": "Mesa 6",
+        "paid": 0,
+        "items": [],
+        "total": 0,
+        "status": "available",
+        "pending": 0,
+        "capacity": 4,
+        "operator": "Administrador",
+        "payments": []
+      },
+      {
+        "id": 7,
+        "name": "Mesa 7",
+        "paid": 0,
+        "items": [],
+        "total": 0,
+        "status": "available",
+        "pending": 0,
+        "capacity": 4,
+        "operator": "Administrador",
+        "payments": [],
+        "appliedDiscountId": "disc-1795143285250"
+      },
+      {
+        "id": 8,
+        "name": "Mesa 8",
+        "paid": 0,
+        "items": [],
+        "total": 0,
+        "status": "available",
+        "pending": 0,
+        "capacity": 4,
+        "operator": "Administrador",
+        "payments": []
+      }
+    ],
+    "products": [
+      {
+        "name": "CERVEZA AGUILA LATA",
+        "category": "Cervezas",
+        "price": 4500,
+        "cost": 0,
+        "stock": 4,
+        "stock_nevera": 4,
+        "stock_bodega": 0,
+        "min_stock_nevera": 6,
+        "min_stock": 10,
+        "barcode": "SKU-775974",
+        "id": "prod-1795054141245",
+        "active": true
+      },
+      {
+        "name": "CIGARROS",
+        "category": "Sin Alcohol",
+        "price": 1500,
+        "cost": 500,
+        "stock": 31,
+        "stock_nevera": 2,
+        "stock_bodega": 29,
+        "min_stock_nevera": 6,
+        "min_stock": 10,
+        "barcode": "SKU-316670",
+        "id": "prod-1795048516365",
+        "active": true
+      },
+      {
+        "name": "CLUB COLOMBIA",
+        "category": "Cervezas",
+        "price": 10000,
+        "cost": 6000,
+        "stock": 1,
+        "stock_nevera": 1,
+        "stock_bodega": 0,
+        "min_stock_nevera": 6,
+        "min_stock": 10,
+        "barcode": "SKU-640185",
+        "id": "prod-1795048471646",
+        "active": true
+      },
+      {
+        "name": "AGUILA LIGHT",
+        "category": "Cervezas",
+        "price": 9000,
+        "cost": 6000,
+        "stock": 11,
+        "stock_nevera": 11,
+        "stock_bodega": 0,
+        "min_stock_nevera": 6,
+        "min_stock": 10,
+        "barcode": "SKU-242696",
+        "id": "prod-1795048437588",
+        "active": true
+      },
+      {
+        "name": "AGUILA ORIGINAL 750",
+        "category": "Cervezas",
+        "price": 9000,
+        "cost": 6000,
+        "stock": 1,
+        "stock_nevera": 1,
+        "stock_bodega": 0,
+        "min_stock_nevera": 6,
+        "min_stock": 10,
+        "barcode": "SKU-995775",
+        "id": "prod-1795048415616",
+        "active": true
+      },
+      {
+        "id": "prod-1794084434457",
+        "cost": 5000,
+        "name": "POKER 750",
+        "price": 9000,
+        "stock": 2,
+        "active": true,
+        "barcode": "SKU-948339",
+        "category": "Cervezas",
+        "min_stock": 5,
+        "stock_bodega": 0,
+        "stock_nevera": 2,
+        "min_stock_nevera": 5
+      }
+    ],
+    "sessions": [
+      {
+        "id": "ses-1795048305125",
+        "openedAt": "Hoy, 07:31 p. m.",
+        "closedAt": "Hoy, 03:39 p. m.",
+        "operator": "Administrador",
+        "initialCash": 0,
+        "cashSales": 40000,
+        "electronicSales": 48000,
+        "expenses": 15000,
+        "expectedCash": 25000,
+        "actualCash": 25000,
+        "difference": 0,
+        "notes": "Cuadre exacto sin novedades.",
+        "status": "closed"
+      },
+      {
+        "id": "ses-1794080788061",
+        "openedAt": "Hoy, 02:46 p. m.",
+        "closedAt": "Hoy, 07:31 p. m.",
+        "operator": "Administrador",
+        "initialCash": 150000,
+        "cashSales": 10000,
+        "electronicSales": 0,
+        "expenses": 0,
+        "expectedCash": 160000,
+        "actualCash": 160000,
+        "difference": 0,
+        "notes": "Cuadre exacto sin novedades.",
+        "status": "closed"
+      }
+    ],
+    "settings": {
+      "barName": "ROCK BAR",
+      "nit": "900.123.456-7",
+      "address": "Calle 10 # 40-20, Medellín",
+      "phone": "+57 (4) 444-1234",
+      "footerText": "¡Gracias por tu visita a Rock Bar! El rock nunca muere.",
+      "tipPercentage": 10,
+      "taxPercentage": 8,
+      "businessType": "Rock Bar & Pub",
+      "themePreset": "lounge-cyan",
+      "brandIcon": "🔥",
+      "slogan": "Control en tiempo real de mesas, pedidos, cobros e inventario.",
+      "logoUrl": "data:image/webp;base64,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"
+    },
+    "discounts": [
+      {
+        "id": "preset-hh-2x1",
+        "name": "Happy Hour 2x1 Cócteles (50%)",
+        "description": "50% OFF en Cócteles durante horario de Happy Hour",
+        "type": "percentage",
+        "value": 50,
+        "scope": "category",
+        "categoryName": "Cócteles",
+        "isHappyHour": true,
+        "startTime": "16:00",
+        "endTime": "20:00",
+        "days": [
+          "Jue",
+          "Vie",
+          "Sáb"
+        ],
+        "businessTypeTag": "Predeterminado • Coctelería",
+        "isPreset": true,
+        "active": false
+      },
+      {
+        "id": "preset-hh-cervezas",
+        "name": "Happy Hour Cervezas (-20%)",
+        "description": "20% de descuento en toda la categoría de Cervezas",
+        "type": "percentage",
+        "value": 20,
+        "scope": "category",
+        "categoryName": "Cervezas",
+        "isHappyHour": true,
+        "startTime": "17:00",
+        "endTime": "21:00",
+        "days": [
+          "Mié",
+          "Jue",
+          "Vie"
+        ],
+        "businessTypeTag": "Predeterminado • Cervecería",
+        "isPreset": true,
+        "active": true
+      },
+      {
+        "id": "preset-desc-10",
+        "name": "Cliente Frecuente / VIP (10%)",
+        "description": "10% de descuento general sobre el total de la cuenta",
+        "type": "percentage",
+        "value": 10,
+        "scope": "all",
+        "isHappyHour": false,
+        "businessTypeTag": "Predeterminado • General",
+        "isPreset": true,
+        "active": false
+      },
+      {
+        "id": "preset-desc-15",
+        "name": "Promo Cumpleañero / Grupo (15%)",
+        "description": "15% de descuento especial para reservas y cumpleañeros",
+        "type": "percentage",
+        "value": 15,
+        "scope": "all",
+        "isHappyHour": false,
+        "businessTypeTag": "Predeterminado • Eventos",
+        "isPreset": true,
+        "active": false
+      },
+      {
+        "id": "preset-cortesia",
+        "name": "Bono Cortesía de la Casa ($10.000)",
+        "description": "Descuento fijo de $10.000 COP autorizado por administración",
+        "type": "fixed",
+        "value": 10000,
+        "scope": "all",
+        "isHappyHour": false,
+        "businessTypeTag": "Predeterminado • Cortesía",
+        "isPreset": true,
+        "active": false
+      },
+      {
+        "name": "HAPPY HOUR",
+        "description": "Happy Hour de $ 1.500 (Rock Bar & Pub)",
+        "type": "fixed_price",
+        "value": 1500,
+        "scope": "category",
+        "categoryName": "Cervezas",
+        "isHappyHour": true,
+        "startTime": "19:00",
+        "endTime": "22:00",
+        "days": [
+          "Jue",
+          "Vie",
+          "Mié",
+          "Mar"
+        ],
+        "businessTypeTag": "Rock Bar & Pub",
+        "active": true,
+        "id": "disc-1795134571918",
+        "isPreset": false
+      },
+      {
+        "name": "happy hour",
+        "description": "Happy Hour de 16% (Rock Bar & Pub)",
+        "type": "percentage",
+        "value": 16,
+        "scope": "category",
+        "categoryName": "Cervezas",
+        "isHappyHour": true,
+        "startTime": "19:00",
+        "endTime": "22:00",
+        "days": [
+          "Jue",
+          "Vie",
+          "Mié",
+          "Mar"
+        ],
+        "businessTypeTag": "Rock Bar & Pub",
+        "active": true,
+        "id": "disc-1795143285250",
+        "isPreset": false
+      }
+    ],
+    "movements": [
+      {
+        "id": "mov-1795158712054",
+        "type": "sale",
+        "category": "Venta",
+        "description": "Pago en efectivo Mesa 2",
+        "amount": 3000,
+        "time": "02:11 a. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795158621261",
+        "type": "sale",
+        "category": "Venta Electrónica",
+        "description": "Pago Nequi / Daviplata Mesa 2",
+        "amount": 45000,
+        "time": "02:10 a. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795157689008",
+        "type": "sale",
+        "category": "Venta Electrónica",
+        "description": "Pago Nequi / Daviplata Mesa 6",
+        "amount": 93000,
+        "time": "01:54 a. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795154481486",
+        "type": "sale",
+        "category": "Venta",
+        "description": "Pago en efectivo Mesa 3",
+        "amount": 27000,
+        "time": "01:01 a. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795151462064",
+        "type": "sale",
+        "category": "Venta Electrónica",
+        "description": "Pago Nequi / Daviplata Mesa 5",
+        "amount": 9000,
+        "time": "12:11 a. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795149212703",
+        "type": "sale",
+        "category": "Venta Electrónica",
+        "description": "Pago Nequi / Daviplata Mesa 2",
+        "amount": 146500,
+        "time": "11:33 p. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795149076368",
+        "type": "sale",
+        "category": "Venta",
+        "description": "Pago en efectivo Mesa 3",
+        "amount": 40000,
+        "time": "11:31 p. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795145810871",
+        "type": "sale",
+        "category": "Venta",
+        "description": "Pago en efectivo Mesa 5",
+        "amount": 30000,
+        "time": "10:36 p. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795143396240",
+        "type": "sale",
+        "category": "Venta",
+        "description": "Pago en efectivo Mesa 6",
+        "amount": 22500,
+        "time": "09:56 p. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795133691809",
+        "type": "sale",
+        "category": "Venta Electrónica",
+        "description": "Pago Nequi / Daviplata Mesa 4",
+        "amount": 69000,
+        "time": "07:14 p. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795133628449",
+        "type": "in",
+        "category": "Base Inicial",
+        "description": "Apertura de turno (Base: $ 0)",
+        "amount": 0,
+        "time": "07:13 p. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795120761526",
+        "type": "out",
+        "category": "Arqueo de Cierre",
+        "description": "Cierre de turno: Contado $ 25.000 (Cuadre exacto)",
+        "amount": 0,
+        "time": "03:39 p. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795067364909",
+        "type": "sale",
+        "category": "Venta Electrónica",
+        "description": "Pago Nequi / Daviplata Mesa 5",
+        "amount": 18000,
+        "time": "12:49 a. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795066126678",
+        "type": "sale",
+        "category": "Venta",
+        "description": "Pago en efectivo Mesa 2",
+        "amount": 10000,
+        "time": "12:28 a. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795060979883",
+        "type": "sale",
+        "category": "Venta Electrónica",
+        "description": "Pago Nequi / Daviplata Mesa 2",
+        "amount": 12000,
+        "time": "11:02 p. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795060976402",
+        "type": "sale",
+        "category": "Venta",
+        "description": "Pago en efectivo Mesa 2",
+        "amount": 15000,
+        "time": "11:02 p. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795060963061",
+        "type": "out",
+        "category": "Otros Gastos",
+        "description": "equivocacion de mesa",
+        "amount": -15000,
+        "time": "11:02 p. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795060937120",
+        "type": "sale",
+        "category": "Venta",
+        "description": "Pago en efectivo Mesa 3",
+        "amount": 15000,
+        "time": "11:02 p. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795055577742",
+        "type": "sale",
+        "category": "Venta Electrónica",
+        "description": "Pago Nequi / Daviplata Mesa 2",
+        "amount": 18000,
+        "time": "09:32 p. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795048305125",
+        "type": "in",
+        "category": "Base Inicial",
+        "description": "Apertura de turno (Base: $ 0)",
+        "amount": 0,
+        "time": "07:31 p. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1795048287826",
+        "type": "out",
+        "category": "Arqueo de Cierre",
+        "description": "Cierre de turno: Contado $ 160.000 (Cuadre exacto)",
+        "amount": 0,
+        "time": "07:31 p. m.",
+        "user": "Administrador"
+      },
+      {
+        "id": "mov-1794084520766",
+        "time": "03:48 p. m.",
+        "type": "sale",
+        "user": "Administrador",
+        "amount": 10000,
+        "category": "Venta",
+        "description": "Pago en efectivo Mesa 2"
+      },
+      {
+        "id": "mov-1794080788061",
+        "time": "02:46 p. m.",
+        "type": "in",
+        "user": "Administrador",
+        "amount": 150000,
+        "category": "Base Inicial",
+        "description": "Apertura de turno (Base: $ 150.000)"
+      }
+    ],
+    "purchases": [],
+    "suppliers": [],
+    "closedSales": [
+      {
+        "id": "FAC-712566",
+        "tableId": 2,
+        "tableName": "Mesa 2",
+        "closedAt": "20/11/2026 02:11 a. m.",
+        "operator": "Administrador",
+        "items": [
+          {
+            "productId": "prod-1795048516365",
+            "name": "CIGARROS",
+            "quantity": 2,
+            "unitPrice": 1500,
+            "subtotal": 3000
+          }
+        ],
+        "payments": [
+          {
+            "id": "pay-1795158712054",
+            "method": "Efectivo",
+            "amount": 3000,
+            "timestamp": "02:11 a. m.",
+            "operator": "Administrador"
+          }
+        ],
+        "subtotal": 3000,
+        "tip": 0,
+        "total": 3000
+      },
+      {
+        "id": "FAC-660159",
+        "tableId": 2,
+        "tableName": "Mesa 2",
+        "customerName": "Luis fer",
+        "closedAt": "20/11/2026 02:11 a. m.",
+        "operator": "Administrador",
+        "items": [
+          {
+            "productId": "prod-1795048415616",
+            "name": "AGUILA ORIGINAL 750",
+            "quantity": 5,
+            "unitPrice": 9000,
+            "subtotal": 45000
+          }
+        ],
+        "payments": [
+          {
+            "id": "pay-1795158621261",
+            "method": "Nequi / Daviplata",
+            "amount": 45000,
+            "timestamp": "02:10 a. m.",
+            "operator": "Administrador"
+          }
+        ],
+        "subtotal": 45000,
+        "tip": 0,
+        "total": 45000
+      },
+      {
+        "id": "FAC-689887",
+        "tableId": 6,
+        "tableName": "Mesa 6",
+        "closedAt": "20/11/2026 01:54 a. m.",
+        "operator": "Administrador",
+        "items": [
+          {
+            "productId": "prod-1794084434457",
+            "name": "POKER 750",
+            "quantity": 9,
+            "unitPrice": 9000,
+            "subtotal": 81000
+          },
+          {
+            "productId": "prod-1795048516365",
+            "name": "CIGARROS",
+            "quantity": 8,
+            "unitPrice": 1500,
+            "subtotal": 12000
+          }
+        ],
+        "payments": [
+          {
+            "id": "pay-1795157689008",
+            "method": "Nequi / Daviplata",
+            "amount": 93000,
+            "timestamp": "01:54 a. m.",
+            "operator": "Administrador"
+          }
+        ],
+        "subtotal": 93000,
+        "tip": 0,
+        "total": 93000
+      },
+      {
+        "id": "FAC-482631",
+        "tableId": 3,
+        "tableName": "Mesa 3",
+        "customerName": "Jairo",
+        "closedAt": "20/11/2026 01:01 a. m.",
+        "operator": "Administrador",
+        "items": [
+          {
+            "productId": "prod-1795048415616",
+            "name": "AGUILA ORIGINAL 750",
+            "quantity": 2,
+            "unitPrice": 9000,
+            "subtotal": 18000
+          },
+          {
+            "productId": "prod-1795048437588",
+            "name": "AGUILA LIGHT",
+            "quantity": 1,
+            "unitPrice": 9000,
+            "subtotal": 9000
+          }
+        ],
+        "payments": [
+          {
+            "id": "pay-1795154481486",
+            "method": "Efectivo",
+            "amount": 27000,
+            "timestamp": "01:01 a. m.",
+            "operator": "Administrador"
+          }
+        ],
+        "subtotal": 27000,
+        "tip": 0,
+        "total": 27000
+      },
+      {
+        "id": "FAC-463030",
+        "tableId": 5,
+        "tableName": "Mesa 5",
+        "customerName": "Profe",
+        "closedAt": "20/11/2026 12:11 a. m.",
+        "operator": "Administrador",
+        "items": [
+          {
+            "productId": "prod-1795048415616",
+            "name": "AGUILA ORIGINAL 750 (Desc.)",
+            "quantity": 4,
+            "unitPrice": 7500,
+            "subtotal": 30000
+          },
+          {
+            "productId": "prod-1795048415616",
+            "name": "AGUILA ORIGINAL 750",
+            "quantity": 1,
+            "unitPrice": 9000,
+            "subtotal": 9000
+          }
+        ],
+        "payments": [
+          {
+            "id": "pay-1795145810871",
+            "method": "Efectivo",
+            "amount": 30000,
+            "timestamp": "10:36 p. m.",
+            "operator": "Administrador"
+          },
+          {
+            "id": "pay-1795151462064",
+            "method": "Nequi / Daviplata",
+            "amount": 9000,
+            "timestamp": "12:11 a. m.",
+            "operator": "Administrador"
+          }
+        ],
+        "subtotal": 39000,
+        "tip": 0,
+        "total": 39000
+      },
+      {
+        "id": "FAC-213559",
+        "tableId": 2,
+        "tableName": "Mesa 2",
+        "customerName": "david",
+        "closedAt": "19/11/2026 11:33 p. m.",
+        "operator": "Administrador",
+        "items": [
+          {
+            "productId": "prod-1795048471646",
+            "name": "CLUB COLOMBIA",
+            "quantity": 7,
+            "unitPrice": 10000,
+            "subtotal": 70000
+          },
+          {
+            "productId": "prod-1795048516365",
+            "name": "CIGARROS",
+            "quantity": 15,
+            "unitPrice": 1500,
+            "subtotal": 22500
+          },
+          {
+            "productId": "prod-1795048437588",
+            "name": "AGUILA LIGHT",
+            "quantity": 4,
+            "unitPrice": 9000,
+            "subtotal": 36000
+          },
+          {
+            "productId": "prod-1795048415616",
+            "name": "AGUILA ORIGINAL 750",
+            "quantity": 2,
+            "unitPrice": 9000,
+            "subtotal": 18000
+          }
+        ],
+        "payments": [
+          {
+            "id": "pay-1795149212703",
+            "method": "Nequi / Daviplata",
+            "amount": 146500,
+            "timestamp": "11:33 p. m.",
+            "operator": "Administrador"
+          }
+        ],
+        "subtotal": 146500,
+        "tip": 0,
+        "total": 146500
+      },
+      {
+        "id": "FAC-077094",
+        "tableId": 3,
+        "tableName": "Mesa 3",
+        "closedAt": "19/11/2026 11:31 p. m.",
+        "operator": "Administrador",
+        "items": [
+          {
+            "productId": "prod-1795048471646",
+            "name": "CLUB COLOMBIA",
+            "quantity": 4,
+            "unitPrice": 10000,
+            "subtotal": 40000
+          }
+        ],
+        "payments": [
+          {
+            "id": "pay-1795149076368",
+            "method": "Efectivo",
+            "amount": 40000,
+            "timestamp": "11:31 p. m.",
+            "operator": "Administrador"
+          }
+        ],
+        "subtotal": 40000,
+        "tip": 0,
+        "total": 40000
+      },
+      {
+        "id": "FAC-397417",
+        "tableId": 6,
+        "tableName": "Mesa 6",
+        "customerName": "Luis",
+        "closedAt": "19/11/2026 09:56 p. m.",
+        "operator": "Administrador",
+        "items": [
+          {
+            "productId": "prod-1794084434457",
+            "name": "POKER 750 (Desc.)",
+            "quantity": 3,
+            "unitPrice": 7500,
+            "subtotal": 22500
+          }
+        ],
+        "payments": [
+          {
+            "id": "pay-1795143396240",
+            "method": "Efectivo",
+            "amount": 22500,
+            "timestamp": "09:56 p. m.",
+            "operator": "Administrador"
+          }
+        ],
+        "subtotal": 22500,
+        "tip": 0,
+        "total": 22500
+      },
+      {
+        "id": "FAC-692735",
+        "tableId": 4,
+        "tableName": "Mesa 4",
+        "closedAt": "19/11/2026 07:14 p. m.",
+        "operator": "Administrador",
+        "items": [
+          {
+            "productId": "prod-1795048415616",
+            "name": "AGUILA ORIGINAL 750",
+            "quantity": 6,
+            "unitPrice": 9000,
+            "subtotal": 54000
+          },
+          {
+            "productId": "prod-1795048516365",
+            "name": "CIGARROS",
+            "quantity": 10,
+            "unitPrice": 1500,
+            "subtotal": 15000
+          }
+        ],
+        "payments": [
+          {
+            "id": "pay-1795133691809",
+            "method": "Nequi / Daviplata",
+            "amount": 69000,
+            "timestamp": "07:14 p. m.",
+            "operator": "Administrador"
+          }
+        ],
+        "subtotal": 69000,
+        "tip": 0,
+        "total": 69000
+      },
+      {
+        "id": "FAC-365861",
+        "tableId": 5,
+        "tableName": "Mesa 5",
+        "closedAt": "19/11/2026 12:49 a. m.",
+        "operator": "Administrador",
+        "items": [
+          {
+            "productId": "prod-1794084434457",
+            "name": "POKER 750",
+            "quantity": 2,
+            "unitPrice": 9000,
+            "subtotal": 18000
+          }
+        ],
+        "payments": [
+          {
+            "id": "pay-1795067364909",
+            "method": "Nequi / Daviplata",
+            "amount": 18000,
+            "timestamp": "12:49 a. m.",
+            "operator": "Administrador"
+          }
+        ],
+        "subtotal": 18000,
+        "tip": 0,
+        "total": 18000
+      },
+      {
+        "id": "FAC-127855",
+        "tableId": 2,
+        "tableName": "Mesa 2",
+        "closedAt": "19/11/2026 12:28 a. m.",
+        "operator": "Administrador",
+        "items": [
+          {
+            "productId": "prod-1795048471646",
+            "name": "CLUB COLOMBIA",
+            "quantity": 1,
+            "unitPrice": 10000,
+            "subtotal": 10000
+          }
+        ],
+        "payments": [
+          {
+            "id": "pay-1795066126678",
+            "method": "Efectivo",
+            "amount": 10000,
+            "timestamp": "12:28 a. m.",
+            "operator": "Administrador"
+          }
+        ],
+        "subtotal": 10000,
+        "tip": 0,
+        "total": 10000
+      },
+      {
+        "id": "FAC-981768",
+        "tableId": 2,
+        "tableName": "Mesa 2",
+        "customerName": "Jairo",
+        "closedAt": "18/11/2026 11:03 p. m.",
+        "operator": "Administrador",
+        "items": [
+          {
+            "productId": "prod-1795048415616",
+            "name": "AGUILA ORIGINAL 750",
+            "quantity": 3,
+            "unitPrice": 9000,
+            "subtotal": 27000
+          }
+        ],
+        "payments": [
+          {
+            "id": "pay-1795060976402",
+            "method": "Efectivo",
+            "amount": 15000,
+            "timestamp": "11:02 p. m.",
+            "operator": "Administrador"
+          },
+          {
+            "id": "pay-1795060979883",
+            "method": "Nequi / Daviplata",
+            "amount": 12000,
+            "timestamp": "11:02 p. m.",
+            "operator": "Administrador"
+          }
+        ],
+        "subtotal": 27000,
+        "tip": 0,
+        "total": 27000
+      },
+      {
+        "id": "FAC-579104",
+        "tableId": 2,
+        "tableName": "Mesa 2",
+        "closedAt": "18/11/2026 09:32 p. m.",
+        "operator": "Administrador",
+        "items": [
+          {
+            "productId": "prod-1795054141245",
+            "name": "CERVEZA AGUILA LATA",
+            "quantity": 2,
+            "unitPrice": 4500,
+            "subtotal": 9000
+          },
+          {
+            "productId": "prod-1795048415616",
+            "name": "AGUILA ORIGINAL 750",
+            "quantity": 1,
+            "unitPrice": 9000,
+            "subtotal": 9000
+          }
+        ],
+        "payments": [
+          {
+            "id": "pay-1795055577742",
+            "method": "Nequi / Daviplata",
+            "amount": 18000,
+            "timestamp": "09:32 p. m.",
+            "operator": "Administrador"
+          }
+        ],
+        "subtotal": 18000,
+        "tip": 0,
+        "total": 18000
+      },
+      {
+        "id": "FAC-521642",
+        "tip": 0,
+        "items": [
+          {
+            "name": "POKER 750",
+            "quantity": 1,
+            "subtotal": 10000,
+            "productId": "prod-1794084434457",
+            "unitPrice": 10000
+          }
+        ],
+        "total": 10000,
+        "tableId": 2,
+        "closedAt": "7/11/2026 03:48 p. m.",
+        "operator": "Administrador",
+        "payments": [
+          {
+            "id": "pay-1794084520766",
+            "amount": 10000,
+            "method": "Efectivo",
+            "operator": "Administrador",
+            "timestamp": "03:48 p. m."
+          }
+        ],
+        "subtotal": 10000,
+        "tableName": "Mesa 2"
+      },
+      {
+        "id": "FAC-515332",
+        "tip": 0,
+        "items": [],
+        "total": 0,
+        "tableId": 3,
+        "closedAt": "7/11/2026 03:48 p. m.",
+        "operator": "Administrador",
+        "payments": [],
+        "subtotal": 0,
+        "tableName": "Mesa 3"
+      }
+    ],
+    "operatorName": "Administrador",
+    "activeTableId": 2,
+    "inventoryMovements": [
+      {
+        "id": "inv-1794086319466-prod-1794084434457",
+        "time": "Hoy, 04:18 p. m.",
+        "type": "transfer",
+        "user": "Administrador",
+        "reason": "Reabastecimiento de Nevera: 18 uds transferidas de Bodega a Nevera",
+        "quantity": 18,
+        "productId": "prod-1794084434457",
+        "productName": "POKER 750",
+        "resultingStock": 41,
+        "resultingBodega": 0,
+        "resultingNevera": 41
+      },
+      {
+        "id": "inv-1794086311563-prod-1794084434457",
+        "time": "Hoy, 04:18 p. m.",
+        "type": "transfer",
+        "user": "Administrador",
+        "reason": "Reabastecimiento de Nevera: 12 uds transferidas de Bodega a Nevera",
+        "quantity": 12,
+        "productId": "prod-1794084434457",
+        "productName": "POKER 750",
+        "resultingStock": 41,
+        "resultingBodega": 18,
+        "resultingNevera": 23
+      },
+      {
+        "id": "inv-1794086305448-prod-1794084434457",
+        "time": "Hoy, 04:18 p. m.",
+        "type": "adjustment",
+        "user": "Administrador",
+        "reason": "Ajuste rápido en Bodega (Reserva): +30 uds",
+        "quantity": 30,
+        "productId": "prod-1794084434457",
+        "productName": "POKER 750",
+        "resultingStock": 41,
+        "resultingBodega": 30,
+        "resultingNevera": 11
+      },
+      {
+        "id": "inv-1794084541651-prod-1794084434457",
+        "time": "Hoy, 03:49 p. m.",
+        "type": "transfer",
+        "user": "Administrador",
+        "reason": "Reabastecimiento de Nevera: 6 uds transferidas de Bodega a Nevera",
+        "quantity": 6,
+        "productId": "prod-1794084434457",
+        "productName": "POKER 750",
+        "resultingStock": 11,
+        "resultingBodega": 0,
+        "resultingNevera": 11
+      }
+    ],
+    "categories": [
+      {
+        "id": "Cervezas",
+        "name": "Cervezas",
+        "icon": "🍺",
+        "isDefault": true
+      },
+      {
+        "id": "Licores",
+        "name": "Licores",
+        "icon": "🥃",
+        "isDefault": true
+      },
+      {
+        "id": "Cócteles",
+        "name": "Cócteles",
+        "icon": "🍸",
+        "isDefault": true
+      },
+      {
+        "id": "Snacks",
+        "name": "Snacks",
+        "icon": "🍔",
+        "isDefault": true
+      },
+      {
+        "id": "Sin Alcohol",
+        "name": "Sin Alcohol",
+        "icon": "🥤",
+        "isDefault": true
+      }
+    ],
+    "updatedAt": "2026-11-20T19:32:51.517Z"
+  },
+  "deletedAccounts": []
+}

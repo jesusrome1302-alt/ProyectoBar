@@ -191,16 +191,16 @@ export async function pullCloudRelaySnapshot(criteria?: {
 
     const candidates: FullBarCloudSnapshot[] = []
 
-    await Promise.all(
-      topics.map(async (topic) => {
-        try {
-          const res = await fetch(`https://ntfy.sh/${topic}/json?poll=1&since=all`, {
-            cache: 'no-store',
-          })
-          if (!res.ok) return
-          const raw = await res.text()
-          if (!raw || !raw.trim()) return
-
+    // Consultar todos los tópicos en UNA SOLA petición HTTP combinada (ntfy soporta tópicos separados por coma)
+    // Esto evita el error HTTP 429 (Too Many Requests) de ntfy.sh
+    const combinedTopics = topics.join(',')
+    try {
+      const res = await fetch(`https://ntfy.sh/${combinedTopics}/json?poll=1&since=all`, {
+        cache: 'no-store',
+      })
+      if (res.ok) {
+        const raw = await res.text()
+        if (raw && raw.trim()) {
           const lines = raw
             .split('\n')
             .map((l) => l.trim())
@@ -218,24 +218,24 @@ export async function pullCloudRelaySnapshot(criteria?: {
             }
           }
 
-          // Revisar los últimos 15 mensajes del tópico (del más reciente hacia atrás) sin detenerse en un mensaje vacío sin productos
-          const recentEvents = messageEvents.slice(-15).reverse()
-          let richFoundInTopic = 0
+          // Deduplicar adjuntos por tamaño/tiempo y revisar del más reciente hacia atrás sin detenerse en snapshots vacíos o placeholders
+          const recentEvents = messageEvents.slice(-25).reverse()
+          const seenSizes = new Set<string>()
           for (const evt of recentEvents) {
+            const sig = `${evt.time || 0}_${(evt.attachment as { size?: number } | undefined)?.size || (evt.message?.length || 0)}`
+            if (seenSizes.has(sig)) continue
+            seenSizes.add(sig)
+
             const snap = await parseNtfyEventSnapshot(evt)
             if (snap && snap.barData) {
               candidates.push(snap)
-              if ((snap.barData.products?.length || 0) > 0) {
-                richFoundInTopic += 1
-                if (richFoundInTopic >= 2) break
-              }
             }
           }
-        } catch {
-          // Ignorar fallo de tópico individual
         }
-      })
-    )
+      }
+    } catch {
+      // Ignorar fallo de red
+    }
 
     if (candidates.length === 0) return null
 
@@ -275,24 +275,29 @@ export async function pullCloudRelaySnapshot(criteria?: {
 
     const pool = matchingCandidates.length > 0 ? matchingCandidates : candidates
 
-    // Ordenar priorizando SIEMPRE el snapshot que tenga productos reales y nombre de bar propio (nunca dejar que un snapshot con 0 productos le gane a uno con productos)
+    // Ordenar priorizando SIEMPRE el snapshot que tenga ventas reales (closedSales), movimientos y productos reales
     pool.sort((a, b) => {
+      const scoreA = calculateBarDataRichness(a.barData)
+      const scoreB = calculateBarDataRichness(b.barData)
+      const aHasRealSales = (a.barData?.closedSales?.length || 0) > 0 ? 1 : 0
+      const bHasRealSales = (b.barData?.closedSales?.length || 0) > 0 ? 1 : 0
+      if (aHasRealSales !== bHasRealSales) return bHasRealSales - aHasRealSales
+
       const prodA = a.barData?.products?.length || 0
       const prodB = b.barData?.products?.length || 0
       const aHasProducts = prodA > 0 ? 1 : 0
       const bHasProducts = prodB > 0 ? 1 : 0
       if (aHasProducts !== bHasProducts) return bHasProducts - aHasProducts
 
-      const scoreA = calculateBarDataRichness(a.barData)
-      const scoreB = calculateBarDataRichness(b.barData)
       const aHasData = scoreA > 20 ? 1 : 0
       const bHasData = scoreB > 20 ? 1 : 0
       if (aHasData !== bHasData) return bHasData - aHasData
 
+      if (Math.abs(scoreB - scoreA) > 300) return scoreB - scoreA
+
       const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
       const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
-      if (Math.abs(timeB - timeA) > 2000) return timeB - timeA
-      return scoreB - scoreA
+      return timeB - timeA
     })
 
     return pool[0] || null
@@ -322,10 +327,20 @@ export function generateUuidV4(): string {
 // Calcular un puntaje de riqueza de datos para saber cuál estado (local o nube) contiene la información real del bar
 export function calculateBarDataRichness(data?: BarData | null): number {
   if (!data) return 0
-  const productsCount = data.products?.length || 0
-  const totalStock = (data.products || []).reduce((acc, p) => acc + (p.stock || 0), 0)
+  const rawProducts = data.products || []
+  // Ignorar productos placeholder antiguos (yisus-prod-*) para que nunca le ganen a los productos y ventas reales del 18 y 19
+  const hasPlaceholderProducts = rawProducts.some((p) => String(p.id || '').startsWith('yisus-prod-'))
+  if (hasPlaceholderProducts && (data.closedSales?.length || 0) === 0) {
+    return 18
+  }
+
+  const productsCount = rawProducts.length
+  const totalStock = rawProducts.reduce((acc, p) => acc + (p.stock || 0), 0)
   const kardexCount = data.inventoryMovements?.length || 0
-  const salesCount = (data.closedSales?.length || 0) + (data.movements?.length || 0)
+  const closedSalesCount = data.closedSales?.length || 0
+  const movementsCount = data.movements?.length || 0
+  const sessionsCount = data.sessions?.length || 0
+  const salesCount = closedSalesCount + movementsCount
   const occupiedTables = (data.tables || []).filter(
     (t) => (t.items?.length || 0) > 0 || t.status !== 'available'
   ).length
@@ -353,11 +368,13 @@ export function calculateBarDataRichness(data?: BarData | null): number {
 
   return (
     productsCount * 500 +
+    closedSalesCount * 400 +
+    movementsCount * 120 +
+    sessionsCount * 300 +
     totalStock +
-    kardexCount * 40 +
-    salesCount * 50 +
+    kardexCount * 80 +
     occupiedTables * 80 +
-    (hasLogo ? 120 : 0) +
+    (hasLogo ? 250 : 0) +
     (hasCustomBarName ? 80 : 0) +
     (customCategories + customDiscounts + suppliersAndPurchases) * 40
   )

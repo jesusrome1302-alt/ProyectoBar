@@ -9,6 +9,7 @@ import {
   generateUuidV4,
 } from '@/lib/supabaseClient'
 import type { AuthUser } from '@/lib/authStore'
+import recoveredYisusSnapshotRaw from './recoveredYisusBarSnapshot.json'
 
 export interface OrderItemState {
   productId: string
@@ -524,35 +525,118 @@ let cachedData: BarData = DEFAULT_BAR_DATA
 let cachedRaw: string | null = null
 const listeners = new Set<() => void>()
 
-// Catálogo y descuento de respaldo del propietario (Yisus Bar - Jesus Arias) si el estado local fue sobrescrito en vacío
-const YISUS_BAR_RECOVERY_PRODUCTS: ProductState[] = [
-  { id: 'yisus-prod-1', name: 'AGUILA LIGTH 750ML', category: 'Cervezas', price: 9000, cost: 4500, stock: 50, stock_nevera: 50, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-100001', active: true },
-  { id: 'yisus-prod-2', name: 'Club Colombia Trigo', category: 'Cervezas', price: 7000, cost: 3800, stock: 38, stock_nevera: 38, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-100002', active: true },
-  { id: 'yisus-prod-3', name: 'Soda Hatsu', category: 'Sin Alcohol', price: 7000, cost: 3500, stock: 7, stock_nevera: 7, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-100003', active: true },
-  { id: 'yisus-prod-4', name: 'Agua', category: 'Sin Alcohol', price: 4000, cost: 1800, stock: 6, stock_nevera: 6, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-100004', active: true },
-  { id: 'yisus-prod-5', name: 'Cigarros', category: 'Sin Alcohol', price: 1500, cost: 800, stock: 14, stock_nevera: 0, stock_bodega: 14, min_stock_nevera: 0, min_stock: 10, barcode: 'SKU-100005', active: true },
-  { id: 'yisus-prod-6', name: 'CERVEZA AGUILA 750 ML', category: 'Cervezas', price: 9000, cost: 4500, stock: 41, stock_nevera: 41, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-100006', active: true },
-  { id: 'yisus-prod-7', name: 'Club colombia', category: 'Cervezas', price: 10000, cost: 5000, stock: 43, stock_nevera: 43, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-100007', active: true },
-  { id: 'yisus-prod-8', name: 'POKER 750ml', category: 'Cervezas', price: 9000, cost: 4500, stock: 45, stock_nevera: 45, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-100008', active: true },
-  { id: 'yisus-prod-9', name: 'COVER', category: 'Sin Alcohol', price: 5000, cost: 0, stock: 50, stock_nevera: 0, stock_bodega: 50, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-893530', active: true },
-  { id: 'yisus-prod-10', name: 'CERVEZA AGUILA LATA', category: 'Cervezas', price: 4500, cost: 0, stock: 4, stock_nevera: 4, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-775974', active: true },
-]
+// Snapshot real recuperado del 18 y 19 de noviembre (6 productos reales, 15 facturas cerradas, 23 movimientos, 2 cierres de turno, caja activa $122.500/$362.500, 7 descuentos y foto de perfil)
+const RECOVERED_NOV18_19_SNAPSHOT = recoveredYisusSnapshotRaw as unknown as FullBarCloudSnapshot
 
-const YISUS_BAR_RECOVERY_DISCOUNT: DiscountRuleState = {
-  id: 'disc-yisus-happy-hour',
-  name: 'HAPPY HOUR',
-  description: 'Happy Hour de $ 1.500 por unidad (Rock Bar & Pub)',
-  type: 'fixed_off',
-  value: 1500,
-  scope: 'category',
-  categoryName: 'Cervezas',
-  isHappyHour: true,
-  startTime: '19:00',
-  endTime: '22:00',
-  days: ['Jue', 'Vie', 'Mié', 'Mar'],
-  businessTypeTag: 'Rock Bar & Pub',
-  isPreset: false,
-  active: true,
+export interface PreChangeRestorePoint {
+  id: string
+  createdAt: string
+  reason: string
+  accountEmail?: string
+  barName?: string
+  businessId?: string
+  productsCount: number
+  closedSalesCount: number
+  snapshot: FullBarCloudSnapshot
+}
+
+const RESTORE_POINTS_STORAGE_KEY = 'ROCK_BAR_RESTORE_POINTS_V1'
+
+// Guardar automáticamente una copia de seguridad (Punto de Restauración) antes de cualquier cambio o sincronización
+export function savePreChangeRestorePoint(reason: string): PreChangeRestorePoint | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const snap = buildLocalFullSnapshot()
+    if (!snap || !snap.barData) return null
+    const prodCount = snap.barData.products?.length || 0
+    const salesCount = snap.barData.closedSales?.length || 0
+    if (prodCount === 0 && salesCount === 0) return null
+
+    const rawList = localStorage.getItem(RESTORE_POINTS_STORAGE_KEY)
+    const list: PreChangeRestorePoint[] = rawList ? JSON.parse(rawList) : []
+
+    const point: PreChangeRestorePoint = {
+      id: `rp-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      reason,
+      accountEmail: snap.ownerUser?.email,
+      barName: snap.barData.settings?.barName || snap.ownerUser?.barName,
+      businessId: snap.businessId,
+      productsCount: prodCount,
+      closedSalesCount: salesCount,
+      snapshot: snap,
+    }
+
+    const updated = [point, ...list].slice(0, 12)
+    localStorage.setItem(RESTORE_POINTS_STORAGE_KEY, JSON.stringify(updated))
+    return point
+  } catch {
+    return null
+  }
+}
+
+// Exportar y respaldar TODAS las cuentas registradas en el sistema (Archivo .JSON + Punto de Restauración + Bóveda Cloud)
+export async function exportAllRegisteredAccountsBackup(reason = 'Respaldo Manual Pre-Cambio'): Promise<boolean> {
+  if (typeof window === 'undefined') return false
+  try {
+    savePreChangeRestorePoint(reason)
+    const currentSnap = buildLocalFullSnapshot()
+    const usersRaw = localStorage.getItem('ROCK_BAR_USERS_STORE_V2')
+    const allUsers: AuthUser[] = usersRaw ? JSON.parse(usersRaw) : []
+    const restorePointsRaw = localStorage.getItem(RESTORE_POINTS_STORAGE_KEY)
+    const restorePoints: PreChangeRestorePoint[] = restorePointsRaw ? JSON.parse(restorePointsRaw) : []
+
+    const perAccountBackups: Record<string, BarData> = {}
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && k.startsWith('ROCK_BAR_USER_BACKUP_')) {
+        try {
+          const val = localStorage.getItem(k)
+          if (val) perAccountBackups[k] = JSON.parse(val)
+        } catch {
+          // Ignorar entrada inválida
+        }
+      }
+    }
+
+    const masterBundle = {
+      backupVersion: 1,
+      createdAt: new Date().toISOString(),
+      reason,
+      activeSnapshot: currentSnap,
+      registeredUsers: allUsers,
+      perAccountBackups,
+      restorePoints,
+    }
+
+    const jsonStr = JSON.stringify(masterBundle, null, 2)
+
+    // 1. Subir también a la bóveda en la nube
+    if (currentSnap) {
+      pushCloudRelaySnapshot(currentSnap).catch(() => {})
+      fetch('https://ntfy.sh/rockbar_v3_vault_backups', {
+        method: 'PUT',
+        headers: { Filename: 'master_accounts_backup.json' },
+        body: jsonStr,
+      }).catch(() => {})
+    }
+
+    // 2. Descargar el archivo JSON en el computador del usuario
+    const blob = new Blob([jsonStr], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const dateTag = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    a.href = url
+    a.download = `backup-todas-las-cuentas-${dateTag}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    return true
+  } catch (err) {
+    console.warn('Error exportando backup maestro de cuentas:', err)
+    return false
+  }
 }
 
 function getActiveAuthInfo(): { email?: string; businessId?: string; barName?: string; name?: string } {
@@ -639,11 +723,68 @@ export function loadBarData(): BarData {
       }
     }
 
-    // Recuperación automática desde backup local por usuario o restauración de Yisus Bar si un estado vacío lo sobrescribió
+    // Recuperación automática de los datos exactos del 18 y 19 de noviembre (ventas, caja, turnos, kardex, productos reales y foto)
     const authInfo = getActiveAuthInfo()
     let wasRecovered = false
 
-    if (parsed.products.length === 0) {
+    const isYisusOwner =
+      authInfo.email === 'jesusrome1302@gmail.com' ||
+      authInfo.businessId === '2151228e-d35e-470a-930f-59ca9b79f8bd' ||
+      authInfo.barName?.toLowerCase().includes('yisus') ||
+      parsed.operatorName === 'Jesus Arias'
+
+    const hasOldPlaceholderProducts = parsed.products.some((p) =>
+      String(p.id || '').startsWith('yisus-prod-')
+    )
+    const nov1819RestoredFlag = localStorage.getItem('ROCK_BAR_NOV18_19_RESTORED_V3') === 'done'
+
+    if (
+      isYisusOwner &&
+      (parsed.products.length === 0 ||
+        hasOldPlaceholderProducts ||
+        ((parsed.closedSales?.length || 0) < 15 && !nov1819RestoredFlag))
+    ) {
+      const realBarData = JSON.parse(
+        JSON.stringify(RECOVERED_NOV18_19_SNAPSHOT.barData)
+      ) as BarData
+
+      parsed.products = realBarData.products || []
+      parsed.closedSales = realBarData.closedSales || []
+      parsed.movements = realBarData.movements || []
+      parsed.inventoryMovements = realBarData.inventoryMovements || []
+      parsed.cash = realBarData.cash || parsed.cash
+      parsed.sessions = realBarData.sessions || []
+      parsed.discounts = realBarData.discounts || parsed.discounts
+      parsed.categories = realBarData.categories || parsed.categories
+      parsed.tables = realBarData.tables || parsed.tables
+      parsed.operatorName = authInfo.name || 'Jesus Arias'
+      parsed.settings = {
+        ...parsed.settings,
+        ...(realBarData.settings || {}),
+        barName: authInfo.barName && authInfo.barName !== 'ROCK BAR' ? authInfo.barName : 'Yisus Bar',
+      }
+      parsed.updatedAt = new Date().toISOString()
+
+      // Restaurar también la foto original en la sesión activa del propietario
+      try {
+        const authRaw = localStorage.getItem('ROCK_BAR_AUTH_SESSION_V1')
+        if (authRaw) {
+          const authObj = JSON.parse(authRaw)
+          if (authObj?.user) {
+            if (RECOVERED_NOV18_19_SNAPSHOT.ownerUser?.photoUrl) {
+              authObj.user.photoUrl = RECOVERED_NOV18_19_SNAPSHOT.ownerUser.photoUrl
+            }
+            authObj.user.barName = parsed.settings.barName
+            localStorage.setItem('ROCK_BAR_AUTH_SESSION_V1', JSON.stringify(authObj))
+          }
+        }
+      } catch {
+        // Ignorar error actualizando foto en sesión
+      }
+
+      localStorage.setItem('ROCK_BAR_NOV18_19_RESTORED_V3', 'done')
+      wasRecovered = true
+    } else if (parsed.products.length === 0) {
       const backupKey = authInfo.businessId
         ? `ROCK_BAR_USER_BACKUP_${authInfo.businessId}`
         : authInfo.email
@@ -656,6 +797,10 @@ export function loadBarData(): BarData {
             const backupData = JSON.parse(backupRaw) as BarData
             if (backupData.products && backupData.products.length > 0) {
               parsed.products = backupData.products
+              if (backupData.closedSales && backupData.closedSales.length > 0) parsed.closedSales = backupData.closedSales
+              if (backupData.movements && backupData.movements.length > 0) parsed.movements = backupData.movements
+              if (backupData.sessions && backupData.sessions.length > 0) parsed.sessions = backupData.sessions
+              if (backupData.cash) parsed.cash = backupData.cash
               if (backupData.categories && backupData.categories.length > 0) parsed.categories = backupData.categories
               if (backupData.discounts && backupData.discounts.length > 0) parsed.discounts = backupData.discounts
               if (backupData.promotions && backupData.promotions.length > 0) parsed.promotions = backupData.promotions
@@ -672,30 +817,6 @@ export function loadBarData(): BarData {
         } catch {
           // Ignorar error de lectura de backup
         }
-      }
-
-      const isYisusOwner =
-        authInfo.email === 'jesusrome1302@gmail.com' ||
-        authInfo.businessId === '2151228e-d35e-470a-930f-59ca9b79f8bd' ||
-        authInfo.barName?.toLowerCase().includes('yisus')
-      const explicitlyCleared = localStorage.getItem('ROCK_BAR_YISUS_RESTORED_V1') === 'manual_empty'
-
-      if (parsed.products.length === 0 && isYisusOwner && !explicitlyCleared) {
-        parsed.products = [...YISUS_BAR_RECOVERY_PRODUCTS]
-        parsed.operatorName = authInfo.name || 'Jesus Arias'
-        parsed.settings = {
-          ...parsed.settings,
-          barName: 'Yisus Bar',
-          phone: '3028333402',
-          address: 'Cúcuta',
-          footerText: '¡Gracias por tu visita a Yisus Bar! Vuelve pronto.',
-        }
-        if (!parsed.discounts.some((d) => d.name.toUpperCase() === 'HAPPY HOUR')) {
-          parsed.discounts = [...parsed.discounts, YISUS_BAR_RECOVERY_DISCOUNT]
-        }
-        // Resetear updatedAt a 0 para que si en el Cloud Relay está el snapshot más reciente con productos/foto del portátil, lo descargue encima
-        parsed.updatedAt = undefined
-        wasRecovered = true
       }
     }
 
@@ -993,11 +1114,23 @@ export function applyCloudBarDataLocally(cloudData: BarData): void {
     const currentLocal = cachedData
     const localProdCount = currentLocal?.products?.length || 0
     const cloudProdCount = cloudData.products?.length || 0
+    const localSalesCount = currentLocal?.closedSales?.length || 0
+    const cloudSalesCount = cloudData.closedSales?.length || 0
+    const cloudHasPlaceholders = (cloudData.products || []).some((p) =>
+      String(p.id || '').startsWith('yisus-prod-')
+    )
 
-    // Si localmente tenemos productos y el paquete entrante de la nube viene con 0 productos, NO permitir que borre el catálogo local
-    if (localProdCount > 0 && cloudProdCount === 0) {
+    // Si localmente tenemos productos o ventas cerradas y el paquete entrante viene vacío o con productos placeholder sin ventas, NO sobrescribir
+    if (
+      (localProdCount > 0 && cloudProdCount === 0) ||
+      (localSalesCount > 0 && cloudSalesCount === 0) ||
+      (localSalesCount > 0 && cloudHasPlaceholders)
+    ) {
       return
     }
+
+    // Guardar punto de restauración automático antes de aplicar cualquier cambio proveniente de la nube
+    savePreChangeRestorePoint('Auto-Backup antes de sincronización Cloud')
 
     const safeData: BarData = {
       ...cloudData,
