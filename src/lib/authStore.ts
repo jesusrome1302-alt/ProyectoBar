@@ -1,9 +1,16 @@
 import { useSyncExternalStore } from 'react'
-import { registerNewBusinessBar, loadBarData, DEFAULT_BAR_DATA } from '@/lib/barState'
+import {
+  registerNewBusinessBar,
+  loadBarData,
+  DEFAULT_BAR_DATA,
+  applyCloudBarDataLocally,
+  smartSyncWithCloud,
+} from '@/lib/barState'
 import {
   checkCloudEmailExists,
   registerCloudAccount,
   loginCloudAccount,
+  getCloudTeamMembers,
   saveCloudTeamMember,
   deleteCloudTeamMember,
   archiveAndDeleteCloudAccount,
@@ -311,6 +318,12 @@ export async function registerBusinessOwner(params: {
   // Lista de usuarios NUEVA y AISLADA para este bar: SOLO el nuevo propietario
   saveBarUsers([newUser])
 
+  // Activar sesión ANTES de inicializar los datos del bar para que saveBarData tenga acceso inmediato al businessId
+  setAuthState({
+    user: newUser,
+    isAuthenticated: true,
+  })
+
   // Sincronizar en barState el nuevo negocio y nombre del bar con plataforma en 0
   registerNewBusinessBar({
     barName: params.barName,
@@ -318,12 +331,6 @@ export async function registerBusinessOwner(params: {
     phone: params.phone,
     city: params.city,
     businessId: businessId,
-  })
-
-  // Activar sesión inmediatamente
-  setAuthState({
-    user: newUser,
-    isAuthenticated: true,
   })
 
   return newUser
@@ -348,7 +355,7 @@ export function loginWithNewUser(name: string, role: UserRole): AuthUser {
   return newUser
 }
 
-// Autenticación con credenciales validando en la nube (permite acceso desde cualquier portátil)
+// Autenticación con credenciales validando en la nube (permite acceso desde cualquier portátil o PC de mesa)
 export async function loginWithCredentials(
   identifier: string,
   pinOrPass: string
@@ -356,7 +363,7 @@ export async function loginWithCredentials(
   const cleanId = identifier.trim()
   const cleanPass = pinOrPass.trim()
 
-  // 1. Intentar validar credenciales contra Supabase en la nube
+  // 1. Validar credenciales contra Supabase en la nube y descargar inmediatamente el estado operativo del bar
   try {
     const cloudRes = await loginCloudAccount(cleanId, cleanPass)
     if (cloudRes.success && cloudRes.user) {
@@ -364,58 +371,98 @@ export async function loginWithCredentials(
         user: cloudRes.user,
         isAuthenticated: true,
       })
-      // Agregar a la lista local si aún no está en este navegador
-      const localUsers = getBarUsers()
-      if (!localUsers.some((u) => u.id === cloudRes.user!.id)) {
-        saveBarUsers([cloudRes.user, ...localUsers])
+
+      // Si la nube ya devolvió el snapshot de bar_data del otro computador (portátil), aplicarlo de inmediato antes de entrar
+      if (cloudRes.barData) {
+        applyCloudBarDataLocally(cloudRes.barData)
+      } else {
+        await smartSyncWithCloud()
       }
+
+      // Sincronizar lista de usuarios del bar en este navegador
+      const localUsers = getBarUsers()
+      const filteredLocal = localUsers.filter(
+        (u) => !['user-owner-1', 'user-admin-1', 'user-staff-1'].includes(u.id)
+      )
+      const hasCloudUser = filteredLocal.some(
+        (u) => u.id === cloudRes.user!.id || u.email.toLowerCase() === cloudRes.user!.email.toLowerCase()
+      )
+      const updatedLocalUsers = hasCloudUser
+        ? filteredLocal.map((u) =>
+            u.id === cloudRes.user!.id || u.email.toLowerCase() === cloudRes.user!.email.toLowerCase()
+              ? cloudRes.user!
+              : u
+          )
+        : [cloudRes.user, ...filteredLocal]
+      saveBarUsers(updatedLocalUsers)
+
+      // Descargar también los miembros del equipo desde la nube en segundo plano
+      if (cloudRes.user.businessId) {
+        getCloudTeamMembers(cloudRes.user.businessId)
+          .then((members) => {
+            if (members && members.length > 0) {
+              const mapped: AuthUser[] = members.map((m) => ({
+                id: m.id,
+                name: m.name,
+                email: m.email || '',
+                role: m.role,
+                roleTitle:
+                  m.role_title || (m.role === 'admin' ? 'Administrador / Gerente' : 'Mesero / Staff'),
+                avatar: m.avatar || m.name.slice(0, 2).toUpperCase(),
+                pin: m.pin,
+                barName: cloudRes.user?.barName,
+                businessId: cloudRes.user?.businessId,
+              }))
+              saveBarUsers([
+                cloudRes.user!,
+                ...mapped.filter((m) => m.id !== cloudRes.user!.id),
+              ])
+            }
+          })
+          .catch(() => {})
+      }
+
       return { success: true, user: cloudRes.user }
     }
   } catch (err) {
     console.warn('Consulta a Supabase en login falló, probando caché local:', err)
   }
 
-  // 2. Fallback local por si el equipo está desconectado
+  // 2. Fallback local por si el equipo está temporalmente sin internet
   const barUsers = getBarUsers()
   const candidates = barUsers.length > 0 ? barUsers : PRESET_USERS
-  const found = candidates.find(
-    (u) =>
-      u.email.toLowerCase() === cleanId.toLowerCase() ||
-      u.pin === cleanPass ||
-      u.name.toLowerCase().includes(cleanId.toLowerCase())
-  ) || PRESET_USERS.find(
-    (u) =>
-      u.email.toLowerCase() === cleanId.toLowerCase() ||
-      u.pin === cleanPass
-  )
+  const found =
+    candidates.find((u) => {
+      const idMatch =
+        cleanId.length > 0 &&
+        (u.email.toLowerCase() === cleanId.toLowerCase() ||
+          u.name.toLowerCase().includes(cleanId.toLowerCase()) ||
+          (u.barName && u.barName.toLowerCase().includes(cleanId.toLowerCase())))
+      const pinMatch = cleanPass.length > 0 && u.pin === cleanPass
+      if (cleanId.length > 0 && cleanPass.length > 0) return idMatch && pinMatch
+      if (cleanId.length === 0 && cleanPass.length > 0) return pinMatch
+      return idMatch
+    }) ||
+    PRESET_USERS.find(
+      (u) =>
+        (cleanId.length > 0 && u.email.toLowerCase() === cleanId.toLowerCase() && u.pin === cleanPass) ||
+        (cleanId.length === 0 && u.pin === cleanPass)
+    )
 
   if (found) {
     setAuthState({
       user: found,
       isAuthenticated: true,
     })
+    await smartSyncWithCloud()
     return { success: true, user: found }
   }
 
-  // 3. Si no coincide, crear usuario custom staff si ingresó algún identificador
-  if (cleanId.length > 0) {
-    const customUser: AuthUser = {
-      id: 'custom-' + Date.now(),
-      name: cleanId,
-      email: `${cleanId.toLowerCase().replace(/\s+/g, '')}@bar.com`,
-      role: 'staff',
-      roleTitle: 'Personal de Turno',
-      avatar: cleanId.slice(0, 2).toUpperCase(),
-      pin: cleanPass || '0000',
-    }
-    setAuthState({
-      user: customUser,
-      isAuthenticated: true,
-    })
-    return { success: true, user: customUser }
+  return {
+    success: false,
+    message:
+      'No encontramos una cuenta con esos datos. Ingresa el correo, tu nombre (ej. Jesus Arias) o el nombre del bar (ej. YIsus Bar) junto con tu PIN/contraseña.',
   }
-
-  return { success: false, message: 'Usuario, correo o PIN incorrectos. Verifica tus credenciales.' }
 }
 
 const DELETED_ACCOUNTS_STORAGE_KEY = 'ROCK_BAR_DELETED_ACCOUNTS_V1'

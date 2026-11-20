@@ -142,6 +142,7 @@ proyecto-bar/
 | ETAPA 14 | Animación interactiva Double Slider Sign In / Sign Up en `/login` con panel overlay deslizante con gradiente, parallax y carrusel móvil | ✅ Completa |
 | ETAPA 15 | Sistema Global de Diálogos Modales Personalizados (`GlobalDialog` & `dialogService.ts`) | ✅ Completa |
 | ETAPA 16 | Tarjetas KPI Simétricas, Alertas Duales (Nevera + Bodega), `NotificationCenter` y Ajuste Rápido con Destino Persistente | ✅ Completa |
+| ETAPA 17 | Sincronización Multi-Dispositivo Bidireccional Auto-Reparable (Portátil <-> PC de Mesa), Unificación de Perfil y Realtime Cloud Sync | ✅ Completa |
 
 ---
 
@@ -396,3 +397,13 @@ npm install -D <pkg> # Instalar devDependency
        - **Modal de Ajuste Rápido con Selección de Destino y Persistencia Real (`adjustProductStock` en `src/lib/barState.ts`):**
          - Al pulsar `-`, `+` o `+10` en cualquier producto, se abre un modal rápido que permite elegir la cantidad (`1`, `6`, `10`, `12`, `24`, `30`) y seleccionar explícitamente si las unidades van a **❄️ En Nevera** o a **📦 En Bodega**.
          - `adjustProductStock(id, delta, target)` actualiza `stock_nevera` o `stock_bodega`, recalcula `stock = newNevera + newBodega`, guarda el movimiento en el Kardex (`data.inventoryMovements`) y sincroniza en Supabase/`localStorage`.
+    19. **ETAPA 17 - Sincronización Multi-Dispositivo Bidireccional Auto-Reparable (Portátil <-> PC de Mesa) (20/11/2026):**
+       - **Problema abordado:** Los datos creados en el Portátil (ej. `YIsus Bar`, `Jesus Arias`, producto `POKER 750` con 41 uds, Kardex y foto de perfil) no aparecían al ingresar desde el PC de Mesa con el mismo perfil debido a:
+         1. Sesiones creadas localmente cuyo `businessId` no existía en `public.bar_accounts` (provocando fallo de llave foránea al guardar en `public.bar_data`) o cuentas duplicadas con diferente `business_id` entre equipos.
+         2. `loginCloudAccount` fallaba en PostgREST `.or()` cuando el usuario escribía un nombre con espacios (`Jesus Arias` o `YIsus Bar`), y `loginWithCredentials` caía en un fallback que creaba un usuario local fantasma (`custom-...`) sin `businessId`.
+         3. Un navegador recién abierto en el PC de Mesa podía inicializar `DEFAULT_BAR_DATA` en cero antes de completar la descarga de la nube, o no recibía la foto de perfil (`photoUrl`) desde `settings.logoUrl`.
+       - **Solución Implementada (`src/lib/supabaseClient.ts`, `src/lib/barState.ts`, `src/lib/authStore.ts`, `src/app/layout.tsx`):**
+         - **Unificación y Auto-Registro de Cuenta (`resolveOrEnsureCloudAccount`):** Busca en `public.bar_accounts` todas las coincidencias por `business_id`, `email`, `bar_name` o `full_name`; si existen varias filas, evalúa `calculateBarDataRichness` en `public.bar_data` para elegir la cuenta con los datos reales más completos y espejar los datos; si la cuenta del portátil no estaba aún en `bar_accounts`, la inserta automáticamente con UUID válido.
+         - **Sincronización Inteligente Anti-Pérdida (`smartSyncWithCloud`):** Si el Portátil tiene datos reales (`localScore > 20`) y la nube está vacía, los sube automáticamente; si el PC de Mesa está en cero y la nube tiene los datos del Portátil, los descarga de inmediato (`applyCloudBarDataLocally`) junto con la foto (`logoUrl`) y el nombre del bar.
+         - **Login Flexible y Seguro (`loginCloudAccount` & `loginWithCredentials`):** Permite iniciar sesión por Correo, Nombre del Propietario (`Jesus Arias`) o Nombre del Bar (`YIsus Bar`) + PIN/contraseña, descargando `bar_data` antes de entrar al panel y eliminando la creación de usuarios fantasma.
+         - **Tiempo Real + Botón `☁️ Nube Activa` en Cabecera:** Suscripción a Supabase Realtime (`postgres_changes` en `public.bar_data`), sincronización al enfocar pestaña y botón interactivo en el header para forzar sincronización en 1 clic.

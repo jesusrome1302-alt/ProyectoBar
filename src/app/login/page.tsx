@@ -10,6 +10,7 @@ import {
   UserRole,
   AuthUser,
 } from '@/lib/authStore'
+import { smartSyncWithCloud } from '@/lib/barState'
 import {
   Shield,
   KeyRound,
@@ -115,17 +116,25 @@ export default function LoginPage() {
     }
   }
 
-  // Manejar Login Rápido por Perfil del Bar
-  const handleQuickLogin = (targetUser: AuthUser) => {
+  // Manejar Login Rápido por Perfil del Bar (con sincronización inmediata desde la nube)
+  const handleQuickLogin = async (targetUser: AuthUser) => {
     setErrorMsg('')
+    setLoading(true)
     setAuthState({
       user: targetUser,
       isAuthenticated: true,
     })
-    setSuccessMsg(`¡Bienvenido ${targetUser.name}! Accediendo al sistema...`)
+    try {
+      await smartSyncWithCloud()
+    } catch {
+      // Continuar con caché local si no hay red
+    } finally {
+      setLoading(false)
+    }
+    setSuccessMsg(`¡Bienvenido ${targetUser.name}! Sincronizando datos de tu bar...`)
     setTimeout(() => {
       router.push('/')
-    }, 400)
+    }, 300)
   }
 
   // Manejar Login Tradicional con Credenciales contra Supabase

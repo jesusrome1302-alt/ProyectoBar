@@ -1,5 +1,9 @@
 import { useSyncExternalStore } from 'react'
-import { saveCloudBarData, getCloudBarData } from '@/lib/supabaseClient'
+import {
+  saveCloudBarData,
+  resolveOrEnsureCloudAccount,
+  calculateBarDataRichness,
+} from '@/lib/supabaseClient'
 
 export interface OrderItemState {
   productId: string
@@ -224,6 +228,7 @@ export interface BarData {
   closedSales?: SaleReceiptRecord[]
   settings?: BarSettings
   promotions?: PromotionRule[]
+  updatedAt?: string
 }
 
 export const DEFAULT_CATEGORIES: CategoryState[] = [
@@ -543,7 +548,7 @@ export function loadBarData(): BarData {
       const existingMap = new Map(parsed.discounts.map((d) => [d.id, d]))
       const mergedPresets = PRESET_DISCOUNTS.map((preset) => {
         const saved = existingMap.get(preset.id)
-        return saved ? { ...preset, active: saved.active } : preset
+        return saved ? { ...preset, ...saved } : preset
       })
       const customDiscounts = parsed.discounts.filter((d) => !d.isPreset && !PRESET_DISCOUNTS.some((p) => p.id === d.id))
       parsed.discounts = [...mergedPresets, ...customDiscounts]
@@ -681,9 +686,76 @@ export function loadBarData(): BarData {
   }
 }
 
+// Aplicar datos provenientes de la nube localmente sin disparar un guardado redundante de regreso a Supabase
+export function applyCloudBarDataLocally(cloudData: BarData): void {
+  if (typeof window === 'undefined' || !cloudData) return
+  try {
+    const str = JSON.stringify(cloudData)
+    cachedRaw = str
+    cachedData = JSON.parse(str)
+    localStorage.setItem(STORAGE_KEY, str)
+
+    // Sincronizar también la foto/logo y el nombre del bar en la sesión del usuario activo en este navegador
+    try {
+      const authRaw = localStorage.getItem('ROCK_BAR_AUTH_SESSION_V1')
+      if (authRaw) {
+        const auth = JSON.parse(authRaw)
+        if (auth && auth.user) {
+          let authChanged = false
+          if (cloudData.settings?.logoUrl && auth.user.photoUrl !== cloudData.settings.logoUrl) {
+            auth.user.photoUrl = cloudData.settings.logoUrl
+            authChanged = true
+          }
+          if (
+            cloudData.settings?.barName &&
+            cloudData.settings.barName !== 'ROCK BAR' &&
+            auth.user.barName !== cloudData.settings.barName
+          ) {
+            auth.user.barName = cloudData.settings.barName
+            authChanged = true
+          }
+          if (authChanged) {
+            localStorage.setItem('ROCK_BAR_AUTH_SESSION_V1', JSON.stringify(auth))
+            window.dispatchEvent(new Event('rock_bar_auth_updated'))
+          }
+        }
+      }
+    } catch {
+      // Ignorar error actualizando auth local
+    }
+
+    listeners.forEach((listener) => {
+      try {
+        listener()
+      } catch {
+        // Ignorar listener fallido
+      }
+    })
+    window.dispatchEvent(new Event('rock_bar_state_updated'))
+  } catch (err) {
+    console.warn('Error aplicando datos de la nube localmente:', err)
+  }
+}
+
 export function saveBarData(data: BarData): void {
   if (typeof window === 'undefined') return
   try {
+    const nowIso = new Date().toISOString()
+    data.updatedAt = nowIso
+
+    // Asegurar que si el usuario tiene foto en su perfil y aún no está en settings.logoUrl, viaje en bar_data
+    try {
+      const authRaw = localStorage.getItem('ROCK_BAR_AUTH_SESSION_V1')
+      if (authRaw) {
+        const auth = JSON.parse(authRaw)
+        if (auth?.user?.photoUrl && data.settings && !data.settings.logoUrl) {
+          data.settings.logoUrl = auth.user.photoUrl
+        }
+      }
+    } catch {
+      // Ignorar error leyendo foto de sesión
+    }
+
     const str = JSON.stringify(data)
     cachedRaw = str
     // Clonación para garantizar nueva identidad de objeto y disparo inmediato en useSyncExternalStore
@@ -701,17 +773,15 @@ export function saveBarData(data: BarData): void {
 
     window.dispatchEvent(new Event('rock_bar_state_updated'))
 
-    // Sincronización en segundo plano con la nube (Supabase) para soporte multi-dispositivo
+    // Sincronización en segundo plano con la nube (Supabase) para soporte multi-dispositivo (Portátil <-> PC de Mesa)
     try {
       const authRaw = localStorage.getItem('ROCK_BAR_AUTH_SESSION_V1')
       if (authRaw) {
         const auth = JSON.parse(authRaw)
-        const businessId = auth?.user?.businessId
-        if (businessId) {
-          saveCloudBarData(businessId, data).catch((e) =>
-            console.warn('Error sincronizando bar_data en Supabase:', e)
-          )
-        }
+        const businessId = auth?.user?.businessId || ''
+        saveCloudBarData(businessId, data).catch((e) =>
+          console.warn('Error sincronizando bar_data en Supabase:', e)
+        )
       }
     } catch {
       // Ignorar error al leer auth
@@ -721,28 +791,164 @@ export function saveBarData(data: BarData): void {
   }
 }
 
-// Sincronizar datos del bar desde la nube (para cuando se ingresa desde otro portátil)
-export async function syncCloudBarData(businessId?: string): Promise<boolean> {
-  if (typeof window === 'undefined') return false
-  try {
-    let targetBizId = businessId
-    if (!targetBizId) {
-      const authRaw = localStorage.getItem('ROCK_BAR_AUTH_SESSION_V1')
-      if (authRaw) {
-        const auth = JSON.parse(authRaw)
-        targetBizId = auth?.user?.businessId
-      }
-    }
-    if (!targetBizId) return false
-    const cloudData = await getCloudBarData(targetBizId)
-    if (cloudData && cloudData.tables && cloudData.tables.length > 0) {
-      saveBarData(cloudData)
-      return true
-    }
-  } catch (err) {
-    console.warn('Error al sincronizar datos desde la nube:', err)
+let isSyncingInProgress = false
+
+// Sincronización inteligente bidireccional entre el dispositivo actual (Portátil o PC de Mesa) y Supabase Cloud
+export async function smartSyncWithCloud(options?: {
+  forcePush?: boolean
+  forcePull?: boolean
+}): Promise<{
+  synced: boolean
+  action: 'pushed' | 'pulled' | 'up-to-date' | 'offline'
+  businessId?: string
+}> {
+  if (typeof window === 'undefined') {
+    return { synced: false, action: 'offline' }
   }
-  return false
+  if (isSyncingInProgress && !options?.forcePush && !options?.forcePull) {
+    return { synced: false, action: 'up-to-date' }
+  }
+
+  isSyncingInProgress = true
+  try {
+    const authRaw = localStorage.getItem('ROCK_BAR_AUTH_SESSION_V1')
+    if (!authRaw) {
+      return { synced: false, action: 'offline' }
+    }
+    const auth = JSON.parse(authRaw)
+    const activeUser = auth?.user
+    if (!activeUser) {
+      return { synced: false, action: 'offline' }
+    }
+
+    const localData = loadBarData()
+
+    // Si el usuario tiene foto en su sesión local pero no en localData.settings.logoUrl, integrarla antes de sincronizar
+    if (activeUser.photoUrl && localData.settings && !localData.settings.logoUrl) {
+      localData.settings.logoUrl = activeUser.photoUrl
+    }
+
+    const resolved = await resolveOrEnsureCloudAccount({
+      user: activeUser,
+      currentBarData: localData,
+    })
+
+    const canonicalAccount = resolved.account
+    const cloudData = resolved.cloudBarData
+    const allMatchedBizIds = resolved.allMatchedBusinessIds
+
+    if (!canonicalAccount) {
+      return { synced: false, action: 'offline' }
+    }
+
+    const canonicalBizId = canonicalAccount.business_id
+
+    // Unificar datos de la cuenta oficial en la sesión local (para que Portátil y PC de Mesa compartan el mismo businessId y perfil)
+    let authUpdated = false
+    if (activeUser.businessId !== canonicalBizId) {
+      activeUser.businessId = canonicalBizId
+      authUpdated = true
+    }
+    if (canonicalAccount.bar_name && !activeUser.barName) {
+      activeUser.barName = canonicalAccount.bar_name
+      authUpdated = true
+    }
+    if (canonicalAccount.email && (!activeUser.email || activeUser.email.endsWith('@bar.com'))) {
+      activeUser.email = canonicalAccount.email
+      authUpdated = true
+    }
+    if (
+      canonicalAccount.full_name &&
+      canonicalAccount.email.toLowerCase() === (activeUser.email || '').toLowerCase() &&
+      activeUser.role !== 'owner'
+    ) {
+      activeUser.role = 'owner'
+      activeUser.roleTitle = `Propietario (${canonicalAccount.bar_name})`
+      authUpdated = true
+    }
+    if (authUpdated) {
+      auth.user = activeUser
+      localStorage.setItem('ROCK_BAR_AUTH_SESSION_V1', JSON.stringify(auth))
+      window.dispatchEvent(new Event('rock_bar_auth_updated'))
+    }
+
+    const localScore = calculateBarDataRichness(localData)
+    const cloudScore = calculateBarDataRichness(cloudData)
+
+    // 1. Si se pidió forzar descarga (forcePull) y hay datos en la nube
+    if (options?.forcePull && cloudData) {
+      applyCloudBarDataLocally(cloudData)
+      return { synced: true, action: 'pulled', businessId: canonicalBizId }
+    }
+
+    // 2. Si se pidió forzar subida (forcePush)
+    if (options?.forcePush) {
+      const ok = await saveCloudBarData(canonicalBizId, localData, allMatchedBizIds)
+      return { synced: ok, action: ok ? 'pushed' : 'offline', businessId: canonicalBizId }
+    }
+
+    // 3. Si en la nube NO hay datos aún o está en blanco (score <= 20), y este equipo (ej. el Portátil) SÍ tiene productos/datos (score > 20):
+    //    -> SUBIR inmediatamente todos los datos del Portátil a la nube
+    if (!cloudData || (localScore > 20 && cloudScore <= 20)) {
+      if (localScore > 0 || !cloudData) {
+        const ok = await saveCloudBarData(canonicalBizId, localData, allMatchedBizIds)
+        return { synced: ok, action: ok ? 'pushed' : 'offline', businessId: canonicalBizId }
+      }
+      return { synced: true, action: 'up-to-date', businessId: canonicalBizId }
+    }
+
+    // 4. Si este equipo (ej. el PC de Mesa recién abierto) está vacío/básico (score <= 20) y la nube SÍ tiene los datos del Portátil (score > 20):
+    //    -> DESCARGAR inmediatamente todos los datos de la nube al PC de Mesa
+    if (cloudScore > 20 && localScore <= 20) {
+      applyCloudBarDataLocally(cloudData)
+      return { synced: true, action: 'pulled', businessId: canonicalBizId }
+    }
+
+    // 5. Si AMBOS tienen datos reales (localScore > 20 y cloudScore > 20):
+    //    Comparar timestamps updatedAt o nivel de completitud
+    const localTime = localData.updatedAt ? new Date(localData.updatedAt).getTime() : 0
+    const cloudTime = cloudData.updatedAt
+      ? new Date(cloudData.updatedAt).getTime()
+      : resolved.cloudUpdatedAt
+      ? new Date(resolved.cloudUpdatedAt).getTime()
+      : 0
+
+    // Si los datos locales del portátil aún no tenían timestamp updatedAt pero tienen más productos/movimientos que la nube, subirlos
+    if (!localData.updatedAt && localScore > cloudScore) {
+      const ok = await saveCloudBarData(canonicalBizId, localData, allMatchedBizIds)
+      return { synced: ok, action: ok ? 'pushed' : 'offline', businessId: canonicalBizId }
+    }
+
+    // Si la nube tiene más productos/movimientos y el local no tiene timestamp más reciente, o si la nube fue actualizada después
+    if (cloudTime > localTime + 1500 || (!localData.updatedAt && cloudScore > localScore)) {
+      const cloudStr = JSON.stringify(cloudData)
+      const localStr = JSON.stringify(localData)
+      if (cloudStr !== localStr) {
+        applyCloudBarDataLocally(cloudData)
+        return { synced: true, action: 'pulled', businessId: canonicalBizId }
+      }
+      return { synced: true, action: 'up-to-date', businessId: canonicalBizId }
+    }
+
+    // Si el dispositivo local fue actualizado más recientemente que la nube (o hay cuentas duplicadas por espejar), subir a la nube
+    if (localTime > cloudTime + 1500 || (localScore > cloudScore && localTime >= cloudTime)) {
+      const ok = await saveCloudBarData(canonicalBizId, localData, allMatchedBizIds)
+      return { synced: ok, action: ok ? 'pushed' : 'offline', businessId: canonicalBizId }
+    }
+
+    return { synced: true, action: 'up-to-date', businessId: canonicalBizId }
+  } catch (err) {
+    console.warn('Error en smartSyncWithCloud:', err)
+    return { synced: false, action: 'offline' }
+  } finally {
+    isSyncingInProgress = false
+  }
+}
+
+// Sincronizar datos del bar desde la nube (compatible con llamadas existentes)
+export async function syncCloudBarData(): Promise<boolean> {
+  const res = await smartSyncWithCloud()
+  return res.synced
 }
 
 export function addProductItem(item: Omit<ProductState, 'id'>): ProductState {
