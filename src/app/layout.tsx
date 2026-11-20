@@ -124,6 +124,13 @@ export default function RootLayout({
           if (parsedEvt && parsedEvt.event === 'message') {
             const incomingSnap = await parseNtfyEventSnapshot(parsedEvt)
             if (incomingSnap && incomingSnap.barData) {
+              const localProdCount = barData.products?.length || 0
+              const incomingProdCount = incomingSnap.barData.products?.length || 0
+              // Protección crítica: nunca permitir que un evento SSE con 0 productos borre un catálogo local con productos
+              if (localProdCount > 0 && incomingProdCount === 0) {
+                return
+              }
+
               const localScore = calculateBarDataRichness(barData)
               const incomingScore = calculateBarDataRichness(incomingSnap.barData)
               const localTime = barData.updatedAt ? new Date(barData.updatedAt).getTime() : 0
@@ -132,8 +139,10 @@ export default function RootLayout({
                 : 0
 
               if (
-                (incomingScore > 20 && localScore <= 20) ||
-                incomingTime > localTime + 1000
+                incomingProdCount > 0 &&
+                ((incomingScore > 20 && localScore <= 20) ||
+                  localProdCount === 0 ||
+                  incomingTime > localTime + 1000)
               ) {
                 applyFullCloudSnapshotLocally(incomingSnap, true)
                 setCloudStatus('synced')

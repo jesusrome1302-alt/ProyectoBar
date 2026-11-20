@@ -98,9 +98,12 @@ export function getBarUsers(): AuthUser[] {
     if (raw) {
       const parsed = JSON.parse(raw) as AuthUser[]
       if (Array.isArray(parsed) && parsed.length > 0) {
+        const cleanedParsed = parsed.filter(
+          (u) => !(u.id.startsWith('custom-') && (u.email.includes('@gmail.com@') || u.name.includes('@')))
+        )
         if (isCustomBar) {
           // Filtrar estrictamente cualquier usuario residual de demostración de Rock Bar
-          const filtered = parsed.filter(
+          const filtered = cleanedParsed.filter(
             (u) => !['user-owner-1', 'user-admin-1', 'user-staff-1'].includes(u.id)
           )
           if (filtered.length > 0) {
@@ -117,7 +120,9 @@ export function getBarUsers(): AuthUser[] {
             return [currentSession]
           }
         }
-        return parsed
+        if (cleanedParsed.length > 0) {
+          return cleanedParsed
+        }
       }
     }
 
@@ -215,6 +220,18 @@ export function getAuthState(): AuthState {
     cachedRaw = raw
     const parsed = JSON.parse(raw) as AuthState
     if (parsed && parsed.user) {
+      const roleBarMatch =
+        typeof parsed.user.roleTitle === 'string' ? parsed.user.roleTitle.match(/\(([^)]+)\)/) : null
+      if (
+        roleBarMatch &&
+        roleBarMatch[1] &&
+        (!parsed.user.barName || parsed.user.barName === 'ROCK BAR')
+      ) {
+        parsed.user.barName = roleBarMatch[1]
+        const fixedRaw = JSON.stringify(parsed)
+        cachedRaw = fixedRaw
+        localStorage.setItem(AUTH_STORAGE_KEY, fixedRaw)
+      }
       currentAuthState = parsed
       return currentAuthState
     }

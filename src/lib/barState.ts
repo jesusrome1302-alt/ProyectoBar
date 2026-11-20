@@ -524,6 +524,63 @@ let cachedData: BarData = DEFAULT_BAR_DATA
 let cachedRaw: string | null = null
 const listeners = new Set<() => void>()
 
+// Catálogo y descuento de respaldo del propietario (Yisus Bar - Jesus Arias) si el estado local fue sobrescrito en vacío
+const YISUS_BAR_RECOVERY_PRODUCTS: ProductState[] = [
+  { id: 'yisus-prod-1', name: 'AGUILA LIGTH 750ML', category: 'Cervezas', price: 9000, cost: 4500, stock: 50, stock_nevera: 50, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-100001', active: true },
+  { id: 'yisus-prod-2', name: 'Club Colombia Trigo', category: 'Cervezas', price: 7000, cost: 3800, stock: 38, stock_nevera: 38, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-100002', active: true },
+  { id: 'yisus-prod-3', name: 'Soda Hatsu', category: 'Sin Alcohol', price: 7000, cost: 3500, stock: 7, stock_nevera: 7, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-100003', active: true },
+  { id: 'yisus-prod-4', name: 'Agua', category: 'Sin Alcohol', price: 4000, cost: 1800, stock: 6, stock_nevera: 6, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-100004', active: true },
+  { id: 'yisus-prod-5', name: 'Cigarros', category: 'Sin Alcohol', price: 1500, cost: 800, stock: 14, stock_nevera: 0, stock_bodega: 14, min_stock_nevera: 0, min_stock: 10, barcode: 'SKU-100005', active: true },
+  { id: 'yisus-prod-6', name: 'CERVEZA AGUILA 750 ML', category: 'Cervezas', price: 9000, cost: 4500, stock: 41, stock_nevera: 41, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-100006', active: true },
+  { id: 'yisus-prod-7', name: 'Club colombia', category: 'Cervezas', price: 10000, cost: 5000, stock: 43, stock_nevera: 43, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-100007', active: true },
+  { id: 'yisus-prod-8', name: 'POKER 750ml', category: 'Cervezas', price: 9000, cost: 4500, stock: 45, stock_nevera: 45, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-100008', active: true },
+  { id: 'yisus-prod-9', name: 'COVER', category: 'Sin Alcohol', price: 5000, cost: 0, stock: 50, stock_nevera: 0, stock_bodega: 50, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-893530', active: true },
+  { id: 'yisus-prod-10', name: 'CERVEZA AGUILA LATA', category: 'Cervezas', price: 4500, cost: 0, stock: 4, stock_nevera: 4, stock_bodega: 0, min_stock_nevera: 6, min_stock: 10, barcode: 'SKU-775974', active: true },
+]
+
+const YISUS_BAR_RECOVERY_DISCOUNT: DiscountRuleState = {
+  id: 'disc-yisus-happy-hour',
+  name: 'HAPPY HOUR',
+  description: 'Happy Hour de $ 1.500 por unidad (Rock Bar & Pub)',
+  type: 'fixed_off',
+  value: 1500,
+  scope: 'category',
+  categoryName: 'Cervezas',
+  isHappyHour: true,
+  startTime: '19:00',
+  endTime: '22:00',
+  days: ['Jue', 'Vie', 'Mié', 'Mar'],
+  businessTypeTag: 'Rock Bar & Pub',
+  isPreset: false,
+  active: true,
+}
+
+function getActiveAuthInfo(): { email?: string; businessId?: string; barName?: string; name?: string } {
+  if (typeof window === 'undefined') return {}
+  try {
+    const authRaw = localStorage.getItem('ROCK_BAR_AUTH_SESSION_V1')
+    if (!authRaw) return {}
+    const auth = JSON.parse(authRaw)
+    const u = auth?.user
+    if (!u) return {}
+    const roleMatch = typeof u.roleTitle === 'string' ? u.roleTitle.match(/\(([^)]+)\)/) : null
+    const inferredBarName =
+      u.barName && u.barName !== 'ROCK BAR'
+        ? u.barName
+        : roleMatch && roleMatch[1]
+        ? roleMatch[1]
+        : u.barName
+    return {
+      email: u.email?.toLowerCase(),
+      businessId: u.businessId,
+      barName: inferredBarName,
+      name: u.name,
+    }
+  } catch {
+    return {}
+  }
+}
+
 export function loadBarData(): BarData {
   if (typeof window === 'undefined') return DEFAULT_BAR_DATA
   try {
@@ -582,6 +639,78 @@ export function loadBarData(): BarData {
       }
     }
 
+    // Recuperación automática desde backup local por usuario o restauración de Yisus Bar si un estado vacío lo sobrescribió
+    const authInfo = getActiveAuthInfo()
+    let wasRecovered = false
+
+    if (parsed.products.length === 0) {
+      const backupKey = authInfo.businessId
+        ? `ROCK_BAR_USER_BACKUP_${authInfo.businessId}`
+        : authInfo.email
+        ? `ROCK_BAR_USER_BACKUP_${authInfo.email}`
+        : null
+      if (backupKey) {
+        try {
+          const backupRaw = localStorage.getItem(backupKey)
+          if (backupRaw) {
+            const backupData = JSON.parse(backupRaw) as BarData
+            if (backupData.products && backupData.products.length > 0) {
+              parsed.products = backupData.products
+              if (backupData.categories && backupData.categories.length > 0) parsed.categories = backupData.categories
+              if (backupData.discounts && backupData.discounts.length > 0) parsed.discounts = backupData.discounts
+              if (backupData.promotions && backupData.promotions.length > 0) parsed.promotions = backupData.promotions
+              if (backupData.inventoryMovements && backupData.inventoryMovements.length > 0) {
+                parsed.inventoryMovements = backupData.inventoryMovements
+              }
+              if (backupData.settings) parsed.settings = { ...parsed.settings, ...backupData.settings }
+              if (backupData.operatorName && backupData.operatorName !== 'Administrador') {
+                parsed.operatorName = backupData.operatorName
+              }
+              wasRecovered = true
+            }
+          }
+        } catch {
+          // Ignorar error de lectura de backup
+        }
+      }
+
+      const isYisusOwner =
+        authInfo.email === 'jesusrome1302@gmail.com' ||
+        authInfo.businessId === '2151228e-d35e-470a-930f-59ca9b79f8bd' ||
+        authInfo.barName?.toLowerCase().includes('yisus')
+      const explicitlyCleared = localStorage.getItem('ROCK_BAR_YISUS_RESTORED_V1') === 'manual_empty'
+
+      if (parsed.products.length === 0 && isYisusOwner && !explicitlyCleared) {
+        parsed.products = [...YISUS_BAR_RECOVERY_PRODUCTS]
+        parsed.operatorName = authInfo.name || 'Jesus Arias'
+        parsed.settings = {
+          ...parsed.settings,
+          barName: 'Yisus Bar',
+          phone: '3028333402',
+          address: 'Cúcuta',
+          footerText: '¡Gracias por tu visita a Yisus Bar! Vuelve pronto.',
+        }
+        if (!parsed.discounts.some((d) => d.name.toUpperCase() === 'HAPPY HOUR')) {
+          parsed.discounts = [...parsed.discounts, YISUS_BAR_RECOVERY_DISCOUNT]
+        }
+        // Resetear updatedAt a 0 para que si en el Cloud Relay está el snapshot más reciente con productos/foto del portátil, lo descargue encima
+        parsed.updatedAt = undefined
+        wasRecovered = true
+      }
+    }
+
+    if (
+      authInfo.barName &&
+      authInfo.barName !== 'ROCK BAR' &&
+      (!parsed.settings.barName || parsed.settings.barName === 'ROCK BAR')
+    ) {
+      parsed.settings.barName = authInfo.barName
+      if (parsed.operatorName === 'Administrador' && authInfo.name) {
+        parsed.operatorName = authInfo.name
+      }
+      wasRecovered = true
+    }
+
     // Normalizar inventario dual (nevera y bodega) si faltan propiedades
     if (parsed.products && Array.isArray(parsed.products)) {
       parsed.products = parsed.products.map((p: ProductState) => {
@@ -606,36 +735,6 @@ export function loadBarData(): BarData {
           min_stock_nevera: minNev,
         }
       })
-    }
-
-    // Si el establecimiento fue registrado por un usuario comercial y aún tiene órdenes o movimientos residuales del mock viejo, limpiar a 0
-    if (parsed.settings?.barName && parsed.settings.barName !== 'ROCK BAR') {
-      const hasOldMockOrders = parsed.tables?.some(t => t.items?.some(i => i.productId === 'prod-8' || i.productId === 'prod-15'))
-      if (hasOldMockOrders) {
-        parsed.tables = Array.from({ length: 8 }, (_, idx) => ({
-          id: idx + 1,
-          name: `Mesa ${idx + 1}`,
-          capacity: 4,
-          status: 'available',
-          operator: parsed.operatorName || 'Personal',
-          items: [],
-          payments: [],
-          total: 0,
-          paid: 0,
-          pending: 0,
-        }))
-        parsed.movements = []
-        parsed.cash = {
-          initialCash: 0,
-          cashSales: 0,
-          electronicSales: 0,
-          expenses: 0,
-          expectedCash: 0,
-          status: 'closed',
-          openedAt: '',
-        }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
-      }
     }
 
     // Normalizar mesas para evitar ítems duplicados con el mismo productId o residuos al cerrar/abrir mesa
@@ -682,6 +781,12 @@ export function loadBarData(): BarData {
           pending: Math.max(0, cleanTotal - cleanPaid),
         }
       })
+    }
+
+    if (wasRecovered) {
+      const recoveredStr = JSON.stringify(parsed)
+      cachedRaw = recoveredStr
+      localStorage.setItem(STORAGE_KEY, recoveredStr)
     }
 
     cachedData = parsed
@@ -862,7 +967,7 @@ export function applyFullCloudSnapshotLocally(
 
 let relayPushTimer: ReturnType<typeof setTimeout> | null = null
 
-// Programar subida automática del snapshot completo al Cloud Relay (con debounce de 700ms para agrupar clics rápidos)
+// Programar subida automática del snapshot completo al Cloud Relay (con debounce de 700ms y bloqueo de estados vacíos sin productos)
 export function scheduleCloudRelayPush(): void {
   if (typeof window === 'undefined') return
   if (relayPushTimer) {
@@ -870,20 +975,59 @@ export function scheduleCloudRelayPush(): void {
   }
   relayPushTimer = setTimeout(() => {
     const snap = buildLocalFullSnapshot()
-    if (snap && snap.richnessScore > 0) {
+    // NUNCA subir automáticamente un snapshot con 0 productos y nombre ROCK BAR por defecto para no contaminar el Cloud Relay
+    const hasProducts = (snap?.barData?.products?.length || 0) > 0
+    const hasCustomBar =
+      Boolean(snap?.barData?.settings?.barName) &&
+      snap?.barData?.settings?.barName?.trim().toUpperCase() !== 'ROCK BAR'
+    if (snap && snap.richnessScore > 20 && (hasProducts || hasCustomBar)) {
       pushCloudRelaySnapshot(snap).catch(() => {})
     }
   }, 700)
 }
 
-// Aplicar datos provenientes de la nube localmente sin disparar un guardado redundante de regreso a Supabase
+// Aplicar datos provenientes de la nube localmente sin disparar un guardado redundante (protegiendo productos locales contra estados vacíos)
 export function applyCloudBarDataLocally(cloudData: BarData): void {
   if (typeof window === 'undefined' || !cloudData) return
   try {
-    const str = JSON.stringify(cloudData)
+    const currentLocal = cachedData
+    const localProdCount = currentLocal?.products?.length || 0
+    const cloudProdCount = cloudData.products?.length || 0
+
+    // Si localmente tenemos productos y el paquete entrante de la nube viene con 0 productos, NO permitir que borre el catálogo local
+    if (localProdCount > 0 && cloudProdCount === 0) {
+      return
+    }
+
+    const safeData: BarData = {
+      ...cloudData,
+      settings: {
+        ...DEFAULT_SETTINGS,
+        ...(currentLocal?.settings || {}),
+        ...(cloudData.settings || {}),
+        barName:
+          cloudData.settings?.barName && cloudData.settings.barName !== 'ROCK BAR'
+            ? cloudData.settings.barName
+            : currentLocal?.settings?.barName && currentLocal.settings.barName !== 'ROCK BAR'
+            ? currentLocal.settings.barName
+            : getActiveAuthInfo().barName || 'ROCK BAR',
+      },
+    }
+
+    const str = JSON.stringify(safeData)
     cachedRaw = str
     cachedData = JSON.parse(str)
     localStorage.setItem(STORAGE_KEY, str)
+
+    const authInfo = getActiveAuthInfo()
+    if (cloudProdCount > 0) {
+      if (authInfo.businessId) {
+        localStorage.setItem(`ROCK_BAR_USER_BACKUP_${authInfo.businessId}`, str)
+      }
+      if (authInfo.email) {
+        localStorage.setItem(`ROCK_BAR_USER_BACKUP_${authInfo.email}`, str)
+      }
+    }
 
     // Sincronizar también la foto/logo y el nombre del bar en la sesión del usuario activo en este navegador
     try {
@@ -951,6 +1095,17 @@ export function saveBarData(data: BarData): void {
     // Clonación para garantizar nueva identidad de objeto y disparo inmediato en useSyncExternalStore
     cachedData = JSON.parse(str)
     localStorage.setItem(STORAGE_KEY, str)
+
+    // Respaldo aislado por usuario cuando tiene productos reales
+    const authInfo = getActiveAuthInfo()
+    if (data.products && data.products.length > 0) {
+      if (authInfo.businessId) {
+        localStorage.setItem(`ROCK_BAR_USER_BACKUP_${authInfo.businessId}`, str)
+      }
+      if (authInfo.email) {
+        localStorage.setItem(`ROCK_BAR_USER_BACKUP_${authInfo.email}`, str)
+      }
+    }
 
     // Notificación sincrónica a componentes React
     listeners.forEach((listener) => {
@@ -1045,12 +1200,18 @@ export async function smartSyncWithCloud(options?: {
       })),
     ])
 
+    const relayProductsCount = relaySnapshot?.barData?.products?.length || 0
+    const supaProductsCount = supaResolved.cloudBarData?.products?.length || 0
     const relayScore = calculateBarDataRichness(relaySnapshot?.barData)
     const supaScore = calculateBarDataRichness(supaResolved.cloudBarData)
 
-    // Elegir la fuente en la nube más completa y reciente (Cloud Relay vs Supabase)
+    // Elegir la fuente en la nube más completa y reciente (priorizando siempre la que tenga productos reales)
     let bestCloudSnapshot: FullBarCloudSnapshot | null = relaySnapshot
-    if (supaResolved.cloudBarData && supaScore > relayScore) {
+    if (
+      supaResolved.cloudBarData &&
+      ((supaProductsCount > 0 && relayProductsCount === 0) ||
+        (supaProductsCount >= relayProductsCount && supaScore > relayScore))
+    ) {
       bestCloudSnapshot = {
         version: 3,
         updatedAt:
@@ -1068,10 +1229,12 @@ export async function smartSyncWithCloud(options?: {
     }
 
     const cloudScore = calculateBarDataRichness(bestCloudSnapshot?.barData)
+    const localProdCount = localData.products?.length || 0
+    const cloudProdCount = bestCloudSnapshot?.barData?.products?.length || 0
 
     // 3. Si el usuario solicitó explícitamente TRAER TODO desde la nube a este PC (Nube -> PC de Mesa)
     if (options?.forcePull) {
-      if (bestCloudSnapshot && bestCloudSnapshot.barData) {
+      if (bestCloudSnapshot && bestCloudSnapshot.barData && (cloudProdCount > 0 || localProdCount === 0)) {
         applyFullCloudSnapshotLocally(bestCloudSnapshot, true)
         return {
           synced: true,
@@ -1087,10 +1250,10 @@ export async function smartSyncWithCloud(options?: {
     }
 
     // 4. Modo Automático Inteligente:
-    // Caso A: En la nube aún no hay datos reales (cloudScore <= 20) y este equipo (ej. el Portátil) SÍ tiene datos reales (localScore > 20)
-    // -> SUBIR inmediatamente TODO el estado del Portátil a la nube
-    if (!bestCloudSnapshot || (localScore > 20 && cloudScore <= 20)) {
-      if (localScore > 0 || !bestCloudSnapshot) {
+    // Caso A: En la nube NO hay productos (cloudProdCount === 0) y este equipo SÍ tiene productos (localProdCount > 0)
+    // -> SUBIR inmediatamente TODO el estado local a la nube (y NUNCA descargar el estado vacío de la nube)
+    if (!bestCloudSnapshot || (localProdCount > 0 && cloudProdCount === 0) || (localScore > 20 && cloudScore <= 20)) {
+      if (localProdCount > 0 || !bestCloudSnapshot) {
         const relayOk = await pushCloudRelaySnapshot(localSnapshot)
         const supaOk = await saveCloudBarData(
           localSnapshot.businessId,
@@ -1110,9 +1273,13 @@ export async function smartSyncWithCloud(options?: {
       }
     }
 
-    // Caso B: Este equipo (ej. el PC de Mesa) está en blanco/básico (localScore <= 20) y la nube SÍ tiene los datos del Portátil (cloudScore > 20)
-    // -> DESCARGAR inmediatamente TODO el estado de la nube al PC de Mesa
-    if (cloudScore > 20 && localScore <= 20 && bestCloudSnapshot) {
+    // Caso B: Este equipo no tiene productos (o tiene los de recuperación sin updatedAt) y la nube SÍ tiene el snapshot con productos del Portátil
+    // -> DESCARGAR inmediatamente TODO el estado de la nube
+    if (
+      bestCloudSnapshot &&
+      cloudProdCount > 0 &&
+      (localProdCount === 0 || localScore <= 20 || !localData.updatedAt)
+    ) {
       applyFullCloudSnapshotLocally(bestCloudSnapshot, true)
       return {
         synced: true,
@@ -1121,7 +1288,7 @@ export async function smartSyncWithCloud(options?: {
       }
     }
 
-    // Caso C: Ambos equipos ya tienen datos reales (localScore > 20 y cloudScore > 20)
+    // Caso C: Ambos equipos ya tienen productos reales (localProdCount > 0 y cloudProdCount > 0)
     // Comparar timestamps updatedAt y nivel de riqueza
     const localTime = localData.updatedAt
       ? new Date(localData.updatedAt).getTime()
@@ -1130,7 +1297,10 @@ export async function smartSyncWithCloud(options?: {
       ? new Date(bestCloudSnapshot.updatedAt).getTime()
       : 0
 
-    if (cloudTime > localTime + 1500 || (cloudScore > localScore && localTime <= cloudTime)) {
+    if (
+      cloudProdCount > 0 &&
+      (cloudTime > localTime + 1500 || (cloudScore > localScore && localTime <= cloudTime))
+    ) {
       const cloudStr = JSON.stringify(bestCloudSnapshot.barData)
       const localStr = JSON.stringify(localData)
       if (cloudStr !== localStr) {

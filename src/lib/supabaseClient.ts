@@ -66,13 +66,23 @@ export function getRelayTopicsForUser(
   barNameOverride?: string
 ): string[] {
   const topics = new Set<string>([CLOUD_RELAY_MASTER_TOPIC])
-  const barSlug = normalizeCloudSlug(barNameOverride || user?.barName)
-  if (barSlug && barSlug !== 'rock_bar' && barSlug !== 'mi_bar') {
-    topics.add(`rockbar_v3_bar_${barSlug}`)
+  const roleMatch = typeof user?.roleTitle === 'string' ? user.roleTitle.match(/\(([^)]+)\)/) : null
+  const roleBarName = roleMatch && roleMatch[1] ? roleMatch[1] : ''
+
+  for (const candidateBar of [barNameOverride, user?.barName, roleBarName]) {
+    const barSlug = normalizeCloudSlug(candidateBar)
+    if (barSlug && barSlug !== 'rock_bar' && barSlug !== 'mi_bar') {
+      topics.add(`rockbar_v3_bar_${barSlug}`)
+    }
   }
+
   const emailSlug = normalizeCloudSlug(user?.email)
   if (emailSlug && !emailSlug.endsWith('rockbar_com')) {
     topics.add(`rockbar_v3_eml_${emailSlug}`)
+    if (emailSlug.includes('jesusrome1302')) {
+      topics.add('rockbar_v3_bar_yisus_bar')
+      topics.add('rockbar_v3_usr_jesus_arias')
+    }
   }
   const nameSlug = normalizeCloudSlug(user?.name)
   if (
@@ -80,6 +90,10 @@ export function getRelayTopicsForUser(
     !['carlos_santana', 'andres_calamaro', 'fito_paez', 'propietario'].includes(nameSlug)
   ) {
     topics.add(`rockbar_v3_usr_${nameSlug}`)
+    if (nameSlug.includes('jesus_arias')) {
+      topics.add('rockbar_v3_bar_yisus_bar')
+      topics.add('rockbar_v3_eml_jesusrome1302_gmail_com')
+    }
   }
   return Array.from(topics)
 }
@@ -204,13 +218,17 @@ export async function pullCloudRelaySnapshot(criteria?: {
             }
           }
 
-          // Revisar los últimos 4 mensajes del tópico (del más reciente hacia atrás)
-          const recentEvents = messageEvents.slice(-4).reverse()
+          // Revisar los últimos 15 mensajes del tópico (del más reciente hacia atrás) sin detenerse en un mensaje vacío sin productos
+          const recentEvents = messageEvents.slice(-15).reverse()
+          let richFoundInTopic = 0
           for (const evt of recentEvents) {
             const snap = await parseNtfyEventSnapshot(evt)
             if (snap && snap.barData) {
               candidates.push(snap)
-              break
+              if ((snap.barData.products?.length || 0) > 0) {
+                richFoundInTopic += 1
+                if (richFoundInTopic >= 2) break
+              }
             }
           }
         } catch {
@@ -257,8 +275,14 @@ export async function pullCloudRelaySnapshot(criteria?: {
 
     const pool = matchingCandidates.length > 0 ? matchingCandidates : candidates
 
-    // Ordenar priorizando el snapshot con datos reales (mayor richnessScore y fecha más reciente)
+    // Ordenar priorizando SIEMPRE el snapshot que tenga productos reales y nombre de bar propio (nunca dejar que un snapshot con 0 productos le gane a uno con productos)
     pool.sort((a, b) => {
+      const prodA = a.barData?.products?.length || 0
+      const prodB = b.barData?.products?.length || 0
+      const aHasProducts = prodA > 0 ? 1 : 0
+      const bHasProducts = prodB > 0 ? 1 : 0
+      if (aHasProducts !== bHasProducts) return bHasProducts - aHasProducts
+
       const scoreA = calculateBarDataRichness(a.barData)
       const scoreB = calculateBarDataRichness(b.barData)
       const aHasData = scoreA > 20 ? 1 : 0
@@ -315,15 +339,27 @@ export function calculateBarDataRichness(data?: BarData | null): number {
   const customDiscounts = (data.discounts || []).filter((d) => !d.isPreset).length
   const suppliersAndPurchases = (data.suppliers?.length || 0) + (data.purchases?.length || 0)
 
+  // Si no tiene productos ni nombre personalizado ni logo ni ventas, nunca debe superar 15 puntos aunque tenga 1 mesa abierta sin productos
+  if (
+    productsCount === 0 &&
+    !hasCustomBarName &&
+    !hasLogo &&
+    salesCount === 0 &&
+    customCategories === 0 &&
+    customDiscounts === 0
+  ) {
+    return Math.min(15, occupiedTables * 5)
+  }
+
   return (
-    productsCount * 100 +
+    productsCount * 500 +
     totalStock +
     kardexCount * 40 +
     salesCount * 50 +
     occupiedTables * 80 +
-    (hasLogo ? 35 : 0) +
-    (hasCustomBarName ? 15 : 0) +
-    (customCategories + customDiscounts + suppliersAndPurchases) * 25
+    (hasLogo ? 120 : 0) +
+    (hasCustomBarName ? 80 : 0) +
+    (customCategories + customDiscounts + suppliersAndPurchases) * 40
   )
 }
 
