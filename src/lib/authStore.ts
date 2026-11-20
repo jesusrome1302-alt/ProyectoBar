@@ -4,6 +4,8 @@ import {
   loadBarData,
   DEFAULT_BAR_DATA,
   applyCloudBarDataLocally,
+  applyFullCloudSnapshotLocally,
+  scheduleCloudRelayPush,
   smartSyncWithCloud,
 } from '@/lib/barState'
 import {
@@ -131,12 +133,13 @@ export function getBarUsers(): AuthUser[] {
   return []
 }
 
-// Guardar lista de usuarios aislada del bar
+// Guardar lista de usuarios aislada del bar (y sincronizar al Cloud Relay)
 export function saveBarUsers(users: AuthUser[]): void {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users))
       window.dispatchEvent(new Event('rock_bar_users_updated'))
+      scheduleCloudRelayPush()
     } catch (err) {
       console.error('Error guardando usuarios del bar:', err)
     }
@@ -372,8 +375,10 @@ export async function loginWithCredentials(
         isAuthenticated: true,
       })
 
-      // Si la nube ya devolvió el snapshot de bar_data del otro computador (portátil), aplicarlo de inmediato antes de entrar
-      if (cloudRes.barData) {
+      // Si la nube devolvió el snapshot COMPLETO (Perfil, Usuarios, Mesas, Comandas, Caja, Productos, Kardex, Configuración y Foto), aplicarlo todo de inmediato
+      if (cloudRes.snapshot) {
+        applyFullCloudSnapshotLocally(cloudRes.snapshot, true)
+      } else if (cloudRes.barData) {
         applyCloudBarDataLocally(cloudRes.barData)
       } else {
         await smartSyncWithCloud()

@@ -36,6 +36,248 @@ export interface CloudTeamMember {
   created_at?: string
 }
 
+export interface FullBarCloudSnapshot {
+  version: number
+  updatedAt: string
+  richnessScore: number
+  businessId: string
+  ownerUser: AuthUser
+  barUsers: AuthUser[]
+  barData: BarData
+  deletedAccounts?: DeletedCloudAccountRecord[]
+}
+
+export const CLOUD_RELAY_MASTER_TOPIC = 'rockbar_proyectobar_master_v3'
+
+export function normalizeCloudSlug(value?: string | null): string {
+  if (!value) return ''
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 42)
+}
+
+export function getRelayTopicsForUser(
+  user?: Partial<AuthUser> | null,
+  barNameOverride?: string
+): string[] {
+  const topics = new Set<string>([CLOUD_RELAY_MASTER_TOPIC])
+  const barSlug = normalizeCloudSlug(barNameOverride || user?.barName)
+  if (barSlug && barSlug !== 'rock_bar' && barSlug !== 'mi_bar') {
+    topics.add(`rockbar_v3_bar_${barSlug}`)
+  }
+  const emailSlug = normalizeCloudSlug(user?.email)
+  if (emailSlug && !emailSlug.endsWith('rockbar_com')) {
+    topics.add(`rockbar_v3_eml_${emailSlug}`)
+  }
+  const nameSlug = normalizeCloudSlug(user?.name)
+  if (
+    nameSlug &&
+    !['carlos_santana', 'andres_calamaro', 'fito_paez', 'propietario'].includes(nameSlug)
+  ) {
+    topics.add(`rockbar_v3_usr_${nameSlug}`)
+  }
+  return Array.from(topics)
+}
+
+interface NtfyEventLine {
+  id?: string
+  time?: number
+  event?: string
+  topic?: string
+  message?: string
+  attachment?: {
+    name?: string
+    url?: string
+  }
+}
+
+// Parsear un evento individual de ntfy (ya sea texto directo o archivo JSON adjunto)
+export async function parseNtfyEventSnapshot(
+  evt: NtfyEventLine
+): Promise<FullBarCloudSnapshot | null> {
+  try {
+    if (evt.attachment?.url) {
+      const res = await fetch(evt.attachment.url, { cache: 'no-store' })
+      if (!res.ok) return null
+      const parsed = (await res.json()) as FullBarCloudSnapshot
+      if (parsed && parsed.barData && parsed.ownerUser) {
+        return parsed
+      }
+    } else if (evt.message && evt.message.trim().startsWith('{')) {
+      const parsed = JSON.parse(evt.message) as FullBarCloudSnapshot
+      if (parsed && parsed.barData && parsed.ownerUser) {
+        return parsed
+      }
+    }
+  } catch {
+    // Ignorar mensaje malformado
+  }
+  return null
+}
+
+// Subir el snapshot COMPLETO del bar (Productos, Mesas, Comandas, Caja, Kardex, Usuarios, Descuentos, Configuración y Foto) al Cloud Relay siempre activo
+export async function pushCloudRelaySnapshot(
+  snapshot: FullBarCloudSnapshot
+): Promise<boolean> {
+  try {
+    const body = JSON.stringify(snapshot)
+    const topics = getRelayTopicsForUser(
+      snapshot.ownerUser,
+      snapshot.barData?.settings?.barName || snapshot.ownerUser?.barName
+    )
+
+    let anyOk = false
+    await Promise.all(
+      topics.map(async (topic) => {
+        try {
+          const res = await fetch(`https://ntfy.sh/${topic}`, {
+            method: 'PUT',
+            headers: {
+              Filename: 'bar_full_snapshot.json',
+            },
+            body,
+          })
+          if (res.ok) {
+            anyOk = true
+          }
+        } catch {
+          // Ignorar error individual de tópico
+        }
+      })
+    )
+    return anyOk
+  } catch (err) {
+    console.warn('Error en pushCloudRelaySnapshot:', err)
+    return false
+  }
+}
+
+// Descargar el snapshot COMPLETO más reciente y rico del bar desde el Cloud Relay siempre activo
+export async function pullCloudRelaySnapshot(criteria?: {
+  email?: string
+  barName?: string
+  userName?: string
+  businessId?: string
+  allowAnyIfEmpty?: boolean
+}): Promise<FullBarCloudSnapshot | null> {
+  try {
+    const topics = getRelayTopicsForUser(
+      {
+        email: criteria?.email,
+        name: criteria?.userName,
+        barName: criteria?.barName,
+      },
+      criteria?.barName
+    )
+
+    const candidates: FullBarCloudSnapshot[] = []
+
+    await Promise.all(
+      topics.map(async (topic) => {
+        try {
+          const res = await fetch(`https://ntfy.sh/${topic}/json?poll=1&since=all`, {
+            cache: 'no-store',
+          })
+          if (!res.ok) return
+          const raw = await res.text()
+          if (!raw || !raw.trim()) return
+
+          const lines = raw
+            .split('\n')
+            .map((l) => l.trim())
+            .filter((l) => l.length > 0)
+
+          const messageEvents: NtfyEventLine[] = []
+          for (const line of lines) {
+            try {
+              const evt = JSON.parse(line) as NtfyEventLine
+              if (evt && evt.event === 'message') {
+                messageEvents.push(evt)
+              }
+            } catch {
+              // Ignorar línea inválida
+            }
+          }
+
+          // Revisar los últimos 4 mensajes del tópico (del más reciente hacia atrás)
+          const recentEvents = messageEvents.slice(-4).reverse()
+          for (const evt of recentEvents) {
+            const snap = await parseNtfyEventSnapshot(evt)
+            if (snap && snap.barData) {
+              candidates.push(snap)
+              break
+            }
+          }
+        } catch {
+          // Ignorar fallo de tópico individual
+        }
+      })
+    )
+
+    if (candidates.length === 0) return null
+
+    const cleanEmail = normalizeCloudSlug(criteria?.email)
+    const cleanBar = normalizeCloudSlug(criteria?.barName)
+    const cleanUser = normalizeCloudSlug(criteria?.userName)
+
+    // Filtrar candidatos que coincidan con el usuario/bar actual (o permitir cualquiera si el PC de Mesa está en blanco)
+    const matchingCandidates = candidates.filter((snap) => {
+      const snapEmail = normalizeCloudSlug(snap.ownerUser?.email)
+      const snapBar = normalizeCloudSlug(
+        snap.barData?.settings?.barName || snap.ownerUser?.barName
+      )
+      const snapUser = normalizeCloudSlug(snap.ownerUser?.name || snap.barData?.operatorName)
+
+      if (criteria?.businessId && snap.businessId === criteria.businessId) return true
+      if (cleanEmail && !cleanEmail.endsWith('rockbar_com') && snapEmail === cleanEmail) return true
+      if (
+        cleanBar &&
+        cleanBar !== 'rock_bar' &&
+        cleanBar !== 'mi_bar' &&
+        snapBar &&
+        (snapBar === cleanBar || snapBar.includes(cleanBar) || cleanBar.includes(snapBar))
+      ) {
+        return true
+      }
+      if (
+        cleanUser &&
+        !['carlos_santana', 'andres_calamaro', 'fito_paez', 'propietario'].includes(cleanUser) &&
+        snapUser &&
+        (snapUser === cleanUser || snapUser.includes(cleanUser) || cleanUser.includes(snapUser))
+      ) {
+        return true
+      }
+      return Boolean(criteria?.allowAnyIfEmpty)
+    })
+
+    const pool = matchingCandidates.length > 0 ? matchingCandidates : candidates
+
+    // Ordenar priorizando el snapshot con datos reales (mayor richnessScore y fecha más reciente)
+    pool.sort((a, b) => {
+      const scoreA = calculateBarDataRichness(a.barData)
+      const scoreB = calculateBarDataRichness(b.barData)
+      const aHasData = scoreA > 20 ? 1 : 0
+      const bHasData = scoreB > 20 ? 1 : 0
+      if (aHasData !== bHasData) return bHasData - aHasData
+
+      const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+      const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
+      if (Math.abs(timeB - timeA) > 2000) return timeB - timeA
+      return scoreB - scoreA
+    })
+
+    return pool[0] || null
+  } catch (err) {
+    console.warn('Error en pullCloudRelaySnapshot:', err)
+    return null
+  }
+}
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function isValidUuid(value?: string | null): boolean {
@@ -379,12 +621,97 @@ export async function loginCloudAccount(
   user?: AuthUser
   businessId?: string
   barData?: BarData | null
+  snapshot?: FullBarCloudSnapshot | null
   error?: string
 }> {
-  try {
-    const cleanId = identifier.trim().toLowerCase()
-    const cleanPass = pinOrPass.trim()
+  const cleanId = identifier.trim().toLowerCase()
+  const cleanPass = pinOrPass.trim()
 
+  // PASO 1: Consultar primero el Cloud Relay siempre activo (funciona incluso si el proyecto gratuito de Supabase está en pausa)
+  try {
+    const relaySnap = await pullCloudRelaySnapshot({
+      email: cleanId.includes('@') ? cleanId : undefined,
+      barName: !cleanId.includes('@') ? cleanId : undefined,
+      userName: !cleanId.includes('@') ? cleanId : undefined,
+      allowAnyIfEmpty: true,
+    })
+
+    if (relaySnap && relaySnap.ownerUser) {
+      const allSnapUsers: AuthUser[] = [
+        relaySnap.ownerUser,
+        ...(Array.isArray(relaySnap.barUsers) ? relaySnap.barUsers : []),
+      ]
+      const uniqueUsersMap = new Map<string, AuthUser>()
+      for (const u of allSnapUsers) {
+        if (u && u.id) uniqueUsersMap.set(u.id, u)
+      }
+      const snapUsers = Array.from(uniqueUsersMap.values())
+
+      const matchedSnapUser = snapUsers.find((u) => {
+        const uEmail = (u.email || '').trim().toLowerCase()
+        const uName = (u.name || '').trim().toLowerCase()
+        const uBar = (
+          u.barName ||
+          relaySnap.barData?.settings?.barName ||
+          relaySnap.ownerUser?.barName ||
+          ''
+        )
+          .trim()
+          .toLowerCase()
+        const uPin = (u.pin || '').trim()
+
+        const idMatches =
+          cleanId.length === 0 ||
+          uEmail === cleanId ||
+          uName.includes(cleanId) ||
+          cleanId.includes(uName) ||
+          (uBar.length > 0 && (uBar.includes(cleanId) || cleanId.includes(uBar)))
+
+        const passMatches = cleanPass.length === 0 || uPin === cleanPass
+
+        if (cleanId.length > 0 && cleanPass.length > 0) return idMatches && passMatches
+        if (cleanId.length === 0 && cleanPass.length > 0) return passMatches
+        if (cleanId.length > 0 && cleanPass.length === 0) return idMatches
+        return false
+      })
+
+      if (matchedSnapUser) {
+        const effectiveBarName =
+          relaySnap.barData?.settings?.barName ||
+          matchedSnapUser.barName ||
+          relaySnap.ownerUser.barName ||
+          'MI BAR'
+        const effectivePhoto =
+          relaySnap.barData?.settings?.logoUrl ||
+          matchedSnapUser.photoUrl ||
+          relaySnap.ownerUser.photoUrl
+
+        const enrichedUser: AuthUser = {
+          ...matchedSnapUser,
+          barName: effectiveBarName,
+          photoUrl: effectivePhoto,
+          businessId: relaySnap.businessId || matchedSnapUser.businessId,
+        }
+
+        return {
+          success: true,
+          user: enrichedUser,
+          businessId: enrichedUser.businessId,
+          barData: relaySnap.barData,
+          snapshot: {
+            ...relaySnap,
+            ownerUser:
+              enrichedUser.role === 'owner' ? enrichedUser : relaySnap.ownerUser,
+          },
+        }
+      }
+    }
+  } catch (relayErr) {
+    console.warn('Aviso al consultar Cloud Relay en login:', relayErr)
+  }
+
+  // PASO 2: Consultar Supabase (si el proyecto está activo)
+  try {
     // A. Consultar cuentas comerciales en public.bar_accounts y filtrar en memoria (evita errores de espacios en PostgREST .or)
     const { data: allAccounts, error: accError } = await supabase
       .from('bar_accounts')

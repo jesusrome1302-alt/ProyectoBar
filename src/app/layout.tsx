@@ -8,8 +8,8 @@ import Sidebar from '@/components/Sidebar'
 import MobileNav from '@/components/MobileNav'
 import { UserCheck, LogOut, Camera, Cloud, RefreshCw, CheckCircle2 } from 'lucide-react'
 import { useAuthStore, logout } from '@/lib/authStore'
-import { useBarStore, smartSyncWithCloud, applyCloudBarDataLocally, BarData } from '@/lib/barState'
-import { supabase, isValidUuid } from '@/lib/supabaseClient'
+import { useBarStore, smartSyncWithCloud, applyCloudBarDataLocally, applyFullCloudSnapshotLocally, BarData } from '@/lib/barState'
+import { supabase, isValidUuid, CLOUD_RELAY_MASTER_TOPIC, parseNtfyEventSnapshot, calculateBarDataRichness } from '@/lib/supabaseClient'
 import LoginPage from './login/page'
 import PhotoUploadModal from '@/components/PhotoUploadModal'
 import GlobalDialog from '@/components/GlobalDialog'
@@ -27,6 +27,7 @@ export default function RootLayout({
   const [showCloudMenu, setShowCloudMenu] = useState(false)
   const [cloudStatus, setCloudStatus] = useState<'idle' | 'syncing' | 'synced' | 'offline'>('idle')
   const [syncTooltip, setSyncTooltip] = useState<string>('Sincronizado en la nube')
+  const [cloudBanner, setCloudBanner] = useState<string>('')
   const isLoginPage = pathname === '/login'
   const isAuthorized = isAuthenticated && !isLoginPage
   const barDisplayName = user?.barName || barData.settings?.barName || 'MI BAR'
@@ -45,15 +46,33 @@ export default function RootLayout({
       })
       if (res.synced) {
         setCloudStatus('synced')
+        const timeStr = new Date().toLocaleTimeString('es-CO', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
         if (res.action === 'pulled') {
-          setSyncTooltip('¡Datos descargados desde la nube a este PC!')
+          const msg = `¡Todo tu bar (Mesas, Caja, Productos, Kardex, Usuarios y Perfil) se descargó en este PC! (${timeStr})`
+          setSyncTooltip(msg)
+          if (mode === 'pull') {
+            setCloudBanner(msg)
+            setTimeout(() => setCloudBanner(''), 5000)
+          }
         } else if (res.action === 'pushed') {
-          setSyncTooltip('¡Datos de este equipo subidos a la nube!')
+          const msg = `¡Todo tu bar (Mesas, Caja, Productos, Kardex, Usuarios y Perfil) se subió a la Nube! (${timeStr})`
+          setSyncTooltip(msg)
+          if (mode === 'push') {
+            setCloudBanner(msg)
+            setTimeout(() => setCloudBanner(''), 5000)
+          }
         } else {
-          setSyncTooltip('100% sincronizado entre tus dispositivos')
+          setSyncTooltip(`100% sincronizado entre Portátil y PC (${timeStr})`)
         }
       } else {
-        setCloudStatus(mode !== 'auto' ? 'offline' : 'synced')
+        setCloudStatus('offline')
+        if (mode !== 'auto') {
+          setCloudBanner('No se encontraron datos en la nube aún. Primero presiona "Subir TODO" en tu Portátil.')
+          setTimeout(() => setCloudBanner(''), 5000)
+        }
       }
     } catch {
       setCloudStatus('offline')
@@ -92,36 +111,74 @@ export default function RootLayout({
     }
   }, [isAuthenticated, user?.id, user?.businessId, runCloudSync, user])
 
-  // Suscripción en tiempo real a cambios de bar_data en Supabase (Portátil <-> PC de Mesa instantáneo)
+  // Suscripción en tiempo real a cambios de todo el bar (Cloud Relay SSE siempre activo + Supabase Realtime)
   useEffect(() => {
-    const bizId = user?.businessId
-    if (!isAuthenticated || !bizId || !isValidUuid(bizId)) return
+    if (!isAuthenticated || typeof window === 'undefined') return
 
-    const channel = supabase
-      .channel(`bar_data_realtime_${bizId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'bar_data',
-          filter: `business_id=eq.${bizId}`,
-        },
-        (payload) => {
-          const newRecord = payload.new as { data?: BarData } | undefined
-          if (newRecord?.data) {
-            applyCloudBarDataLocally(newRecord.data)
-            setCloudStatus('synced')
-            setSyncTooltip('Actualizado en tiempo real desde otro dispositivo')
+    let es: EventSource | null = null
+    try {
+      es = new EventSource(`https://ntfy.sh/${CLOUD_RELAY_MASTER_TOPIC}/sse`)
+      es.onmessage = async (event) => {
+        try {
+          const parsedEvt = JSON.parse(event.data)
+          if (parsedEvt && parsedEvt.event === 'message') {
+            const incomingSnap = await parseNtfyEventSnapshot(parsedEvt)
+            if (incomingSnap && incomingSnap.barData) {
+              const localScore = calculateBarDataRichness(barData)
+              const incomingScore = calculateBarDataRichness(incomingSnap.barData)
+              const localTime = barData.updatedAt ? new Date(barData.updatedAt).getTime() : 0
+              const incomingTime = incomingSnap.updatedAt
+                ? new Date(incomingSnap.updatedAt).getTime()
+                : 0
+
+              if (
+                (incomingScore > 20 && localScore <= 20) ||
+                incomingTime > localTime + 1000
+              ) {
+                applyFullCloudSnapshotLocally(incomingSnap, true)
+                setCloudStatus('synced')
+                setSyncTooltip('¡Actualizado en vivo desde tu otro computador!')
+              }
+            }
           }
+        } catch {
+          // Ignorar evento SSE no válido
         }
-      )
-      .subscribe()
+      }
+    } catch {
+      // Ignorar si EventSource no está disponible
+    }
+
+    const bizId = user?.businessId
+    const channel =
+      bizId && isValidUuid(bizId)
+        ? supabase
+            .channel(`bar_data_realtime_${bizId}`)
+            .on(
+              'postgres_changes',
+              {
+                event: '*',
+                schema: 'public',
+                table: 'bar_data',
+                filter: `business_id=eq.${bizId}`,
+              },
+              (payload) => {
+                const newRecord = payload.new as { data?: BarData } | undefined
+                if (newRecord?.data) {
+                  applyCloudBarDataLocally(newRecord.data)
+                  setCloudStatus('synced')
+                  setSyncTooltip('Actualizado en tiempo real desde otro dispositivo')
+                }
+              }
+            )
+            .subscribe()
+        : null
 
     return () => {
-      supabase.removeChannel(channel)
+      if (es) es.close()
+      if (channel) supabase.removeChannel(channel)
     }
-  }, [isAuthenticated, user?.businessId])
+  }, [isAuthenticated, user?.businessId, barData])
 
   const roleKey = (user?.role && ['owner', 'admin', 'staff'].includes(user.role)) ? user.role : 'owner'
   const roleStyles = {
@@ -209,14 +266,17 @@ export default function RootLayout({
                     </button>
 
                     {showCloudMenu && (
-                      <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-zinc-950 border border-zinc-800 shadow-2xl p-3.5 z-50 space-y-2.5">
-                        <div className="pb-2 border-b border-zinc-800">
+                      <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-zinc-950 border border-zinc-800 shadow-2xl p-4 z-50 space-y-3">
+                        <div className="pb-2.5 border-b border-zinc-800">
                           <p className="text-xs font-black text-white flex items-center space-x-1.5">
                             <Cloud className="w-4 h-4 text-emerald-400" />
-                            <span>Sincronización Portátil ↔ PC</span>
+                            <span>Sincronización Total Portátil ↔ PC</span>
                           </p>
-                          <p className="text-[11px] text-zinc-400 mt-0.5">
-                            {syncTooltip} ({barData.products?.length || 0} productos en este equipo)
+                          <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
+                            Sincroniza <strong className="text-zinc-200">TODO tu bar</strong>: Mesas, Comandas, Caja, Turnos, Productos, Nevera/Bodega, Kardex, Reportes, Descuentos, Usuarios y Foto de Perfil.
+                          </p>
+                          <p className="text-[10px] text-emerald-400 font-semibold mt-1">
+                            {syncTooltip}
                           </p>
                         </div>
 
@@ -226,11 +286,11 @@ export default function RootLayout({
                             runCloudSync('push')
                             setShowCloudMenu(false)
                           }}
-                          className="w-full text-left px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-bold transition-colors cursor-pointer"
+                          className="w-full text-left px-3 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-bold transition-colors cursor-pointer"
                         >
-                          🔼 Subir datos de este equipo a la Nube
-                          <span className="block text-[10px] text-zinc-400 font-normal">
-                            Úsalo en tu Portátil para enviar tus productos y stock
+                          🔼 Subir TODO de este equipo a la Nube
+                          <span className="block text-[10px] text-zinc-300 font-normal mt-0.5">
+                            Haz clic aquí en tu <strong>Portátil</strong> para enviar todas tus mesas, caja, productos, kardex, usuarios y perfil
                           </span>
                         </button>
 
@@ -240,11 +300,11 @@ export default function RootLayout({
                             runCloudSync('pull')
                             setShowCloudMenu(false)
                           }}
-                          className="w-full text-left px-3 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-bold transition-colors cursor-pointer"
+                          className="w-full text-left px-3 py-2.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-bold transition-colors cursor-pointer"
                         >
-                          🔽 Traer datos de la Nube a este PC
-                          <span className="block text-[10px] text-zinc-400 font-normal">
-                            Úsalo en tu PC de Mesa para descargar todo tu bar
+                          🔽 Traer TODO de la Nube a este PC
+                          <span className="block text-[10px] text-zinc-300 font-normal mt-0.5">
+                            Haz clic aquí en tu <strong>PC de Mesa</strong> para recibir todo tu bar completo al instante
                           </span>
                         </button>
                       </div>
@@ -302,6 +362,20 @@ export default function RootLayout({
                   </button>
                 </div>
               </header>
+            )}
+
+            {/* Banner de confirmación de sincronización Cloud */}
+            {cloudBanner && (
+              <div className="mx-4 sm:mx-8 mt-3 px-4 py-2.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-between shadow-lg animate-fadeIn">
+                <span>☁️ {cloudBanner}</span>
+                <button
+                  type="button"
+                  onClick={() => setCloudBanner('')}
+                  className="text-emerald-400 hover:text-white ml-3 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
             )}
 
             {/* Vista principal con padding */}

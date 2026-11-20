@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   getBarUsers,
@@ -10,7 +10,15 @@ import {
   UserRole,
   AuthUser,
 } from '@/lib/authStore'
-import { smartSyncWithCloud } from '@/lib/barState'
+import {
+  smartSyncWithCloud,
+  applyFullCloudSnapshotLocally,
+  loadBarData,
+} from '@/lib/barState'
+import {
+  pullCloudRelaySnapshot,
+  calculateBarDataRichness,
+} from '@/lib/supabaseClient'
 import {
   Shield,
   KeyRound,
@@ -58,8 +66,31 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
 
-  // Usuarios registrados del bar
-  const [barUsers] = useState<AuthUser[]>(() => getBarUsers())
+  // Usuarios registrados del bar (se sincronizan automáticamente con la nube al abrir /login en un PC nuevo)
+  const [barUsers, setBarUsers] = useState<AuthUser[]>(() => getBarUsers())
+
+  useEffect(() => {
+    const syncLoginProfiles = async () => {
+      try {
+        const localScore = calculateBarDataRichness(loadBarData())
+        const snap = await pullCloudRelaySnapshot({ allowAnyIfEmpty: true })
+        if (snap && snap.ownerUser) {
+          // Si este navegador (ej. PC de Mesa recién abierto) está vacío y en la nube está el bar del Portátil, precargar perfiles y estado
+          if (localScore <= 20 && snap.richnessScore > 20) {
+            applyFullCloudSnapshotLocally(snap, false)
+          }
+          if (Array.isArray(snap.barUsers) && snap.barUsers.length > 0) {
+            setBarUsers(snap.barUsers)
+          } else {
+            setBarUsers([snap.ownerUser])
+          }
+        }
+      } catch {
+        // Usar perfiles en caché local
+      }
+    }
+    syncLoginProfiles()
+  }, [])
 
   // Manejar Registro de Nuevo Bar con comprobación en la nube
   const handleRegister = async (e: React.FormEvent) => {

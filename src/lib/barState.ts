@@ -3,7 +3,12 @@ import {
   saveCloudBarData,
   resolveOrEnsureCloudAccount,
   calculateBarDataRichness,
+  pushCloudRelaySnapshot,
+  pullCloudRelaySnapshot,
+  FullBarCloudSnapshot,
+  generateUuidV4,
 } from '@/lib/supabaseClient'
+import type { AuthUser } from '@/lib/authStore'
 
 export interface OrderItemState {
   productId: string
@@ -686,6 +691,191 @@ export function loadBarData(): BarData {
   }
 }
 
+// Construir el snapshot COMPLETO del bar en este equipo (Perfil + Empleados + Mesas + Comandas + Caja + Productos + Nevera/Bodega + Kardex + Descuentos + Configuración + Foto)
+export function buildLocalFullSnapshot(): FullBarCloudSnapshot | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const authRaw = localStorage.getItem('ROCK_BAR_AUTH_SESSION_V1')
+    if (!authRaw) return null
+    const auth = JSON.parse(authRaw)
+    const activeUser: AuthUser | undefined = auth?.user
+    if (!activeUser) return null
+
+    const localData = loadBarData()
+
+    // Sincronizar foto y nombre del bar entre sesión y settings
+    if (activeUser.photoUrl && localData.settings && !localData.settings.logoUrl) {
+      localData.settings.logoUrl = activeUser.photoUrl
+    } else if (localData.settings?.logoUrl && !activeUser.photoUrl) {
+      activeUser.photoUrl = localData.settings.logoUrl
+    }
+
+    if (
+      localData.settings?.barName &&
+      localData.settings.barName !== 'ROCK BAR' &&
+      !activeUser.barName
+    ) {
+      activeUser.barName = localData.settings.barName
+    }
+
+    let barUsers: AuthUser[] = [activeUser]
+    try {
+      const usersRaw = localStorage.getItem('ROCK_BAR_USERS_STORE_V2')
+      if (usersRaw) {
+        const parsedUsers = JSON.parse(usersRaw)
+        if (Array.isArray(parsedUsers) && parsedUsers.length > 0) {
+          barUsers = parsedUsers
+        }
+      }
+    } catch {
+      // Usar solo activeUser
+    }
+
+    let deletedAccounts = []
+    try {
+      const delRaw = localStorage.getItem('ROCK_BAR_DELETED_ACCOUNTS_V1')
+      if (delRaw) {
+        const parsedDel = JSON.parse(delRaw)
+        if (Array.isArray(parsedDel)) deletedAccounts = parsedDel
+      }
+    } catch {
+      // Ignorar
+    }
+
+    const ownerUser =
+      barUsers.find((u) => u.role === 'owner') || activeUser
+    const bizId =
+      activeUser.businessId || ownerUser.businessId || generateUuidV4()
+
+    const nowIso = localData.updatedAt || new Date().toISOString()
+
+    return {
+      version: 3,
+      updatedAt: nowIso,
+      richnessScore: calculateBarDataRichness(localData),
+      businessId: bizId,
+      ownerUser: {
+        ...ownerUser,
+        businessId: bizId,
+        barName:
+          localData.settings?.barName || ownerUser.barName || 'MI BAR',
+        photoUrl:
+          localData.settings?.logoUrl || ownerUser.photoUrl,
+      },
+      barUsers: barUsers.map((u) => ({
+        ...u,
+        businessId: bizId,
+        barName:
+          localData.settings?.barName || u.barName || ownerUser.barName,
+      })),
+      barData: {
+        ...localData,
+        updatedAt: nowIso,
+      },
+      deletedAccounts,
+    }
+  } catch (err) {
+    console.warn('Error construyendo snapshot completo local:', err)
+    return null
+  }
+}
+
+// Aplicar un snapshot COMPLETO proveniente de la nube en este computador (Portátil o PC de Mesa)
+export function applyFullCloudSnapshotLocally(
+  snapshot: FullBarCloudSnapshot,
+  updateActiveSession = true
+): void {
+  if (typeof window === 'undefined' || !snapshot || !snapshot.barData) return
+  try {
+    // 1. Actualizar usuarios y empleados del bar (ROCK_BAR_USERS_STORE_V2)
+    if (Array.isArray(snapshot.barUsers) && snapshot.barUsers.length > 0) {
+      localStorage.setItem(
+        'ROCK_BAR_USERS_STORE_V2',
+        JSON.stringify(snapshot.barUsers)
+      )
+      window.dispatchEvent(new Event('rock_bar_users_updated'))
+    }
+
+    // 2. Actualizar historial de cuentas eliminadas si viene incluido
+    if (
+      Array.isArray(snapshot.deletedAccounts) &&
+      snapshot.deletedAccounts.length > 0
+    ) {
+      localStorage.setItem(
+        'ROCK_BAR_DELETED_ACCOUNTS_V1',
+        JSON.stringify(snapshot.deletedAccounts)
+      )
+    }
+
+    // 3. Actualizar sesión activa del usuario (ROCK_BAR_AUTH_SESSION_V1) con foto, nombre del bar y businessId unificado
+    if (updateActiveSession && snapshot.ownerUser) {
+      const authRaw = localStorage.getItem('ROCK_BAR_AUTH_SESSION_V1')
+      const currentAuth = authRaw ? JSON.parse(authRaw) : null
+      const currentUser: AuthUser | null = currentAuth?.user || null
+
+      const matchingMember =
+        currentUser && Array.isArray(snapshot.barUsers)
+          ? snapshot.barUsers.find(
+              (u) =>
+                u.id === currentUser.id ||
+                (u.email &&
+                  currentUser.email &&
+                  u.email.toLowerCase() === currentUser.email.toLowerCase()) ||
+                (u.name &&
+                  currentUser.name &&
+                  u.name.toLowerCase() === currentUser.name.toLowerCase())
+            )
+          : null
+
+      const targetUser: AuthUser = matchingMember || snapshot.ownerUser
+      const enrichedUser: AuthUser = {
+        ...targetUser,
+        businessId: snapshot.businessId || targetUser.businessId,
+        barName:
+          snapshot.barData.settings?.barName ||
+          targetUser.barName ||
+          snapshot.ownerUser.barName,
+        photoUrl:
+          snapshot.barData.settings?.logoUrl ||
+          targetUser.photoUrl ||
+          snapshot.ownerUser.photoUrl,
+      }
+
+      localStorage.setItem(
+        'ROCK_BAR_AUTH_SESSION_V1',
+        JSON.stringify({
+          user: enrichedUser,
+          isAuthenticated: true,
+        })
+      )
+      localStorage.setItem('userRole', enrichedUser.role)
+      localStorage.setItem('userName', enrichedUser.name)
+      window.dispatchEvent(new Event('rock_bar_auth_updated'))
+    }
+
+    // 4. Aplicar el estado operativo completo del bar (Mesas, Comandas, Caja, Productos, Nevera/Bodega, Kardex, Descuentos, Configuración)
+    applyCloudBarDataLocally(snapshot.barData)
+  } catch (err) {
+    console.warn('Error en applyFullCloudSnapshotLocally:', err)
+  }
+}
+
+let relayPushTimer: ReturnType<typeof setTimeout> | null = null
+
+// Programar subida automática del snapshot completo al Cloud Relay (con debounce de 700ms para agrupar clics rápidos)
+export function scheduleCloudRelayPush(): void {
+  if (typeof window === 'undefined') return
+  if (relayPushTimer) {
+    clearTimeout(relayPushTimer)
+  }
+  relayPushTimer = setTimeout(() => {
+    const snap = buildLocalFullSnapshot()
+    if (snap && snap.richnessScore > 0) {
+      pushCloudRelaySnapshot(snap).catch(() => {})
+    }
+  }, 700)
+}
+
 // Aplicar datos provenientes de la nube localmente sin disparar un guardado redundante de regreso a Supabase
 export function applyCloudBarDataLocally(cloudData: BarData): void {
   if (typeof window === 'undefined' || !cloudData) return
@@ -773,15 +963,14 @@ export function saveBarData(data: BarData): void {
 
     window.dispatchEvent(new Event('rock_bar_state_updated'))
 
-    // Sincronización en segundo plano con la nube (Supabase) para soporte multi-dispositivo (Portátil <-> PC de Mesa)
+    // Sincronización en segundo plano con la nube (Cloud Relay Siempre Activo + Supabase) para soporte multi-dispositivo total (Portátil <-> PC de Mesa)
+    scheduleCloudRelayPush()
     try {
       const authRaw = localStorage.getItem('ROCK_BAR_AUTH_SESSION_V1')
       if (authRaw) {
         const auth = JSON.parse(authRaw)
         const businessId = auth?.user?.businessId || ''
-        saveCloudBarData(businessId, data).catch((e) =>
-          console.warn('Error sincronizando bar_data en Supabase:', e)
-        )
+        saveCloudBarData(businessId, data).catch(() => {})
       }
     } catch {
       // Ignorar error al leer auth
@@ -793,7 +982,7 @@ export function saveBarData(data: BarData): void {
 
 let isSyncingInProgress = false
 
-// Sincronización inteligente bidireccional entre el dispositivo actual (Portátil o PC de Mesa) y Supabase Cloud
+// Sincronización inteligente bidireccional COMPLETA (Todo el Bar: Perfil, Usuarios, Mesas, Comandas, Caja, Productos, Kardex, Descuentos y Configuración)
 export async function smartSyncWithCloud(options?: {
   forcePush?: boolean
   forcePull?: boolean
@@ -806,137 +995,178 @@ export async function smartSyncWithCloud(options?: {
     return { synced: false, action: 'offline' }
   }
   if (isSyncingInProgress && !options?.forcePush && !options?.forcePull) {
-    return { synced: false, action: 'up-to-date' }
+    return { synced: true, action: 'up-to-date' }
   }
 
   isSyncingInProgress = true
   try {
-    const authRaw = localStorage.getItem('ROCK_BAR_AUTH_SESSION_V1')
-    if (!authRaw) {
-      return { synced: false, action: 'offline' }
-    }
-    const auth = JSON.parse(authRaw)
-    const activeUser = auth?.user
-    if (!activeUser) {
+    const localSnapshot = buildLocalFullSnapshot()
+    if (!localSnapshot) {
       return { synced: false, action: 'offline' }
     }
 
-    const localData = loadBarData()
-
-    // Si el usuario tiene foto en su sesión local pero no en localData.settings.logoUrl, integrarla antes de sincronizar
-    if (activeUser.photoUrl && localData.settings && !localData.settings.logoUrl) {
-      localData.settings.logoUrl = activeUser.photoUrl
-    }
-
-    const resolved = await resolveOrEnsureCloudAccount({
-      user: activeUser,
-      currentBarData: localData,
-    })
-
-    const canonicalAccount = resolved.account
-    const cloudData = resolved.cloudBarData
-    const allMatchedBizIds = resolved.allMatchedBusinessIds
-
-    if (!canonicalAccount) {
-      return { synced: false, action: 'offline' }
-    }
-
-    const canonicalBizId = canonicalAccount.business_id
-
-    // Unificar datos de la cuenta oficial en la sesión local (para que Portátil y PC de Mesa compartan el mismo businessId y perfil)
-    let authUpdated = false
-    if (activeUser.businessId !== canonicalBizId) {
-      activeUser.businessId = canonicalBizId
-      authUpdated = true
-    }
-    if (canonicalAccount.bar_name && !activeUser.barName) {
-      activeUser.barName = canonicalAccount.bar_name
-      authUpdated = true
-    }
-    if (canonicalAccount.email && (!activeUser.email || activeUser.email.endsWith('@bar.com'))) {
-      activeUser.email = canonicalAccount.email
-      authUpdated = true
-    }
-    if (
-      canonicalAccount.full_name &&
-      canonicalAccount.email.toLowerCase() === (activeUser.email || '').toLowerCase() &&
-      activeUser.role !== 'owner'
-    ) {
-      activeUser.role = 'owner'
-      activeUser.roleTitle = `Propietario (${canonicalAccount.bar_name})`
-      authUpdated = true
-    }
-    if (authUpdated) {
-      auth.user = activeUser
-      localStorage.setItem('ROCK_BAR_AUTH_SESSION_V1', JSON.stringify(auth))
-      window.dispatchEvent(new Event('rock_bar_auth_updated'))
-    }
-
+    const activeUser = localSnapshot.ownerUser
+    const localData = localSnapshot.barData
     const localScore = calculateBarDataRichness(localData)
-    const cloudScore = calculateBarDataRichness(cloudData)
 
-    // 1. Si se pidió forzar descarga (forcePull) y hay datos en la nube
-    if (options?.forcePull && cloudData) {
-      applyCloudBarDataLocally(cloudData)
-      return { synced: true, action: 'pulled', businessId: canonicalBizId }
-    }
-
-    // 2. Si se pidió forzar subida (forcePush)
+    // 1. Si el usuario solicitó explícitamente SUBIR TODO desde este equipo (ej. Portátil -> Nube)
     if (options?.forcePush) {
-      const ok = await saveCloudBarData(canonicalBizId, localData, allMatchedBizIds)
-      return { synced: ok, action: ok ? 'pushed' : 'offline', businessId: canonicalBizId }
-    }
-
-    // 3. Si en la nube NO hay datos aún o está en blanco (score <= 20), y este equipo (ej. el Portátil) SÍ tiene productos/datos (score > 20):
-    //    -> SUBIR inmediatamente todos los datos del Portátil a la nube
-    if (!cloudData || (localScore > 20 && cloudScore <= 20)) {
-      if (localScore > 0 || !cloudData) {
-        const ok = await saveCloudBarData(canonicalBizId, localData, allMatchedBizIds)
-        return { synced: ok, action: ok ? 'pushed' : 'offline', businessId: canonicalBizId }
+      localSnapshot.updatedAt = new Date().toISOString()
+      localSnapshot.barData.updatedAt = localSnapshot.updatedAt
+      const relayOk = await pushCloudRelaySnapshot(localSnapshot)
+      const supaOk = await saveCloudBarData(
+        localSnapshot.businessId,
+        localSnapshot.barData
+      ).catch(() => false)
+      return {
+        synced: relayOk || supaOk,
+        action: relayOk || supaOk ? 'pushed' : 'offline',
+        businessId: localSnapshot.businessId,
       }
-      return { synced: true, action: 'up-to-date', businessId: canonicalBizId }
     }
 
-    // 4. Si este equipo (ej. el PC de Mesa recién abierto) está vacío/básico (score <= 20) y la nube SÍ tiene los datos del Portátil (score > 20):
-    //    -> DESCARGAR inmediatamente todos los datos de la nube al PC de Mesa
-    if (cloudScore > 20 && localScore <= 20) {
-      applyCloudBarDataLocally(cloudData)
-      return { synced: true, action: 'pulled', businessId: canonicalBizId }
+    // 2. Consultar en paralelo el Cloud Relay siempre activo y Supabase (si está activo)
+    const [relaySnapshot, supaResolved] = await Promise.all([
+      pullCloudRelaySnapshot({
+        email: activeUser.email,
+        barName: localData.settings?.barName || activeUser.barName,
+        userName: activeUser.name,
+        businessId: activeUser.businessId,
+        allowAnyIfEmpty: localScore <= 20 || Boolean(options?.forcePull),
+      }).catch(() => null),
+      resolveOrEnsureCloudAccount({
+        user: activeUser,
+        currentBarData: localData,
+      }).catch(() => ({
+        account: null,
+        cloudBarData: null,
+        cloudUpdatedAt: undefined,
+        allMatchedBusinessIds: [],
+      })),
+    ])
+
+    const relayScore = calculateBarDataRichness(relaySnapshot?.barData)
+    const supaScore = calculateBarDataRichness(supaResolved.cloudBarData)
+
+    // Elegir la fuente en la nube más completa y reciente (Cloud Relay vs Supabase)
+    let bestCloudSnapshot: FullBarCloudSnapshot | null = relaySnapshot
+    if (supaResolved.cloudBarData && supaScore > relayScore) {
+      bestCloudSnapshot = {
+        version: 3,
+        updatedAt:
+          supaResolved.cloudBarData.updatedAt ||
+          supaResolved.cloudUpdatedAt ||
+          new Date().toISOString(),
+        richnessScore: supaScore,
+        businessId:
+          supaResolved.account?.business_id || localSnapshot.businessId,
+        ownerUser: activeUser,
+        barUsers: localSnapshot.barUsers,
+        barData: supaResolved.cloudBarData,
+        deletedAccounts: localSnapshot.deletedAccounts,
+      }
     }
 
-    // 5. Si AMBOS tienen datos reales (localScore > 20 y cloudScore > 20):
-    //    Comparar timestamps updatedAt o nivel de completitud
-    const localTime = localData.updatedAt ? new Date(localData.updatedAt).getTime() : 0
-    const cloudTime = cloudData.updatedAt
-      ? new Date(cloudData.updatedAt).getTime()
-      : resolved.cloudUpdatedAt
-      ? new Date(resolved.cloudUpdatedAt).getTime()
+    const cloudScore = calculateBarDataRichness(bestCloudSnapshot?.barData)
+
+    // 3. Si el usuario solicitó explícitamente TRAER TODO desde la nube a este PC (Nube -> PC de Mesa)
+    if (options?.forcePull) {
+      if (bestCloudSnapshot && bestCloudSnapshot.barData) {
+        applyFullCloudSnapshotLocally(bestCloudSnapshot, true)
+        return {
+          synced: true,
+          action: 'pulled',
+          businessId: bestCloudSnapshot.businessId,
+        }
+      }
+      return {
+        synced: false,
+        action: 'offline',
+        businessId: localSnapshot.businessId,
+      }
+    }
+
+    // 4. Modo Automático Inteligente:
+    // Caso A: En la nube aún no hay datos reales (cloudScore <= 20) y este equipo (ej. el Portátil) SÍ tiene datos reales (localScore > 20)
+    // -> SUBIR inmediatamente TODO el estado del Portátil a la nube
+    if (!bestCloudSnapshot || (localScore > 20 && cloudScore <= 20)) {
+      if (localScore > 0 || !bestCloudSnapshot) {
+        const relayOk = await pushCloudRelaySnapshot(localSnapshot)
+        const supaOk = await saveCloudBarData(
+          localSnapshot.businessId,
+          localSnapshot.barData,
+          supaResolved.allMatchedBusinessIds
+        ).catch(() => false)
+        return {
+          synced: relayOk || supaOk,
+          action: relayOk || supaOk ? 'pushed' : 'offline',
+          businessId: localSnapshot.businessId,
+        }
+      }
+      return {
+        synced: true,
+        action: 'up-to-date',
+        businessId: localSnapshot.businessId,
+      }
+    }
+
+    // Caso B: Este equipo (ej. el PC de Mesa) está en blanco/básico (localScore <= 20) y la nube SÍ tiene los datos del Portátil (cloudScore > 20)
+    // -> DESCARGAR inmediatamente TODO el estado de la nube al PC de Mesa
+    if (cloudScore > 20 && localScore <= 20 && bestCloudSnapshot) {
+      applyFullCloudSnapshotLocally(bestCloudSnapshot, true)
+      return {
+        synced: true,
+        action: 'pulled',
+        businessId: bestCloudSnapshot.businessId,
+      }
+    }
+
+    // Caso C: Ambos equipos ya tienen datos reales (localScore > 20 y cloudScore > 20)
+    // Comparar timestamps updatedAt y nivel de riqueza
+    const localTime = localData.updatedAt
+      ? new Date(localData.updatedAt).getTime()
+      : 0
+    const cloudTime = bestCloudSnapshot.updatedAt
+      ? new Date(bestCloudSnapshot.updatedAt).getTime()
       : 0
 
-    // Si los datos locales del portátil aún no tenían timestamp updatedAt pero tienen más productos/movimientos que la nube, subirlos
-    if (!localData.updatedAt && localScore > cloudScore) {
-      const ok = await saveCloudBarData(canonicalBizId, localData, allMatchedBizIds)
-      return { synced: ok, action: ok ? 'pushed' : 'offline', businessId: canonicalBizId }
-    }
-
-    // Si la nube tiene más productos/movimientos y el local no tiene timestamp más reciente, o si la nube fue actualizada después
-    if (cloudTime > localTime + 1500 || (!localData.updatedAt && cloudScore > localScore)) {
-      const cloudStr = JSON.stringify(cloudData)
+    if (cloudTime > localTime + 1500 || (cloudScore > localScore && localTime <= cloudTime)) {
+      const cloudStr = JSON.stringify(bestCloudSnapshot.barData)
       const localStr = JSON.stringify(localData)
       if (cloudStr !== localStr) {
-        applyCloudBarDataLocally(cloudData)
-        return { synced: true, action: 'pulled', businessId: canonicalBizId }
+        applyFullCloudSnapshotLocally(bestCloudSnapshot, true)
+        return {
+          synced: true,
+          action: 'pulled',
+          businessId: bestCloudSnapshot.businessId,
+        }
       }
-      return { synced: true, action: 'up-to-date', businessId: canonicalBizId }
+      return {
+        synced: true,
+        action: 'up-to-date',
+        businessId: bestCloudSnapshot.businessId,
+      }
     }
 
-    // Si el dispositivo local fue actualizado más recientemente que la nube (o hay cuentas duplicadas por espejar), subir a la nube
-    if (localTime > cloudTime + 1500 || (localScore > cloudScore && localTime >= cloudTime)) {
-      const ok = await saveCloudBarData(canonicalBizId, localData, allMatchedBizIds)
-      return { synced: ok, action: ok ? 'pushed' : 'offline', businessId: canonicalBizId }
+    if (localTime > cloudTime + 1500 || localScore > cloudScore) {
+      const relayOk = await pushCloudRelaySnapshot(localSnapshot)
+      const supaOk = await saveCloudBarData(
+        localSnapshot.businessId,
+        localSnapshot.barData,
+        supaResolved.allMatchedBusinessIds
+      ).catch(() => false)
+      return {
+        synced: relayOk || supaOk,
+        action: relayOk || supaOk ? 'pushed' : 'offline',
+        businessId: localSnapshot.businessId,
+      }
     }
 
-    return { synced: true, action: 'up-to-date', businessId: canonicalBizId }
+    return {
+      synced: true,
+      action: 'up-to-date',
+      businessId: localSnapshot.businessId,
+    }
   } catch (err) {
     console.warn('Error en smartSyncWithCloud:', err)
     return { synced: false, action: 'offline' }
